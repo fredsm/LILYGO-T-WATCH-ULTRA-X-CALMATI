@@ -1,0 +1,31 @@
+name: Development validation
+on:
+  push:
+    branches: [development/simulator]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: python -m pip install platformio "esptool==4.8.1"
+      - name: Compile original firmware
+        run: pio run -e twatch_ultra
+      - uses: actions/upload-artifact@v4
+        with:
+          name: development-firmware
+          path: |
+            .pio/build/twatch_ultra/firmware.bin
+            .pio/build/twatch_ultra/bootloader.bin
+            .pio/build/twatch_ultra/partitions.bin
+          include-hidden-files: true
+          if-no-files-found: error
