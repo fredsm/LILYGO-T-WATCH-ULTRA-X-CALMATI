@@ -16,8 +16,10 @@ inline void dispatch_pointer(lv_indev_t* input, bool pressed) {
             lv_obj_clear_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
             for(unsigned i=0;i<lv_obj_get_child_count(screen);++i){
                 auto* child=lv_obj_get_child(screen,i);
-                if(lv_obj_get_child_count(child) && lv_obj_get_scroll_dir(child)==LV_DIR_VER)
-                    lv_obj_clear_flag(child,LV_OBJ_FLAG_SCROLL_ELASTIC|LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+                if(lv_obj_get_child_count(child) && lv_obj_get_scroll_dir(child)==LV_DIR_VER){
+                    lv_obj_clear_flag(child,LV_OBJ_FLAG_SCROLL_ELASTIC);
+                    lv_obj_clear_flag(child,LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+                }
             }
         }
         if(pressed)lv_indev_wait_release(input);
