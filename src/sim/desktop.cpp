@@ -101,6 +101,9 @@ int main(int argc,char** argv) {
     auto* input=lv_indev_create();
     lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,read_pointer);
+    // SDL supplies event samples. Timer polling between those samples would
+    // inject zero-motion reads and repeatedly reset LVGL's gesture distance.
+    lv_indev_set_mode(input,LV_INDEV_MODE_EVENT);
     lv_indev_set_scroll_limit(input,35); // Same tap/drag threshold as firmware setup.
     preview();
     screen_catalog=lv_screen_active();
@@ -110,6 +113,8 @@ int main(int argc,char** argv) {
     bool running=true;
     uint32_t last=SDL_GetTicks();
     SDL_FingerID finger=0;bool touching=false;
+    uint32_t pointer_event_at=last,held_read_at=last;
+    auto dispatch_pointer=[&](){pointer_event_at=SDL_GetTicks();lv_indev_read(input);};
     while(running) {
         if(smoke && frame%5==0){
             const auto index=frame/5;
@@ -123,21 +128,21 @@ int main(int argc,char** argv) {
         while(SDL_PollEvent(&e)) {
             if(e.type==SDL_QUIT) running=false;
             if(e.type==SDL_MOUSEMOTION && e.motion.which!=SDL_TOUCH_MOUSEID && !touching) {
-                pointer.x=e.motion.x; pointer.y=e.motion.y;lv_indev_read(input);
+                pointer.x=e.motion.x; pointer.y=e.motion.y;dispatch_pointer();
             }
             if((e.type==SDL_MOUSEBUTTONDOWN || e.type==SDL_MOUSEBUTTONUP) && e.button.button==SDL_BUTTON_LEFT && e.button.which!=SDL_TOUCH_MOUSEID && !touching) {
                 pointer.x=e.button.x; pointer.y=e.button.y; pressed=e.type==SDL_MOUSEBUTTONDOWN;
-                lv_indev_read(input);
+                dispatch_pointer();
             }
             if(e.type==SDL_FINGERDOWN && !touching){finger=e.tfinger.fingerId;touching=true;}
             if(touching && (e.type==SDL_FINGERDOWN || e.type==SDL_FINGERMOTION || e.type==SDL_FINGERUP) && e.tfinger.fingerId==finger){
                 pointer.x=static_cast<int>(e.tfinger.x*(W-1));
                 pointer.y=static_cast<int>(e.tfinger.y*(H-1));
                 pressed=e.type!=SDL_FINGERUP;
-                lv_indev_read(input);
+                dispatch_pointer();
                 if(!pressed)touching=false;
             }
-            if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {pressed=false;touching=false;lv_indev_read(input);}
+            if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {pressed=false;touching=false;dispatch_pointer();}
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
@@ -147,7 +152,12 @@ int main(int argc,char** argv) {
             }
         }
         auto now=SDL_GetTicks(); auto delta=smoke?20u:now-last; last=now;
-        watch.advance(delta); lv_tick_inc(delta); sim::tick(); lv_timer_handler();
+        watch.advance(delta); lv_tick_inc(delta); sim::tick();
+        // Stationary holds still need reads for original long-press callbacks.
+        if(pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
+            lv_indev_read(input);held_read_at=now;
+        }
+        lv_timer_handler();
         sim::ButtonEvent event{};
         while(watch.pop_button(event)) std::printf("button %d %s\n",static_cast<int>(event.button),event.pressed?"down":"up");
         SDL_UpdateTexture(texture,nullptr,pixels.data(),W*sizeof(uint16_t));
