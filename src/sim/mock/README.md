@@ -1,3 +1,7 @@
 # Native mock boundary
 
-Host-only deterministic watch state lives in watch.hpp: monotonic time, RTC, battery, charging, brightness, display power, button edges, motion and haptic event recording/failure injection. No real hardware or network calls. Battery and motion are explicitly controlled by tests; no automatic discharge model. RTC is UTC epoch seconds. Brightness is 0–255. This is a native state model, not yet a LilyGoLib adapter. Storage and radio mocks are deferred. Firmware excludes src/sim.
+watch.hpp models deterministic watch time, RTC, battery, charging, brightness, display power, button edges, motion and haptic events.
+
+storage.hpp models in-memory SD and namespaced NVS state. Retain Media across simulated reboots; create a fresh Storage controller to reset transient faults. SD supports binary strings, capacity, removal, read-only mode and exclusive USB ownership. No host filesystem access. NVS currently stores strings only. Persistence across process exit, FAT directory semantics, and firmware adapters are not implemented yet.
+
+All mocks are host-only and excluded from firmware. No real radio or network operations.

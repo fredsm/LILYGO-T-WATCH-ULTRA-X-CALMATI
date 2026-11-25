@@ -16,3 +16,7 @@ add_test(NAME lvgl_headless_smoke COMMAND twatch_sim)
 add_executable(watch_mock_test tests/watch_test.cpp)
 target_include_directories(watch_mock_test PRIVATE ../src/sim)
 add_test(NAME watch_mock_state COMMAND watch_mock_test)
+
+add_executable(storage_mock_test tests/storage_test.cpp)
+target_include_directories(storage_mock_test PRIVATE ../src/sim)
+add_test(NAME storage_mock_state COMMAND storage_mock_test)
