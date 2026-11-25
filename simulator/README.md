@@ -1,5 +1,25 @@
 # Original firmware UI simulator
 
+## Watch-flow integration: Phase 1
+
+The next desktop build starts on the original clock face at 410 x 502 pixels.
+**F1** opens the debug screen catalog; **B** and firmware clock-return callbacks
+return to the watch face. The original analog/digital and time-format settings
+now control the face. Weather is a host-only synthetic fixture, populated by
+tapping the original weather label; the RTC advances from a fixed test epoch.
+
+`extract_clock.py` selects the original layout and 21 drawing/formatting
+functions verbatim from `src/main.cpp` during the host build. Missing or
+ambiguous source boundaries fail the build. The production file is unchanged.
+The original DEF CON image, clock font and Matrix background are compiled too.
+
+Swipe routing, physical buttons, keyboard text entry, a separate simulation
+panel and boot/onboarding remain later phases. The debug catalog's existing
+hardware sliders are not yet wired to the clock's hardware fixtures.
+Phase 1 is committed with CI skipped; its C++ build and added clock rendering
+test are pending the final workflow run. Previously downloaded EXEs do not
+contain these changes.
+
 The native build reuses all **61 `src/*_screen.cpp` translation units**, plus the
 original task manager. Screens are not reimplemented. The SDL launcher and CMake
 test inventory both read `src/sim/screens.inc`.

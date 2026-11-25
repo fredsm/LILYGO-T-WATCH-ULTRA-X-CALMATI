@@ -3,6 +3,7 @@
 #include <lvgl.h>
 #include "mock/watch.hpp"
 #include "screens.hpp"
+#include "clock.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -17,6 +18,7 @@ sim::Watch watch;
 lv_point_t pointer{};
 bool pressed=false;
 lv_obj_t* status=nullptr;
+lv_obj_t* screen_catalog=nullptr;
 void flush(lv_display_t* d,const lv_area_t* a,uint8_t* data) {
     auto* src=reinterpret_cast<const uint16_t*>(data);
     const int width=a->x2-a->x1+1;
@@ -84,7 +86,7 @@ int main(int argc,char** argv) {
     const bool smoke=argc>1 && std::strcmp(argv[1],"--smoke")==0;
     SDL_SetMainReady();
     if(SDL_Init(SDL_INIT_VIDEO)!=0) { std::fprintf(stderr,"%s\n",SDL_GetError()); return 1; }
-    auto* window=SDL_CreateWindow("T-Watch Ultra simulator",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,0);
+    auto* window=SDL_CreateWindow("T-Watch Ultra | SIMULATED DATA | F1: screen catalog",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,0);
     if(window) renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
     if(renderer) texture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB565,SDL_TEXTUREACCESS_STREAMING,W,H);
     if(!texture) { std::fprintf(stderr,"%s\n",SDL_GetError()); if(renderer) SDL_DestroyRenderer(renderer); if(window) SDL_DestroyWindow(window); SDL_Quit(); return 1; }
@@ -97,7 +99,8 @@ int main(int argc,char** argv) {
     lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,read_pointer);
     preview();
-    sim::initialize_screens(lv_screen_active());
+    screen_catalog=lv_screen_active();
+    sim::initialize_screens(sim::create_clock());
     std::size_t screen_count=0;const auto* screens=sim::screens(screen_count);
     unsigned frame=0;bool smoke_ok=true;
     bool running=true;
@@ -123,6 +126,7 @@ int main(int argc,char** argv) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
                 if(e.key.keysym.sym==SDLK_b) sim::show_home();
+                if(e.key.keysym.sym==SDLK_F1) { sim::leave_screen(); lv_screen_load(screen_catalog); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }

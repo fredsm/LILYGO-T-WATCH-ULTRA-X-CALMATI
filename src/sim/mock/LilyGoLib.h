@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cmath>
+#include <ctime>
 constexpr int DEVICE_MAX_BRIGHTNESS_LEVEL=255;
 // A firmware busy-wait must advance even while the LVGL callback owns the thread.
 // Keep a deterministic sub-tick clock; do not advance LVGL recursively.
@@ -22,7 +23,14 @@ struct SimGpsValue {
  unsigned long value() const {return 8;} double meters() const {return 220;} double kmph() const {return 0;} double deg() const {return 0;}
 };
 struct SimGps {SimGpsValue location,date,time,satellites,altitude,speed,course;};
-struct SimRtc {template<class... T> void setDateTime(T...){} void hwClockRead(){}};
+struct SimRtc {
+ template<class... T> void setDateTime(T...){} void hwClockRead(){}
+ void getDateTime(struct tm* out) const {
+  // A fixed simulated epoch advances with LVGL, not the computer's clock.
+  std::time_t value=1795608000 + lv_tick_get()/1000;
+  *out=*std::gmtime(&value);
+ }
+};
 enum {POWER_GPS,POWER_RADIO,POWER_NFC};
 constexpr int RADIOLIB_ERR_NONE=0;
 struct SimRadio {

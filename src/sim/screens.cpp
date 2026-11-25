@@ -19,6 +19,7 @@
 #include "../mifare_screen.h"
 #include "../scan_screen.h"
 #include "screens.hpp"
+#include "clock.hpp"
 #include "../tools_screen.h"
 #include "../task_manager.h"
 #include <ctime>
@@ -83,11 +84,9 @@ const sim::Screen registry[]={
 namespace sim {
 void initialize_filesystem();
 const Screen* screens(std::size_t& count){count=sizeof(registry)/sizeof(registry[0]);return registry;}
-void initialize_screens(lv_obj_t* home){home_screen=home;initialize_filesystem();for(const auto& s:registry)if(s.create)s.create();lv_screen_load(home);}
-void tick(){nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();}
+void initialize_screens(lv_obj_t* home){create_clock();home_screen=home;initialize_filesystem();for(const auto& s:registry)if(s.create)s.create();lv_screen_load(home);}
+void tick(){refresh_clock();nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();}
 void leave_screen(){for(const auto& s:registry)if(s.active()&&s.stop)s.stop();}
 void show_home(){leave_screen();lv_screen_load(home_screen);}
 }
 void clock_screen_show(){sim::show_home();}
-bool clock_screen_uses_12h(){return false;}
-void clock_screen_get_local_time(struct tm* out){*out={};out->tm_year=126;out->tm_mon=10;out->tm_mday=25;out->tm_hour=12;out->tm_wday=3;}

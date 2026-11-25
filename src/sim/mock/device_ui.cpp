@@ -48,14 +48,6 @@ void meta_glasses_set_capture(bool v){capture=v;}
 bool meta_glasses_capture_enabled(){return capture;}
 bool meta_glasses_save_labeled(const uint8_t*,const char*){return false;}
 int meta_glasses_capture_total(){return hits;}
-void clock_screen_set_analog_face(bool){}
-void clock_screen_set_12h(bool){}
-void clock_screen_set_matrix(bool){}
-void clock_screen_set_show_day(bool){}
-void clock_screen_set_show_date(bool){}
-void clock_screen_set_show_ampm(bool){}
-void clock_screen_set_show_secs(bool){}
-void clock_screen_set_vibrate(bool){}
 void clock_screen_set_motion_wake(bool){}
 void clock_screen_set_manual_override(bool){}
 void clock_screen_set_dim_timeout(uint32_t){}

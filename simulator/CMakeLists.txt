@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(twatch_simulator LANGUAGES C CXX)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(CLOCK_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/original_clock.inc")
+add_custom_command(OUTPUT "${CLOCK_INCLUDE}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/extract_clock.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp" "${CLOCK_INCLUDE}"
+    DEPENDS extract_clock.py ../src/main.cpp VERBATIM)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
@@ -52,6 +58,7 @@ foreach(row IN LISTS SCREEN_ROWS)
     list(APPEND SCREEN_NAMES "${screen}")
 endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
+    "${CLOCK_INCLUDE}" ../src/sim/clock.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
     ../src/task_manager.cpp ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
     ../src/sim/screens.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
@@ -59,6 +66,7 @@ add_library(simulator_ui STATIC ${SCREEN_SOURCES}
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
     ../src/sim/mock/device_ui.cpp ../src/sim/mock/analysis_ui.cpp ../src/sim/mock/security_ui.cpp ../src/sim/mock/observation_ui.cpp ../src/sim/mock/filesystem.cpp)
 target_include_directories(simulator_ui PUBLIC ../src/sim/mock)
+target_include_directories(simulator_ui PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_compile_definitions(simulator_ui PUBLIC TWATCH_SIMULATOR=1)
 target_link_libraries(simulator_ui PUBLIC lvgl)
 add_executable(screen_ui_test tests/screen_ui_test.cpp)
@@ -81,3 +89,10 @@ add_executable(screen_interaction_test tests/screen_interaction_test.cpp)
 target_link_libraries(screen_interaction_test PRIVATE simulator_ui)
 add_test(NAME original_ui_interactions COMMAND screen_interaction_test)
 set_tests_properties(original_ui_interactions PROPERTIES TIMEOUT 90)
+
+add_executable(clock_ui_test tests/clock_ui_test.cpp)
+target_link_libraries(clock_ui_test PRIVATE simulator_ui)
+add_test(NAME original_clock_home COMMAND clock_ui_test)
+set_tests_properties(original_clock_home PROPERTIES TIMEOUT 30)
+add_test(NAME original_clock_extraction
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_extract_clock.py")
