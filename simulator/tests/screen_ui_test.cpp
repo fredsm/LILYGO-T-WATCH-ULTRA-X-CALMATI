@@ -6,7 +6,7 @@ namespace {
 std::array<uint16_t,410*32> buffer{};
 unsigned flushes=0;
 void flush(lv_display_t* d,const lv_area_t*,uint8_t*){++flushes;lv_display_flush_ready(d);}
-void pump(){for(int i=0;i<150;++i){lv_tick_inc(20);lv_timer_handler();}}
+void pump(){for(int i=0;i<150;++i){lv_tick_inc(20);sim::tick();lv_timer_handler();}}
 }
 int main(int argc,char** argv){
  if(argc!=2)return 1;

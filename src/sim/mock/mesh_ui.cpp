@@ -13,9 +13,6 @@ void clock_screen_set_utc_offset(int){}
 bool clock_screen_manual_time_active(){return true;}
 void timezone_note_detected(int){}
 void main_loop_request_lvgl_priority(int){}
-bool map_screen_available(){return false;}
-void map_screen_show(){tools_screen_show();}
-void map_screen_focus(double,double){tools_screen_show();}
 
 
 

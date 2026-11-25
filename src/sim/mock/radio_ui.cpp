@@ -4,6 +4,7 @@
 #include "../../adsb.h"
 #include "../../mic_rec.h"
 #include <lvgl.h>
+#include "SD.h"
 #include <cstdio>
 namespace { bool p=false,scan=false,t=false,a=false,d=false,m=false; float freq=433.92f; PagerMode mode=PAGER_POCSAG_1200; TpmsFormat fmt=TPMS_FORMAT_FSK; bool f433=true; char call[16]="SIM-1"; uint32_t start=0,elapsed=0,seq=0; }
 
@@ -71,7 +72,7 @@ namespace { int range=10; }
 int adsb_range_nm(){return range;}
 void adsb_cycle_range(){range=range==40?10:range*2;++seq;}
 void mic_rec_start(){if(!m){start=lv_tick_get();elapsed=0;m=true;}}
-void mic_rec_stop(){if(m){elapsed=lv_tick_get()-start;m=false;}}
+void mic_rec_stop(){if(m){elapsed=lv_tick_get()-start;m=false;auto f=SD.open("/Recordings/SIM.wav",FILE_WRITE);std::string wav(32044,0);std::memcpy(wav.data(),"RIFF",4);std::memcpy(wav.data()+8,"WAVE",4);f.write((const uint8_t*)wav.data(),wav.size());}}
 void mic_rec_toggle(){if(m)mic_rec_stop();else mic_rec_start();}
 bool mic_rec_is_recording(){return m;}
 uint32_t mic_rec_elapsed_ms(){return m?lv_tick_get()-start:elapsed;}

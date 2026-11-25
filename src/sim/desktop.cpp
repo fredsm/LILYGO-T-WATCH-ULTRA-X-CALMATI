@@ -115,7 +115,7 @@ int main() {
             }
         }
         auto now=SDL_GetTicks(); auto delta=now-last; last=now;
-        watch.advance(delta); lv_tick_inc(delta); lv_timer_handler();
+        watch.advance(delta); lv_tick_inc(delta); sim::tick(); lv_timer_handler();
         sim::ButtonEvent event{};
         while(watch.pop_button(event)) std::printf("button %d %s\n",static_cast<int>(event.button),event.pressed?"down":"up");
         SDL_UpdateTexture(texture,nullptr,pixels.data(),W*sizeof(uint16_t));

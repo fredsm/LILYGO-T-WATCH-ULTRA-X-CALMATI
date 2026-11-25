@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cmath>
+constexpr int DEVICE_MAX_BRIGHTNESS_LEVEL=255;
+inline uint32_t micros(){return lv_tick_get()*1000u;}
 inline uint32_t millis() { return lv_tick_get(); }
 struct SimGpsValue {
  bool isValid() const {return true;} unsigned long age() const {return 0;}
@@ -13,7 +15,7 @@ struct SimGpsValue {
 };
 struct SimGps {SimGpsValue location,date,time,satellites,altitude,speed,course;};
 struct SimRtc {template<class... T> void setDateTime(T...){} void hwClockRead(){}};
-enum {POWER_GPS,POWER_RADIO};
+enum {POWER_GPS,POWER_RADIO,POWER_NFC};
 constexpr int RADIOLIB_ERR_NONE=0;
 struct SimRadio {
  float frequency=915; bool receiving=false;
@@ -24,7 +26,8 @@ struct SimRadio {
  int standby(){receiving=false;return 0;}
  float getRSSI(bool=false){return receiving ? -110.0f + std::fmod(frequency*7+lv_tick_get()/100,65.0f) : -127;}
 }; inline SimRadio radio;
-struct SimLilyGo { SimGps gps; SimRtc rtc; void powerControl(int,bool){} void initLoRa(){} void setBrightness(uint8_t){}  void vibrator() {} bool isCardReady() const { return true; } };
+struct SimPmu {bool nfc=false;bool isEnableDLDO1()const{return nfc;}};
+struct SimLilyGo { SimPmu pmu; void initNFC(){}  SimGps gps; SimRtc rtc; void powerControl(int power,bool on){if(power==POWER_NFC)pmu.nfc=on;} void initLoRa(){} void setBrightness(uint8_t){}  void vibrator() {} bool isCardReady() const { return true; } };
 inline SimLilyGo instance;
 
 struct SimSerial { void println(const char* s){std::puts(s);} void print(const char* s){std::printf("%s",s);}  template<class... Args> void printf(const char* fmt, Args... args) { std::printf(fmt,args...); } };
@@ -33,3 +36,7 @@ inline SimSerial Serial;
 struct SimUart {void end(){}}; inline SimUart Serial1;
 
 #include "Arduino.h"
+
+#include "nfc.hpp"
+
+struct SimEsp {unsigned getFreeHeap()const{return 16*1024*1024;}};inline SimEsp ESP;

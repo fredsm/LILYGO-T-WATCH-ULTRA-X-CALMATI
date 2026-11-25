@@ -58,12 +58,12 @@ foreach(row IN LISTS SCREEN_ROWS)
     list(APPEND SCREEN_NAMES "${screen}")
 endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
-    ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
+    ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
     ../src/sim/screens.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
-    ../src/sim/mock/device_ui.cpp ../src/sim/mock/analysis_ui.cpp ../src/sim/mock/security_ui.cpp)
+    ../src/sim/mock/device_ui.cpp ../src/sim/mock/analysis_ui.cpp ../src/sim/mock/security_ui.cpp ../src/sim/mock/observation_ui.cpp ../src/sim/mock/filesystem.cpp)
 target_include_directories(simulator_ui PUBLIC ../src/sim/mock)
 target_compile_definitions(simulator_ui PUBLIC TWATCH_SIMULATOR=1)
 target_link_libraries(simulator_ui PUBLIC lvgl)

@@ -1,10 +1,42 @@
 #pragma once
-#include <cstdint>
 #include "Arduino.h"
-enum {FILE_READ,FILE_WRITE};
-struct File { explicit operator bool() const {return false;} int available(){return 0;} int read(){return -1;} size_t read(uint8_t*,size_t){return 0;} String readStringUntil(char){return {}; } void close(){} template<class... T> int printf(const char*,T...){return 0;} };
-struct SimSD { bool exists(const char*){return false;} bool mkdir(const char*){return true;} File open(const char*,int){return {};} 
- uint64_t totalBytes() const { return 32000000000ULL; }
- uint64_t usedBytes() const { return 4000000ULL; }
+#include <map>
+#include <set>
+#include <memory>
+#include <vector>
+#include <algorithm>
+// Volatile virtual SD: every path is an in-memory key, never a host file.
+enum {FILE_READ,FILE_WRITE,FILE_APPEND};
+inline std::map<std::string,std::shared_ptr<std::string>> sim_sd_files;
+inline std::set<std::string> sim_sd_dirs;
+class File {
+ std::shared_ptr<std::string> bytes;size_t pos=0;bool writable=false;
+public:
+ File()=default;
+ File(std::shared_ptr<std::string> b,bool w,bool append=false):bytes(b),pos(append?b->size():0),writable(w){}
+ explicit operator bool()const{return bool(bytes);}
+ size_t size()const{return bytes?bytes->size():0;}
+ int available()const{return bytes&&pos<bytes->size()?int(bytes->size()-pos):0;}
+ int read(){return available()?uint8_t((*bytes)[pos++]):-1;}
+ size_t read(uint8_t* out,size_t n){n=std::min(n,size_t(available()));if(n)std::memcpy(out,bytes->data()+pos,n);pos+=n;return n;}
+ size_t readBytes(char* out,size_t n){return read((uint8_t*)out,n);}
+ String readStringUntil(char end){std::string out;int c;while((c=read())>=0&&c!=end)out+=char(c);return out;}
+ bool seek(size_t p){if(!bytes||p>bytes->size())return false;pos=p;return true;}
+ size_t position()const{return pos;}
+ size_t write(const uint8_t* data,size_t n){if(!bytes||!writable)return 0;if(pos+n>bytes->size())bytes->resize(pos+n);std::memcpy(bytes->data()+pos,data,n);pos+=n;return n;}
+ size_t print(const char* s){return write((const uint8_t*)s,std::strlen(s));}
+ size_t println(const char* s){size_t n=print(s);return n+print("\n");}
+ template<class... T> int printf(const char* fmt,T... args){int n=std::snprintf(nullptr,0,fmt,args...);if(n<0)return 0;std::vector<char> b(n+1);std::snprintf(b.data(),b.size(),fmt,args...);return int(write((const uint8_t*)b.data(),n));}
+ void close(){bytes.reset();} void flush(){}
+};
+struct SimSD {
+ bool exists(const char* p){return sim_sd_files.count(p)||sim_sd_dirs.count(p);}
+ bool mkdir(const char* p){sim_sd_dirs.insert(p);return true;}
+ File open(const char* p,int mode=FILE_READ){
+  auto it=sim_sd_files.find(p);if(mode==FILE_READ)return it==sim_sd_files.end()?File():File(it->second,false);
+  auto& b=sim_sd_files[p];if(!b)b=std::make_shared<std::string>();if(mode==FILE_WRITE)b->clear();return File(b,true,mode==FILE_APPEND);
+ }
+ uint64_t totalBytes()const{return 32000000000ULL;}
+ uint64_t usedBytes()const{uint64_t n=0;for(const auto& p:sim_sd_files)n+=p.second->size();return n;}
 };
 inline SimSD SD;

@@ -30,3 +30,10 @@ inline void delay(unsigned long){}
 
 constexpr double DEG_TO_RAD=0.017453292519943295;
 constexpr double RAD_TO_DEG=57.29577951308232;
+
+#ifndef __GNUC__
+#define __attribute__(x)
+#endif
+inline size_t strlcpy(char* out,const char* in,size_t n){size_t len=std::strlen(in);if(n){size_t copy=len<n-1?len:n-1;std::memcpy(out,in,copy);out[copy]=0;}return len;}
+
+constexpr double PI=3.14159265358979323846;

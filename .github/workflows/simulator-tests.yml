@@ -27,4 +27,3 @@ jobs:
       - run: cmake -G Ninja -S simulator -B build/desktop -DCMAKE_BUILD_TYPE=Release -DTWATCH_DESKTOP=ON
       - run: cmake --build build/desktop --config Release --parallel 2 -- -k 0
       - run: ctest --test-dir build/desktop -C Release --output-on-failure
-

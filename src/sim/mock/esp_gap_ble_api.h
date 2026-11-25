@@ -14,3 +14,6 @@ inline int esp_ble_gap_stop_advertising(){sim_advertising=false;return 0;}
 inline int esp_ble_gap_set_rand_addr(const uint8_t*){return 0;}
 inline int esp_ble_gap_config_adv_data_raw(const uint8_t*,int){return 0;}
 inline int esp_ble_gap_start_advertising(const esp_ble_adv_params_t*){sim_advertising=true;return 0;}
+
+constexpr int ESP_BLE_EVT_CONN_ADV=0,ESP_BLE_EVT_CONN_DIR_ADV=1;
+inline int esp_ble_gap_stop_scanning(){return 0;}

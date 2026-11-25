@@ -1,3 +1,13 @@
+#include "../camera_screen.h"
+#include "../gatt_explorer_screen.h"
+#include "../map_screen.h"
+#include "../nfc_screen.h"
+#include "../nfc_write_screen.h"
+#include "../nfc_credit_screen.h"
+#include "../pet_screen.h"
+#include "../skimmer_screen.h"
+#include "../voice_screen.h"
+#include "../wardriver_screen.h"
 #include "../arp_mitm_screen.h"
 #include "../badusb_screen.h"
 #include "../deauther_screen.h"
@@ -53,6 +63,9 @@
 
 namespace {
 lv_obj_t* home_screen=nullptr;
+lv_obj_t* voice_screen=nullptr;
+void show_voice(){voice_screen_show();voice_screen=lv_screen_active();}
+bool voice_active(){return voice_screen && lv_screen_active()==voice_screen;}
 void show_results(){calmati_result_screen_show("SIM RESULTS","/demo",false);}
 void show_ports(){portscan_screen_show(0xc000020a,"SIM host");}
 const sim::Screen registry[]={
@@ -62,8 +75,10 @@ const sim::Screen registry[]={
 };
 }
 namespace sim {
+void initialize_filesystem();
 const Screen* screens(std::size_t& count){count=sizeof(registry)/sizeof(registry[0]);return registry;}
-void initialize_screens(lv_obj_t* home){home_screen=home;for(const auto& s:registry)if(s.create)s.create();lv_screen_load(home);}
+void initialize_screens(lv_obj_t* home){home_screen=home;initialize_filesystem();for(const auto& s:registry)if(s.create)s.create();lv_screen_load(home);}
+void tick(){nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();}
 void leave_screen(){for(const auto& s:registry)if(s.active()&&s.stop)s.stop();}
 void show_home(){leave_screen();lv_screen_load(home_screen);}
 }
