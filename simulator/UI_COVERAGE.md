@@ -2,70 +2,83 @@
 
 Inventory: **61** dedicated screen translation units; **61 integrated**, none pending. The earlier estimate of 60 omitted one unit.
 
-Inventory of dedicated screen translation units. Integrated means included in native build; verified means headless CI passed. Desktop interaction remains unverified for all. Additional UI in main.cpp, onboarding and other modules must be inventoried separately. No UI redesign before full coverage.
+Verified at commit `5c6a3405bbdf64a8e3262cbbbd395364134ad99d`:
+[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45649991807).
+Linux and Windows each pass **69/69** tests; the SDL desktop build passes
+**70/70**, including the real SDL render-path smoke test.
+
+Every dedicated screen links the original firmware translation unit, opens,
+renders, returns to the launcher and reopens. The complete navigation cycle also
+passes in a single process. The original task manager is tested separately.
+Interaction coverage includes port-scan completion, BLE clear and shared stack
+ownership, simulated USB execution, NFC write/read and before/after captures,
+GATT enumeration, PNG tile decoding and voice response.
+
+These are automated host checks, not a claim of exhaustive manual visual review
+or hardware validation. No UI redesign or production hardware changes were made.
 
 | Source | Native status |
 |---|---|
-| src/adsb_screen.cpp | Integrated, unverified |
-| src/alarm_screen.cpp | Integrated, unverified |
-| src/analyze_screen.cpp | Integrated; CI pending |
-| src/aprs_screen.cpp | Integrated, unverified |
-| src/arp_mitm_screen.cpp | Integrated; CI pending |
-| src/badusb_screen.cpp | Integrated; CI pending |
-| src/ble_pair_screen.cpp | Integrated; CI pending |
-| src/bluetooth_screen.cpp | Integrated, unverified |
-| src/bt_analyze_screen.cpp | Integrated; CI pending |
-| src/calendar_screen.cpp | Integrated, unverified |
-| src/calmati_remote_screen.cpp | Integrated, unverified |
-| src/calmati_result_screen.cpp | Integrated, unverified |
-| src/calmati_targets_screen.cpp | Integrated, unverified |
-| src/camera_screen.cpp | Integrated; CI pending |
-| src/car_screen.cpp | Integrated, unverified |
-| src/channels_screen.cpp | Integrated, unverified |
-| src/configuration_screen.cpp | Integrated, unverified |
-| src/deauther_screen.cpp | Integrated; CI pending |
-| src/drone_screen.cpp | Integrated; CI pending |
-| src/espnow_screen.cpp | Integrated, unverified |
-| src/evil_twin_screen.cpp | Integrated; CI pending |
-| src/gatt_explorer_screen.cpp | Integrated; CI pending |
-| src/gps_screen.cpp | Integrated, unverified |
-| src/lora_analyze_screen.cpp | Integrated; CI pending |
-| src/lora_screen.cpp | Integrated, unverified |
-| src/map_screen.cpp | Integrated; CI pending |
-| src/meshtastic_screen.cpp | Integrated, unverified |
-| src/meta_screen.cpp | Integrated, unverified |
-| src/mic_screen.cpp | Integrated, unverified |
-| src/mifare_screen.cpp | Integrated; CI pending |
-| src/mouse_screen.cpp | Integrated, unverified |
-| src/nfc_credit_screen.cpp | Integrated; CI pending |
-| src/nfc_screen.cpp | Integrated; CI pending |
-| src/nfc_write_screen.cpp | Integrated; CI pending |
-| src/nodes_screen.cpp | Integrated, unverified |
-| src/pager_screen.cpp | Integrated, unverified |
-| src/pet_screen.cpp | Integrated; CI pending |
-| src/phantom_flood_screen.cpp | Integrated; CI pending |
-| src/portscan_screen.cpp | Integrated; CI pending |
-| src/printer_screen.cpp | Integrated, unverified |
-| src/rid_spoof_screen.cpp | Integrated; CI pending |
-| src/scan_screen.cpp | Integrated; CI pending |
-| src/send_message_screen.cpp | Integrated, unverified |
-| src/settings_screen.cpp | Integrated, unverified |
-| src/skimmer_screen.cpp | Integrated; CI pending |
-| src/stopwatch_screen.cpp | Headless verified |
-| src/subghz_sentinel_screen.cpp | Integrated; CI pending |
-| src/tesla_cp_screen.cpp | Integrated; CI pending |
-| src/threat_radar_screen.cpp | Integrated; CI pending |
-| src/time_screen.cpp | Integrated, unverified |
-| src/timer_screen.cpp | Integrated, unverified |
-| src/tools_screen.cpp | Integrated; CI pending |
-| src/tpms_screen.cpp | Integrated, unverified |
-| src/usb_sd_screen.cpp | Integrated, unverified |
-| src/voice_screen.cpp | Integrated; CI pending |
-| src/wardriver_screen.cpp | Integrated; CI pending |
-| src/waterfall_screen.cpp | Integrated; CI pending |
-| src/webpanel_screen.cpp | Integrated, unverified |
-| src/wifi_radio_screen.cpp | Integrated, unverified |
-| src/wifi_screen.cpp | Integrated, unverified |
-| src/wpa3_sae_screen.cpp | Integrated; CI pending |
+| src/adsb_screen.cpp | Headless + SDL smoke verified |
+| src/alarm_screen.cpp | Headless + SDL smoke verified |
+| src/analyze_screen.cpp | Headless + SDL smoke verified |
+| src/aprs_screen.cpp | Headless + SDL smoke verified |
+| src/arp_mitm_screen.cpp | Headless + SDL smoke verified |
+| src/badusb_screen.cpp | Headless + SDL smoke verified |
+| src/ble_pair_screen.cpp | Headless + SDL smoke verified |
+| src/bluetooth_screen.cpp | Headless + SDL smoke verified |
+| src/bt_analyze_screen.cpp | Headless + SDL smoke verified |
+| src/calendar_screen.cpp | Headless + SDL smoke verified |
+| src/calmati_remote_screen.cpp | Headless + SDL smoke verified |
+| src/calmati_result_screen.cpp | Headless + SDL smoke verified |
+| src/calmati_targets_screen.cpp | Headless + SDL smoke verified |
+| src/camera_screen.cpp | Headless + SDL smoke verified |
+| src/car_screen.cpp | Headless + SDL smoke verified |
+| src/channels_screen.cpp | Headless + SDL smoke verified |
+| src/configuration_screen.cpp | Headless + SDL smoke verified |
+| src/deauther_screen.cpp | Headless + SDL smoke verified |
+| src/drone_screen.cpp | Headless + SDL smoke verified |
+| src/espnow_screen.cpp | Headless + SDL smoke verified |
+| src/evil_twin_screen.cpp | Headless + SDL smoke verified |
+| src/gatt_explorer_screen.cpp | Headless + SDL smoke verified |
+| src/gps_screen.cpp | Headless + SDL smoke verified |
+| src/lora_analyze_screen.cpp | Headless + SDL smoke verified |
+| src/lora_screen.cpp | Headless + SDL smoke verified |
+| src/map_screen.cpp | Headless + SDL smoke verified |
+| src/meshtastic_screen.cpp | Headless + SDL smoke verified |
+| src/meta_screen.cpp | Headless + SDL smoke verified |
+| src/mic_screen.cpp | Headless + SDL smoke verified |
+| src/mifare_screen.cpp | Headless + SDL smoke verified |
+| src/mouse_screen.cpp | Headless + SDL smoke verified |
+| src/nfc_credit_screen.cpp | Headless + SDL smoke verified |
+| src/nfc_screen.cpp | Headless + SDL smoke verified |
+| src/nfc_write_screen.cpp | Headless + SDL smoke verified |
+| src/nodes_screen.cpp | Headless + SDL smoke verified |
+| src/pager_screen.cpp | Headless + SDL smoke verified |
+| src/pet_screen.cpp | Headless + SDL smoke verified |
+| src/phantom_flood_screen.cpp | Headless + SDL smoke verified |
+| src/portscan_screen.cpp | Headless + SDL smoke verified |
+| src/printer_screen.cpp | Headless + SDL smoke verified |
+| src/rid_spoof_screen.cpp | Headless + SDL smoke verified |
+| src/scan_screen.cpp | Headless + SDL smoke verified |
+| src/send_message_screen.cpp | Headless + SDL smoke verified |
+| src/settings_screen.cpp | Headless + SDL smoke verified |
+| src/skimmer_screen.cpp | Headless + SDL smoke verified |
+| src/stopwatch_screen.cpp | Headless + SDL smoke verified |
+| src/subghz_sentinel_screen.cpp | Headless + SDL smoke verified |
+| src/tesla_cp_screen.cpp | Headless + SDL smoke verified |
+| src/threat_radar_screen.cpp | Headless + SDL smoke verified |
+| src/time_screen.cpp | Headless + SDL smoke verified |
+| src/timer_screen.cpp | Headless + SDL smoke verified |
+| src/tools_screen.cpp | Headless + SDL smoke verified |
+| src/tpms_screen.cpp | Headless + SDL smoke verified |
+| src/usb_sd_screen.cpp | Headless + SDL smoke verified |
+| src/voice_screen.cpp | Headless + SDL smoke verified |
+| src/wardriver_screen.cpp | Headless + SDL smoke verified |
+| src/waterfall_screen.cpp | Headless + SDL smoke verified |
+| src/webpanel_screen.cpp | Headless + SDL smoke verified |
+| src/wifi_radio_screen.cpp | Headless + SDL smoke verified |
+| src/wifi_screen.cpp | Headless + SDL smoke verified |
+| src/wpa3_sae_screen.cpp | Headless + SDL smoke verified |
 
-Additional coverage: original task manager is integrated as a bonus entry. Watch face (main.cpp), onboarding and boot overlays are separate from the 61 dedicated screen inventory and are not claimed as covered.
+Additional coverage: original task manager is verified as a bonus entry. Watch face (main.cpp), onboarding and boot overlays are separate from the 61 dedicated screen inventory and are not claimed as covered.
