@@ -1,0 +1,19 @@
+Import("env")
+import os
+import subprocess
+
+root = env.subst("$PROJECT_DIR")
+desktop = env.GetProjectOption("custom_sim_desktop")
+build = os.path.join(root, "build", env.subst("$PIOENV"))
+
+def compile_sim(*args, **kwargs):
+    subprocess.check_call(["cmake", "-S", os.path.join(root, "simulator"), "-B", build,
+                           "-DTWATCH_DESKTOP=" + desktop, "-DCMAKE_BUILD_TYPE=Release"])
+    subprocess.check_call(["cmake", "--build", build, "--config", "Release"])
+
+def test_sim(*args, **kwargs):
+    compile_sim()
+    subprocess.check_call(["ctest", "--test-dir", build, "-C", "Release", "--output-on-failure"])
+
+env.AddCustomTarget("sim_build", None, compile_sim, title="Build UI simulator", always_build=True)
+env.AddCustomTarget("sim_check", None, test_sim, title="Build and test UI simulator", always_build=True)

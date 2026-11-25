@@ -2,6 +2,9 @@
 #include <SDL.h>
 #include <lvgl.h>
 #include "mock/watch.hpp"
+#include "../stopwatch_screen.h"
+static lv_obj_t* preview_screen=nullptr;
+void time_screen_show() { lv_screen_load(preview_screen); }
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -45,6 +48,7 @@ void charging_changed(lv_event_t* e) {
 }
 void preview() {
     auto* screen=lv_screen_active();
+    preview_screen=screen;
     lv_obj_set_flex_flow(screen,LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(screen,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
     auto* title=lv_label_create(screen);
@@ -66,6 +70,10 @@ void preview() {
     lv_obj_add_event_cb(charge,charging_changed,LV_EVENT_VALUE_CHANGED,nullptr);
     auto* help=lv_label_create(screen);
     lv_label_set_text(help,"P: power | B: back | M: motion");
+    auto* btn=lv_button_create(screen);
+    auto* lbl=lv_label_create(btn);
+    lv_label_set_text(lbl,"Original stopwatch");
+    lv_obj_add_event_cb(btn,[](lv_event_t*){ stopwatch_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -84,6 +92,7 @@ int main() {
     lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,read_pointer);
     preview();
+    stopwatch_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -98,7 +107,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }
