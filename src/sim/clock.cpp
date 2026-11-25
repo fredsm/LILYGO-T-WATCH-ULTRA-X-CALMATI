@@ -1,4 +1,7 @@
 #include "clock.hpp"
+// Original firmware accesses the colon span's style directly. LVGL 9 keeps
+// that struct definition in this header; the simulator pins the same version.
+#include <src/widgets/span/lv_span_private.h>
 #include "mock/LilyGoLib.h"
 #include "../defcon_img.h"
 #include "../nfc_icon.h"
