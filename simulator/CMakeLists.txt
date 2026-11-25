@@ -58,7 +58,7 @@ foreach(row IN LISTS SCREEN_ROWS)
     list(APPEND SCREEN_NAMES "${screen}")
 endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
-    "${CLOCK_INCLUDE}" ../src/sim/clock.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
+    "${CLOCK_INCLUDE}" ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
     ../src/task_manager.cpp ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
     ../src/sim/screens.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
@@ -66,7 +66,7 @@ add_library(simulator_ui STATIC ${SCREEN_SOURCES}
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
     ../src/sim/mock/device_ui.cpp ../src/sim/mock/analysis_ui.cpp ../src/sim/mock/security_ui.cpp ../src/sim/mock/observation_ui.cpp ../src/sim/mock/filesystem.cpp)
 target_include_directories(simulator_ui PUBLIC ../src/sim/mock)
-target_include_directories(simulator_ui PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(simulator_ui PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" ../src)
 target_compile_definitions(simulator_ui PUBLIC TWATCH_SIMULATOR=1)
 target_link_libraries(simulator_ui PUBLIC lvgl)
 add_executable(screen_ui_test tests/screen_ui_test.cpp)
@@ -101,3 +101,8 @@ add_executable(navigation_ui_test tests/navigation_ui_test.cpp)
 target_link_libraries(navigation_ui_test PRIVATE simulator_ui)
 add_test(NAME original_swipe_navigation COMMAND navigation_ui_test)
 set_tests_properties(original_swipe_navigation PROPERTIES TIMEOUT 30)
+
+add_executable(keyboard_buttons_test tests/keyboard_buttons_test.cpp)
+target_link_libraries(keyboard_buttons_test PRIVATE simulator_ui)
+add_test(NAME original_keyboard_and_buttons COMMAND keyboard_buttons_test)
+set_tests_properties(original_keyboard_and_buttons PROPERTIES TIMEOUT 30)

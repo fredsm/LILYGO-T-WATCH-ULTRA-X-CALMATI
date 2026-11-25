@@ -8,13 +8,17 @@ class ExtractionTests(unittest.TestCase):
     def test_original_source_is_reused_verbatim(self):
         path = Path(__file__).resolve().parents[2] / 'src/main.cpp'
         before = path.read_bytes()
-        source = before.decode('utf-8')
+        source = path.read_text(encoding='utf-8')
         generated = extract_clock.extract(source)
         for name in extract_clock.FUNCTIONS:
             self.assertIn(extract_clock.function(source, name), generated)
         self.assertIn(extract_clock.between(source, '    clock_screen = lv_obj_create(NULL);',
                                            '    gps_screen_create();'), generated)
         self.assertEqual(before, path.read_bytes())
+        self.assertIn(extract_clock.between(source, '            if (lv_screen_active() == clock_screen)\n',
+                                           '\n        }\n    }, POWER_EVENT, NULL);'), generated)
+        self.assertIn(extract_clock.between(source, '            if (settings_screen_is_active()) {',
+                                           '\n        }\n    }\n\n    // Feed NMEA'), generated)
 
     def test_comments_and_strings_do_not_terminate_function(self):
         source = 'static void clock() { /* } */ const char* s="}"; if(true){ } }\nvoid other() {}'

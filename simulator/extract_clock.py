@@ -46,12 +46,20 @@ def function(source, name):
     return source[start:end]
 
 def extract(source):
-    parts = [between(source, 'static lv_obj_t *clock_screen;', 'static lv_color_t bat_color'),
+    headers = re.findall(r'^#include "[^"\n]*_screen\.h"', source, re.M)
+    parts = ['\n'.join(headers),
+             between(source, 'static lv_obj_t *clock_screen;', 'static lv_color_t bat_color'),
              between(source, '#define CLOCK_TEXT_PAD_X', 'static void resize_clock_text()'),
              'static void update_clock();\n']
     parts.extend(function(source, name) for name in FUNCTIONS)
     layout = between(source, '    clock_screen = lv_obj_create(NULL);', '    gps_screen_create();')
     parts.append('static void create_original_clock() {\n' + layout + '\n}\n')
+    power = between(source, '            if (lv_screen_active() == clock_screen)\n',
+                    '\n        }\n    }, POWER_EVENT, NULL);')
+    back = between(source, '            if (settings_screen_is_active()) {',
+                   '\n        }\n    }\n\n    // Feed NMEA')
+    parts.append('static void original_power_click() {\n' + power + '\n}\n')
+    parts.append('static void original_back_click() {\n' + back + '\n}\n')
     return '// Generated from src/main.cpp; do not edit.\n' + '\n'.join(parts)
 
 if __name__ == '__main__':

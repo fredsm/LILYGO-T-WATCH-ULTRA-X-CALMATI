@@ -24,12 +24,20 @@ namespace { bool weather_valid=false; uint32_t weather_at=0; }
 bool weather_fetch_async(){weather_valid=true;weather_at=lv_tick_get();return true;}
 bool weather_is_fetching(){return false;}
 WeatherSample weather_get(){return {weather_valid,22.0f,55,1013,lv_tick_get()-weather_at};}
+void clock_screen_show();
 
 #include "original_clock.inc"
 
 void clock_screen_get_local_time(struct tm* out){instance.rtc.getDateTime(out);}
 
 namespace sim {
+void power_button_click(){original_power_click();}
+void back_button_click(){
+    static bool seen=false;static uint32_t last=0;
+    const auto now=lv_tick_get();
+    if(seen && now-last<250)return;
+    seen=true;last=now;original_back_click();
+}
 lv_obj_t* create_clock(){
     if(!clock_screen){
         create_original_clock();

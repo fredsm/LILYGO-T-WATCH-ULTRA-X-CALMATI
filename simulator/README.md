@@ -1,9 +1,9 @@
 # Original firmware UI simulator
 
-## Watch-flow integration: Phases 1 and 2
+## Watch-flow integration: Phases 1, 2 and 3
 
 The next desktop build starts on the original clock face at 410 x 502 pixels.
-**F1** opens the debug screen catalog; **B** and firmware clock-return callbacks
+**F1** opens the debug screen catalog; **F4** and firmware clock-return callbacks
 return to the watch face. The original analog/digital and time-format settings
 now control the face. Weather is a host-only synthetic fixture, populated by
 tapping the original weather label; the RTC advances from a fixed test epoch.
@@ -17,10 +17,12 @@ Clock swipes reuse the original handler: left to Wardriver, right to Meshtastic,
 down to Tools, up to Time. Original destination-screen gestures and tile
 callbacks handle subsequent navigation. Mouse dragging and native touchscreen
 finger input use the LVGL pointer driver, with the firmware scroll threshold.
-Physical buttons, keyboard text entry, a separate simulation panel and
-boot/onboarding remain later phases. The debug catalog's existing
+Power and Back buttons below the watch display reuse the firmware button
+routes (including the 250 ms Back debounce). The watch viewport remains
+410 x 502; the 60-pixel control bar is outside it. A separate hardware
+simulation panel and boot/onboarding remain later phases. The debug catalog's existing
 hardware sliders are not yet wired to the clock's hardware fixtures.
-The phase-2 commit enables CI for both phases. Download its successful Windows
+CI validates the integrated phases. Download its successful Windows
 artifact; previously downloaded EXEs do not contain these changes.
 
 The native build reuses all **61 `src/*_screen.cpp` translation units**, plus the
@@ -64,9 +66,13 @@ ctest --test-dir build/desktop -C Release --output-on-failure
 
 Multi-config Windows builds place the executable in `build/desktop/Release`.
 The launcher uses the firmware's 410 x 502 portrait geometry. Mouse acts as
-touch; drag to scroll the list. **B** returns to the launcher, **P** toggles the
-simulated display, **M** toggles motion, and **Escape** exits. Each screen with
-an exported stop hook is stopped when B returns to the launcher. Original
+touch; drag to scroll the list. **F2/P** presses Power, **F3/B** presses Back, **F4** returns home,
+**F5** toggles the display, and **M** toggles motion. **Ctrl+Q** exits.
+Printable shortcuts are disabled while editing. UTF-8 typing, Backspace,
+Delete, arrows, Home/End and Ctrl+V edit the active firmware text field.
+Enter invokes the original keyboard Ready action; Escape cancels editing
+or presses Back when no editor is active. Each screen with
+an exported stop hook is stopped when the debug home action returns to the clock. Original
 in-screen navigation remains available. Worker-driven NFC and wardriver flows
 are pumped by the host runtime, as they are by the firmware main loop.
 
