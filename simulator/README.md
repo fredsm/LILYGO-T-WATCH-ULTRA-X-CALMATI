@@ -13,6 +13,13 @@ The clock mock uses a fixed date/time. Virtual SD writes last for the process.
 
 ## Build and run
 
+For Windows x64, download the **TWatchUltra-simulator-windows-x64** artifact
+from a successful **Simulator tests** GitHub Actions run. Extract the ZIP and
+double-click `twatch_desktop.exe`. This portable package includes statically
+linked SDL2 and C runtime; no development tools are needed. `smoke-test.cmd`
+automatically cycles all 62 entries and saves a log. CI runs all 70 desktop
+tests on Windows before publishing the artifact.
+
 Requires Git, CMake 3.16+, a C/C++17 compiler, and network access on the first
 configure to fetch the pinned LVGL v9.5.0 dependency.
 
