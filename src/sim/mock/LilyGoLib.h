@@ -4,7 +4,15 @@
 #include <cstdio>
 #include <cmath>
 constexpr int DEVICE_MAX_BRIGHTNESS_LEVEL=255;
-inline uint32_t micros(){return lv_tick_get()*1000u;}
+// A firmware busy-wait must advance even while the LVGL callback owns the thread.
+// Keep a deterministic sub-tick clock; do not advance LVGL recursively.
+inline void (*sim_micro_tick)(uint32_t)=nullptr;
+inline uint32_t micros(){
+ static uint64_t us=0;const uint64_t scheduled=uint64_t(lv_tick_get())*1000;
+ us+=100;if(us<scheduled)us=scheduled;
+ if(sim_micro_tick)sim_micro_tick(uint32_t(us));
+ return uint32_t(us);
+}
 inline uint32_t millis() { return lv_tick_get(); }
 struct SimGpsValue {
  bool isValid() const {return true;} unsigned long age() const {return 0;}

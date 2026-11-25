@@ -15,7 +15,12 @@ inline void (*sim_promisc_cb)(void*,wifi_promiscuous_pkt_type_t)=nullptr;
 inline bool sim_promisc_enabled=false;
 inline int esp_wifi_set_promiscuous(bool v){sim_promisc_enabled=v;return 0;}
 inline int esp_wifi_set_promiscuous_filter(const wifi_promiscuous_filter_t*){return 0;}
-inline int esp_wifi_set_promiscuous_rx_cb(void (*cb)(void*,wifi_promiscuous_pkt_type_t)){sim_promisc_cb=cb;return 0;}
+inline void sim_wifi_sample(uint32_t us){
+ if(sim_promisc_enabled&&sim_promisc_cb&&(us/200)%7<3){wifi_promiscuous_pkt_t p;sim_promisc_cb(&p,WIFI_PKT_DATA);}
+}
+inline int esp_wifi_set_promiscuous_rx_cb(void (*cb)(void*,wifi_promiscuous_pkt_type_t)){
+ sim_promisc_cb=cb;sim_micro_tick=cb?sim_wifi_sample:nullptr;return 0;
+}
 inline int esp_wifi_set_channel(int ch,wifi_second_chan_t){
  if(sim_promisc_enabled && sim_promisc_cb){wifi_promiscuous_pkt_t p; p.rx_ctrl.rssi=-35-ch*3; for(int i=0;i<ch*2;++i)sim_promisc_cb(&p,WIFI_PKT_DATA);} return 0;
 }
