@@ -51,6 +51,11 @@ int main(){
   swipe(205,100,0,240);if(!check(tools_screen_is_active(),"clock down -> tools"))return 7;
   swipe(5,80,0,300);if(!check(lv_screen_active()==home,"tools edge down -> clock"))return 8;
  }
+ swipe(205,100,0,240);
+ auto* grid=lv_obj_get_child(lv_screen_active(),1);
+ swipe(205,400,0,-240);
+ if(!check(tools_screen_is_active() && lv_obj_get_scroll_top(grid)>0,"tools inward swipe scrolls tiles"))return 12;
+ sim::show_home();pump();
  swipe(205,330,0,-240);
  auto* text=label(lv_screen_active(),"Stopwatch");if(!check(text!=nullptr,"original time tile exists"))return 9;
  lv_obj_scroll_to_view(text,LV_ANIM_OFF);pump();lv_area_t area;lv_obj_get_coords(text,&area);
