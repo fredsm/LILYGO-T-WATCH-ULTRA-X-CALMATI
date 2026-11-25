@@ -18,3 +18,12 @@ jobs:
       - run: cmake -S simulator -B build/simulator -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build/simulator --config Release --parallel 2
       - run: ctest --test-dir build/simulator -C Release --output-on-failure
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - run: cmake -S simulator -B build/desktop -DCMAKE_BUILD_TYPE=Release -DTWATCH_DESKTOP=ON
+      - run: cmake --build build/desktop --config Release --parallel 2
+      - run: ctest --test-dir build/desktop -C Release --output-on-failure
