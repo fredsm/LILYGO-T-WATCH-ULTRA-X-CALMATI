@@ -24,7 +24,7 @@ void wifi_creds_save(const char*,const char*){}
 bool wifi_creds_autoconnect(){if(auto_connect)WiFi.begin("SIM");return auto_connect;}
 bool wifi_creds_autoconnect_enabled(){return auto_connect;}
 void wifi_creds_set_autoconnect(bool v){auto_connect=v;}
-namespace { std::vector<ble_scan_cb_t> ble_consumers; }
+namespace { std::vector<ble_scan_cb_t> ble_consumers; int ble_holds=0; }
 bool ble_scan_add(ble_scan_cb_t cb){
  if(std::find(ble_consumers.begin(),ble_consumers.end(),cb)==ble_consumers.end())ble_consumers.push_back(cb);
  sim_ble_active=true;
@@ -35,8 +35,8 @@ bool ble_scan_add(ble_scan_cb_t cb){
  p.scan_rst.ble_adv[5]=2;p.scan_rst.ble_adv[6]=0x21;
  std::memcpy(p.scan_rst.ble_adv+7,"SIM-DRONE-0001",14);cb(&p);return true;
 }
-void ble_scan_remove(ble_scan_cb_t cb){ble_consumers.erase(std::remove(ble_consumers.begin(),ble_consumers.end(),cb),ble_consumers.end());sim_ble_active=!ble_consumers.empty();}
-bool ble_scan_active(){return sim_ble_active;}
+void ble_scan_remove(ble_scan_cb_t cb){ble_consumers.erase(std::remove(ble_consumers.begin(),ble_consumers.end(),cb),ble_consumers.end());sim_ble_active=ble_holds||!ble_consumers.empty();}
+bool ble_scan_active(){return !ble_consumers.empty();}
 int ble_scan_consumer_count(){return int(ble_consumers.size());}
 bool phone_link_connected(){return false;}
 bool meta_glasses_start(){meta=true;return true;}
@@ -62,7 +62,6 @@ void clock_screen_set_dim_timeout(uint32_t){}
 void clock_screen_set_dim_brightness(uint8_t){}
 void clock_screen_apply_manual_time(int,int,int,int,int){}
 
-namespace {int ble_holds=0;}
 bool ble_stack_acquire(){++ble_holds;sim_ble_active=true;return true;}
 void ble_stack_release(){if(ble_holds)--ble_holds;sim_ble_active=ble_holds||!ble_consumers.empty();}
 void ble_gap_forward_set(ble_gap_forward_t){}

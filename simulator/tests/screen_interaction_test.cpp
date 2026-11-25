@@ -9,6 +9,8 @@
 #include "../../src/badusb_screen.h"
 #include "../../src/badusb.h"
 #include "../../src/mic_rec.h"
+#include "../../src/ble_scan_manager.h"
+#include "esp_bt.h"
 #include "SD.h"
 #include <array>
 #include <cstdio>
@@ -28,6 +30,13 @@ bool open(const char* name){std::size_t n;auto* entries=sim::screens(n);sim::sho
 int main(){
  lv_init();auto* d=lv_display_create(410,502);lv_display_set_color_format(d,LV_COLOR_FORMAT_RGB565);
  lv_display_set_buffers(d,buffer.data(),nullptr,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);
+ // A non-scanning GATT/advertising holder keeps the controller alive after
+ // the last scanner leaves; registering the same consumer is idempotent.
+ auto scan=[](esp_ble_gap_cb_param_t*){};
+ CHECK(ble_stack_acquire());CHECK(ble_scan_add(scan));CHECK(ble_scan_add(scan));
+ CHECK(ble_scan_consumer_count()==1);ble_scan_remove(scan);
+ CHECK(!ble_scan_active());CHECK(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_ENABLED);
+ ble_stack_release();CHECK(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_IDLE);
  sim::initialize_screens(lv_screen_active());
  CHECK(open("portscan"));CHECK(click("START"));pump();CHECK(portscan_result_count()==2);CHECK(!portscan_is_running());CHECK(label(lv_screen_active(),"80"));
  CHECK(open("ble_pair"));CHECK(bpa_count()==2);CHECK(click("CLEAR"));CHECK(bpa_count()==0);
