@@ -39,20 +39,20 @@ jobs:
         run: |
           git clone --depth 1 --branch release-2.30.11 https://github.com/libsdl-org/SDL.git build/SDL
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cmake -S build/SDL -B build/SDL-build -A x64 -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST=OFF -DSDL_TESTS=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DCMAKE_INSTALL_PREFIX=$pwd/build/SDL-install"
+          cmake -S build/SDL -B build/SDL-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST=OFF -DSDL_TESTS=OFF "-DCMAKE_INSTALL_PREFIX=$pwd/build/SDL-install"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cmake --build build/SDL-build --config Release --parallel 2
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cmake --install build/SDL-build --config Release
       - name: Configure Windows desktop
-        run: cmake -S simulator -B build/desktop -A x64 -DTWATCH_DESKTOP=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DCMAKE_PREFIX_PATH=$pwd/build/SDL-install"
+        run: cmake -S simulator -B build/desktop -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS=-static -DTWATCH_DESKTOP=ON "-DCMAKE_PREFIX_PATH=$pwd/build/SDL-install"
       - run: cmake --build build/desktop --config Release --parallel 2
       - run: ctest --test-dir build/desktop -C Release --output-on-failure
       - name: Package portable simulator
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build/portable | Out-Null
-          Copy-Item build/desktop/Release/twatch_desktop.exe build/portable/
+          Copy-Item build/desktop/twatch_desktop.exe build/portable/
           Copy-Item simulator/PORTABLE_README.txt build/portable/README.txt
           Copy-Item simulator/smoke-test.cmd build/portable/
       - uses: actions/upload-artifact@v4
