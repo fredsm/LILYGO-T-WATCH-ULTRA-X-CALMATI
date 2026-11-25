@@ -10,6 +10,11 @@
 #include "../usb_sd_screen.h"
 #include "../mouse_screen.h"
 #include "../webpanel_screen.h"
+#include "../pager_screen.h"
+#include "../tpms_screen.h"
+#include "../aprs_screen.h"
+#include "../adsb_screen.h"
+#include "../mic_screen.h"
 #include <ctime>
 void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
@@ -100,6 +105,21 @@ void preview() {
     auto* web=lv_button_create(screen);
     lv_label_set_text(lv_label_create(web),"Original web panel");
     lv_obj_add_event_cb(web,[](lv_event_t*){ webpanel_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_pager=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_pager),"Original pager");
+    lv_obj_add_event_cb(b_pager,[](lv_event_t*){ pager_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_tpms=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_tpms),"Original tpms");
+    lv_obj_add_event_cb(b_tpms,[](lv_event_t*){ tpms_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_aprs=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_aprs),"Original aprs");
+    lv_obj_add_event_cb(b_aprs,[](lv_event_t*){ aprs_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_adsb=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_adsb),"Original adsb");
+    lv_obj_add_event_cb(b_adsb,[](lv_event_t*){ adsb_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_mic=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_mic),"Original mic");
+    lv_obj_add_event_cb(b_mic,[](lv_event_t*){ mic_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -126,6 +146,11 @@ int main() {
     usb_sd_screen_create();
     mouse_screen_create();
     webpanel_screen_create();
+    pager_screen_create();
+    tpms_screen_create();
+    aprs_screen_create();
+    adsb_screen_create();
+    mic_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -140,7 +165,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active()) clock_screen_show(); else time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active()) clock_screen_show(); else time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }

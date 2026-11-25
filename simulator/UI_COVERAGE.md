@@ -4,10 +4,10 @@ Inventory of dedicated screen translation units. Integrated means included in na
 
 | Source | Native status |
 |---|---|
-| src/adsb_screen.cpp | Pending |
+| src/adsb_screen.cpp | Integrated, unverified |
 | src/alarm_screen.cpp | Integrated, unverified |
 | src/analyze_screen.cpp | Pending |
-| src/aprs_screen.cpp | Pending |
+| src/aprs_screen.cpp | Integrated, unverified |
 | src/arp_mitm_screen.cpp | Pending |
 | src/badusb_screen.cpp | Pending |
 | src/ble_pair_screen.cpp | Pending |
@@ -32,14 +32,14 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/map_screen.cpp | Pending |
 | src/meshtastic_screen.cpp | Pending |
 | src/meta_screen.cpp | Pending |
-| src/mic_screen.cpp | Pending |
+| src/mic_screen.cpp | Integrated, unverified |
 | src/mifare_screen.cpp | Pending |
 | src/mouse_screen.cpp | Integrated, unverified |
 | src/nfc_credit_screen.cpp | Pending |
 | src/nfc_screen.cpp | Pending |
 | src/nfc_write_screen.cpp | Pending |
 | src/nodes_screen.cpp | Pending |
-| src/pager_screen.cpp | Pending |
+| src/pager_screen.cpp | Integrated, unverified |
 | src/pet_screen.cpp | Pending |
 | src/phantom_flood_screen.cpp | Pending |
 | src/portscan_screen.cpp | Pending |
@@ -56,7 +56,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/time_screen.cpp | Integrated, unverified |
 | src/timer_screen.cpp | Integrated, unverified |
 | src/tools_screen.cpp | Pending |
-| src/tpms_screen.cpp | Pending |
+| src/tpms_screen.cpp | Integrated, unverified |
 | src/usb_sd_screen.cpp | Integrated, unverified |
 | src/voice_screen.cpp | Pending |
 | src/wardriver_screen.cpp | Pending |
