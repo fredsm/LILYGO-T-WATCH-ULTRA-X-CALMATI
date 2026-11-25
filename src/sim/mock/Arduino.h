@@ -15,8 +15,15 @@ public:
  const char* c_str() const{return s.c_str();} unsigned length()const{return s.size();}
  char operator[](unsigned i)const{return i<s.size()?s[i]:0;}
  int indexOf(const char* p,unsigned from=0)const{auto i=s.find(p,from);return i==std::string::npos?-1:int(i);}
+ String substring(unsigned a)const{return substring(a,s.size());}
+ int indexOf(char c)const{auto i=s.find(c);return i==std::string::npos?-1:int(i);}
+ void trim(){auto a=s.find_first_not_of(" \t\r\n");if(a==std::string::npos){s.clear();return;}s=s.substr(a,s.find_last_not_of(" \t\r\n")-a+1);}
+ long toInt()const{return std::strtol(s.c_str(),nullptr,10);}
+ friend bool operator==(const String& a,const String& b){return a.s==b.s;}
  String substring(unsigned a,unsigned b)const{return a<s.size()&&b>=a?String(s.substr(a,b-a)):String();}
  String& operator+=(char c){s+=c;return *this;}
  friend String operator+(const String& a,const String& b){return String(a.s+b.s);}
 };
 inline bool isDigit(char c){return std::isdigit(static_cast<unsigned char>(c));}
+
+inline void delay(unsigned long){}

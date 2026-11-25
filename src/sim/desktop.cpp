@@ -28,6 +28,11 @@
 #include "../calmati_remote_screen.h"
 #include "../calmati_targets_screen.h"
 #include "../calmati_result_screen.h"
+#include "../settings_screen.h"
+#include "../wifi_screen.h"
+#include "../bluetooth_screen.h"
+#include "../meta_screen.h"
+#include "../printer_screen.h"
 #include <ctime>
 void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
@@ -172,6 +177,21 @@ void preview() {
     auto* b_calmati_result=lv_button_create(screen);
     lv_label_set_text(lv_label_create(b_calmati_result),"Original calmati_result");
     lv_obj_add_event_cb(b_calmati_result,[](lv_event_t*){ calmati_result_screen_show("SIM RESULTS","/demo",false); },LV_EVENT_CLICKED,nullptr);
+    auto* b_settings=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_settings),"Original settings");
+    lv_obj_add_event_cb(b_settings,[](lv_event_t*){ settings_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_wifi=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_wifi),"Original wifi");
+    lv_obj_add_event_cb(b_wifi,[](lv_event_t*){ wifi_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_bluetooth=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_bluetooth),"Original bluetooth");
+    lv_obj_add_event_cb(b_bluetooth,[](lv_event_t*){ bluetooth_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_meta=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_meta),"Original meta");
+    lv_obj_add_event_cb(b_meta,[](lv_event_t*){ meta_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_printer=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_printer),"Original printer");
+    lv_obj_add_event_cb(b_printer,[](lv_event_t*){ printer_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -212,6 +232,11 @@ int main() {
     espnow_screen_create();
     lora_screen_create();
     wifi_radio_screen_create();
+    settings_screen_create();
+    wifi_screen_create();
+    bluetooth_screen_create();
+    meta_screen_create();
+    printer_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -226,7 +251,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active() || gps_screen_is_active() || car_screen_is_active() || nodes_screen_is_active() || configuration_screen_is_active() || send_message_screen_is_active() || channels_screen_is_active() || meshtastic_screen_is_active() || espnow_screen_is_active() || lora_screen_is_active() || wifi_radio_screen_is_active() || calmati_remote_screen_is_active() || calmati_targets_screen_is_active() || calmati_result_screen_is_active()) clock_screen_show(); else time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active() || gps_screen_is_active() || car_screen_is_active() || nodes_screen_is_active() || configuration_screen_is_active() || send_message_screen_is_active() || channels_screen_is_active() || meshtastic_screen_is_active() || espnow_screen_is_active() || lora_screen_is_active() || wifi_radio_screen_is_active() || calmati_remote_screen_is_active() || calmati_targets_screen_is_active() || calmati_result_screen_is_active() || settings_screen_is_active() || wifi_screen_is_active() || bluetooth_screen_is_active() || meta_screen_is_active() || printer_screen_is_active()) clock_screen_show(); else time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }
