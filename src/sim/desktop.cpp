@@ -3,6 +3,9 @@
 #include <lvgl.h>
 #include "mock/watch.hpp"
 #include "../stopwatch_screen.h"
+#include "../calendar_screen.h"
+#include <ctime>
+void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
 void time_screen_show() { lv_screen_load(preview_screen); }
 #include <array>
@@ -74,6 +77,9 @@ void preview() {
     auto* lbl=lv_label_create(btn);
     lv_label_set_text(lbl,"Original stopwatch");
     lv_obj_add_event_cb(btn,[](lv_event_t*){ stopwatch_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* cal=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(cal),"Original calendar");
+    lv_obj_add_event_cb(cal,[](lv_event_t*){ calendar_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -93,6 +99,7 @@ int main() {
     lv_indev_set_read_cb(input,read_pointer);
     preview();
     stopwatch_screen_create();
+    calendar_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
