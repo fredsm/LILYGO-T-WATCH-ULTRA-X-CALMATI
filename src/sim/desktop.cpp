@@ -152,7 +152,9 @@ int main(int argc,char** argv) {
     bool contact=false;int captured_button=-1;
     auto route_pointer=[&](int x,int y,bool down){
         int hit=(y>=H+8 && y<H+52 && x>=10 && x<400)?(x<195?0:(x>=215?1:-1)):-1;
-        if(down && !contact){contact=true;captured_button=hit;}
+        if(down && !contact){contact=true;captured_button=y>=H?(hit>=0?hit:-2):-1;}
+        // A tap in the control-bar margin must not reach the watch underneath.
+        if(captured_button==-2){if(!down){contact=false;captured_button=-1;}return;}
         if(captured_button>=0){
             auto* button=watch_buttons[captured_button];
             if(down && hit==captured_button)lv_obj_add_state(button,LV_STATE_PRESSED);
@@ -226,8 +228,11 @@ int main(int argc,char** argv) {
         if(watch.display_on()) {
             auto level=static_cast<uint8_t>(watch.brightness());
             SDL_SetTextureColorMod(texture,level,level,level);
-            SDL_RenderCopy(renderer,texture,nullptr,nullptr);
+            SDL_Rect face{0,0,W,H};SDL_RenderCopy(renderer,texture,&face,&face);
         }
+        // Physical buttons stay visible and usable even when the watch is dim/off.
+        SDL_SetTextureColorMod(texture,255,255,255);
+        SDL_Rect bar{0,H,W,BAR};SDL_RenderCopy(renderer,texture,&bar,&bar);
         SDL_RenderPresent(renderer); SDL_Delay(10);
     }
     SDL_StopTextInput();lv_indev_delete(input);lv_display_delete(controls_display);lv_display_delete(display);lv_deinit();
