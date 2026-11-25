@@ -85,6 +85,9 @@ void preview() {
 int main(int argc,char** argv) {
     const bool smoke=argc>1 && std::strcmp(argv[1],"--smoke")==0;
     SDL_SetMainReady();
+    // Native touch is handled below; disable duplicate synthesized mouse events.
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,"0");
+    SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS,"0");
     if(SDL_Init(SDL_INIT_VIDEO)!=0) { std::fprintf(stderr,"%s\n",SDL_GetError()); return 1; }
     auto* window=SDL_CreateWindow("T-Watch Ultra | SIMULATED DATA | F1: screen catalog",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,0);
     if(window) renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
@@ -98,6 +101,7 @@ int main(int argc,char** argv) {
     auto* input=lv_indev_create();
     lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,read_pointer);
+    lv_indev_set_scroll_limit(input,35); // Same tap/drag threshold as firmware setup.
     preview();
     screen_catalog=lv_screen_active();
     sim::initialize_screens(sim::create_clock());
@@ -105,6 +109,7 @@ int main(int argc,char** argv) {
     unsigned frame=0;bool smoke_ok=true;
     bool running=true;
     uint32_t last=SDL_GetTicks();
+    SDL_FingerID finger=0;bool touching=false;
     while(running) {
         if(smoke && frame%5==0){
             const auto index=frame/5;
@@ -117,11 +122,22 @@ int main(int argc,char** argv) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type==SDL_QUIT) running=false;
-            if(e.type==SDL_MOUSEMOTION) { pointer.x=e.motion.x; pointer.y=e.motion.y; }
-            if((e.type==SDL_MOUSEBUTTONDOWN || e.type==SDL_MOUSEBUTTONUP) && e.button.button==SDL_BUTTON_LEFT) {
-                pointer.x=e.button.x; pointer.y=e.button.y; pressed=e.type==SDL_MOUSEBUTTONDOWN;
+            if(e.type==SDL_MOUSEMOTION && e.motion.which!=SDL_TOUCH_MOUSEID && !touching) {
+                pointer.x=e.motion.x; pointer.y=e.motion.y;lv_indev_read(input);
             }
-            if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) pressed=false;
+            if((e.type==SDL_MOUSEBUTTONDOWN || e.type==SDL_MOUSEBUTTONUP) && e.button.button==SDL_BUTTON_LEFT && e.button.which!=SDL_TOUCH_MOUSEID && !touching) {
+                pointer.x=e.button.x; pointer.y=e.button.y; pressed=e.type==SDL_MOUSEBUTTONDOWN;
+                lv_indev_read(input);
+            }
+            if(e.type==SDL_FINGERDOWN && !touching){finger=e.tfinger.fingerId;touching=true;}
+            if(touching && (e.type==SDL_FINGERDOWN || e.type==SDL_FINGERMOTION || e.type==SDL_FINGERUP) && e.tfinger.fingerId==finger){
+                pointer.x=static_cast<int>(e.tfinger.x*(W-1));
+                pointer.y=static_cast<int>(e.tfinger.y*(H-1));
+                pressed=e.type!=SDL_FINGERUP;
+                lv_indev_read(input);
+                if(!pressed)touching=false;
+            }
+            if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {pressed=false;touching=false;lv_indev_read(input);}
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }

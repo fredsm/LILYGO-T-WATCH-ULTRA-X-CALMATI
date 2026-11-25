@@ -7,6 +7,12 @@
 #include "../alarm.h"
 #include "../stopwatch_screen.h"
 #include "../timer_screen.h"
+#include "../wardriver_screen.h"
+#include "../meshtastic_screen.h"
+#include "../meshtastic.h"
+#include "../tools_screen.h"
+#include "../time_screen.h"
+#include "../stealth.h"
 #include <ctime>
 #include <cstdio>
 
@@ -24,6 +30,7 @@ namespace sim {
 lv_obj_t* create_clock(){
     if(!clock_screen){
         create_original_clock();
+        lv_obj_add_event_cb(clock_screen,on_clock_gesture,LV_EVENT_GESTURE,nullptr);
         lv_obj_update_layout(clock_screen);
         realign_status_icons();
         update_clock();

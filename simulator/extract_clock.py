@@ -18,6 +18,7 @@ FUNCTIONS = (
     'clock_screen_set_show_date', 'clock_screen_set_show_ampm',
     'clock_screen_set_show_secs', 'clock_screen_set_vibrate',
     'clock_screen_set_matrix',
+    'on_clock_gesture',
 )
 
 def between(source, start, end):

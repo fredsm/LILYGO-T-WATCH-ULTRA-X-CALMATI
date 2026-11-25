@@ -1,6 +1,6 @@
 # Original firmware UI simulator
 
-## Watch-flow integration: Phase 1
+## Watch-flow integration: Phases 1 and 2
 
 The next desktop build starts on the original clock face at 410 x 502 pixels.
 **F1** opens the debug screen catalog; **B** and firmware clock-return callbacks
@@ -8,17 +8,20 @@ return to the watch face. The original analog/digital and time-format settings
 now control the face. Weather is a host-only synthetic fixture, populated by
 tapping the original weather label; the RTC advances from a fixed test epoch.
 
-`extract_clock.py` selects the original layout and 21 drawing/formatting
+`extract_clock.py` selects the original layout and 22 drawing/formatting/navigation
 functions verbatim from `src/main.cpp` during the host build. Missing or
 ambiguous source boundaries fail the build. The production file is unchanged.
 The original DEF CON image, clock font and Matrix background are compiled too.
 
-Swipe routing, physical buttons, keyboard text entry, a separate simulation
-panel and boot/onboarding remain later phases. The debug catalog's existing
+Clock swipes reuse the original handler: left to Wardriver, right to Meshtastic,
+down to Tools, up to Time. Original destination-screen gestures and tile
+callbacks handle subsequent navigation. Mouse dragging and native touchscreen
+finger input use the LVGL pointer driver, with the firmware scroll threshold.
+Physical buttons, keyboard text entry, a separate simulation panel and
+boot/onboarding remain later phases. The debug catalog's existing
 hardware sliders are not yet wired to the clock's hardware fixtures.
-Phase 1 is committed with CI skipped; its C++ build and added clock rendering
-test are pending the final workflow run. Previously downloaded EXEs do not
-contain these changes.
+The phase-2 commit enables CI for both phases. Download its successful Windows
+artifact; previously downloaded EXEs do not contain these changes.
 
 The native build reuses all **61 `src/*_screen.cpp` translation units**, plus the
 original task manager. Screens are not reimplemented. The SDL launcher and CMake
@@ -37,7 +40,7 @@ For Windows x64, download the **TWatchUltra-simulator-windows-x64** artifact
 from a successful **Simulator tests** GitHub Actions run. Extract the ZIP and
 double-click `twatch_desktop.exe`. This portable package includes statically
 linked SDL2 and C runtime; no development tools are needed. `smoke-test.cmd`
-automatically cycles all 62 entries and saves a log. CI runs all 70 desktop
+automatically cycles all 62 entries and saves a log. CI runs all desktop
 tests on Windows before publishing the artifact.
 
 Requires Git, CMake 3.16+, a C/C++17 compiler, and network access on the first
@@ -78,8 +81,8 @@ remain. Desktop builds also run `twatch_desktop --smoke` with SDL's dummy video
 driver, cycling through all screens using the real SDL render path.
 
 The tests validate host UI integration and sample workflows, not physical-device
-behavior or exhaustive visual equivalence. The watch face in `main.cpp`, boot
-onboarding and boot overlays are outside the dedicated-screen inventory.
+behavior or exhaustive visual equivalence. The original watch face is also tested. Boot
+onboarding and boot overlays are outside the current simulator scope.
 
 PlatformIO shortcuts remain available:
 

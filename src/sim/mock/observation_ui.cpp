@@ -63,3 +63,4 @@ const char* pwnagotchi_last_name(){return "SIM peer";}
 int pwnagotchi_last_pwnd(){return 1;}
 void stealth_set_armed(bool v){armed=v;}
 bool stealth_armed(){return armed;}
+bool stealth_active(){return false;}

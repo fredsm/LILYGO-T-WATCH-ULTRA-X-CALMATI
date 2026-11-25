@@ -96,3 +96,8 @@ add_test(NAME original_clock_home COMMAND clock_ui_test)
 set_tests_properties(original_clock_home PROPERTIES TIMEOUT 30)
 add_test(NAME original_clock_extraction
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_extract_clock.py")
+
+add_executable(navigation_ui_test tests/navigation_ui_test.cpp)
+target_link_libraries(navigation_ui_test PRIVATE simulator_ui)
+add_test(NAME original_swipe_navigation COMMAND navigation_ui_test)
+set_tests_properties(original_swipe_navigation PROPERTIES TIMEOUT 30)
