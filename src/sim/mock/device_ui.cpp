@@ -1,3 +1,5 @@
+#include <vector>
+#include <algorithm>
 #include "../../pingsweep.h"
 #include "../../hostresolve.h"
 #include "../../wifi_creds.h"
@@ -8,7 +10,6 @@
 #include <cstring>
 namespace {bool auto_connect=false,meta=false,capture=false;int hits=0,devices=0;}
 void tools_screen_show();
-void portscan_screen_show(uint32_t,const char*){tools_screen_show();}
 void pingsweep_start(){devices=1;}
 void pingsweep_stop(){}
 bool pingsweep_is_running(){return false;}
@@ -23,10 +24,15 @@ void wifi_creds_save(const char*,const char*){}
 bool wifi_creds_autoconnect(){if(auto_connect)WiFi.begin("SIM");return auto_connect;}
 bool wifi_creds_autoconnect_enabled(){return auto_connect;}
 void wifi_creds_set_autoconnect(bool v){auto_connect=v;}
-bool ble_scan_add(ble_scan_cb_t){sim_ble_active=true;return true;}
-void ble_scan_remove(ble_scan_cb_t){sim_ble_active=false;}
+namespace { std::vector<ble_scan_cb_t> ble_consumers; }
+bool ble_scan_add(ble_scan_cb_t cb){
+ if(std::find(ble_consumers.begin(),ble_consumers.end(),cb)==ble_consumers.end())ble_consumers.push_back(cb);
+ sim_ble_active=true;
+ esp_ble_gap_cb_param_t p{}; cb(&p); return true;
+}
+void ble_scan_remove(ble_scan_cb_t cb){ble_consumers.erase(std::remove(ble_consumers.begin(),ble_consumers.end(),cb),ble_consumers.end());sim_ble_active=!ble_consumers.empty();}
 bool ble_scan_active(){return sim_ble_active;}
-int ble_scan_consumer_count(){return sim_ble_active?1:0;}
+int ble_scan_consumer_count(){return int(ble_consumers.size());}
 bool phone_link_connected(){return false;}
 bool meta_glasses_start(){meta=true;return true;}
 void meta_glasses_stop(){meta=false;}

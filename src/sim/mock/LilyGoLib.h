@@ -14,11 +14,20 @@ struct SimGpsValue {
 struct SimGps {SimGpsValue location,date,time,satellites,altitude,speed,course;};
 struct SimRtc {template<class... T> void setDateTime(T...){} void hwClockRead(){}};
 enum {POWER_GPS,POWER_RADIO};
-struct SimRadio {void setRxBoostedGainMode(bool,bool){}}; inline SimRadio radio;
+constexpr int RADIOLIB_ERR_NONE=0;
+struct SimRadio {
+ float frequency=915; bool receiving=false;
+ void setRxBoostedGainMode(bool,bool){}
+ template<class... T> int begin(float f,T...){frequency=f;return 0;}
+ int setFrequency(float f,bool=false){frequency=f;return 0;}
+ int startReceive(){receiving=true;return 0;}
+ int standby(){receiving=false;return 0;}
+ float getRSSI(bool=false){return receiving ? -110.0f + std::fmod(frequency*7+lv_tick_get()/100,65.0f) : -127;}
+}; inline SimRadio radio;
 struct SimLilyGo { SimGps gps; SimRtc rtc; void powerControl(int,bool){} void initLoRa(){} void setBrightness(uint8_t){}  void vibrator() {} bool isCardReady() const { return true; } };
 inline SimLilyGo instance;
 
-struct SimSerial { template<class... Args> void printf(const char* fmt, Args... args) { std::printf(fmt,args...); } };
+struct SimSerial { void println(const char* s){std::puts(s);} void print(const char* s){std::printf("%s",s);}  template<class... Args> void printf(const char* fmt, Args... args) { std::printf(fmt,args...); } };
 inline SimSerial Serial;
 
 struct SimUart {void end(){}}; inline SimUart Serial1;

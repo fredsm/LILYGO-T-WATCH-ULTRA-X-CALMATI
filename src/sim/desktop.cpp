@@ -2,48 +2,12 @@
 #include <SDL.h>
 #include <lvgl.h>
 #include "mock/watch.hpp"
-#include "../stopwatch_screen.h"
-#include "../calendar_screen.h"
-#include "../timer_screen.h"
-#include "../alarm_screen.h"
-#include "../time_screen.h"
-#include "../usb_sd_screen.h"
-#include "../mouse_screen.h"
-#include "../webpanel_screen.h"
-#include "../pager_screen.h"
-#include "../tpms_screen.h"
-#include "../aprs_screen.h"
-#include "../adsb_screen.h"
-#include "../mic_screen.h"
-#include "../gps_screen.h"
-#include "../car_screen.h"
-#include "../nodes_screen.h"
-#include "../configuration_screen.h"
-#include "../send_message_screen.h"
-#include "../channels_screen.h"
-#include "../meshtastic_screen.h"
-#include "../espnow_screen.h"
-#include "../lora_screen.h"
-#include "../wifi_radio_screen.h"
-#include "../calmati_remote_screen.h"
-#include "../calmati_targets_screen.h"
-#include "../calmati_result_screen.h"
-#include "../settings_screen.h"
-#include "../wifi_screen.h"
-#include "../bluetooth_screen.h"
-#include "../meta_screen.h"
-#include "../printer_screen.h"
-#include <ctime>
-void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
-static lv_obj_t* preview_screen=nullptr;
-void clock_screen_show() { lv_screen_load(preview_screen); }
-void tools_screen_show() { lv_screen_load(preview_screen); }
-bool clock_screen_uses_12h() { return false; }
+#include "screens.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdio>
 namespace {
-constexpr int W=502,H=410;
+constexpr int W=410,H=502;
 std::array<uint16_t,W*H> pixels{};
 std::array<uint16_t,W*32> buffer{};
 SDL_Texture* texture=nullptr;
@@ -82,11 +46,10 @@ void charging_changed(lv_event_t* e) {
 }
 void preview() {
     auto* screen=lv_screen_active();
-    preview_screen=screen;
     lv_obj_set_flex_flow(screen,LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(screen,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
     auto* title=lv_label_create(screen);
-    lv_label_set_text(title,"T-Watch Ultra | UI runtime preview");
+    lv_label_set_text(title,"T-Watch Ultra | SIMULATED DATA");
     status=lv_label_create(screen);
     refresh();
     auto* battery=lv_slider_create(screen);
@@ -104,94 +67,16 @@ void preview() {
     lv_obj_add_event_cb(charge,charging_changed,LV_EVENT_VALUE_CHANGED,nullptr);
     auto* help=lv_label_create(screen);
     lv_label_set_text(help,"P: power | B: back | M: motion");
-    auto* btn=lv_button_create(screen);
-    auto* lbl=lv_label_create(btn);
-    lv_label_set_text(lbl,"Original stopwatch");
-    lv_obj_add_event_cb(btn,[](lv_event_t*){ stopwatch_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* cal=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(cal),"Original calendar");
-    lv_obj_add_event_cb(cal,[](lv_event_t*){ calendar_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* time=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(time),"Original time menu");
-    lv_obj_add_event_cb(time,[](lv_event_t*){ time_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* usb=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(usb),"Original USB SD");
-    lv_obj_add_event_cb(usb,[](lv_event_t*){ usb_sd_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* mouse=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(mouse),"Original mouse");
-    lv_obj_add_event_cb(mouse,[](lv_event_t*){ mouse_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* web=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(web),"Original web panel");
-    lv_obj_add_event_cb(web,[](lv_event_t*){ webpanel_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_pager=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_pager),"Original pager");
-    lv_obj_add_event_cb(b_pager,[](lv_event_t*){ pager_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_tpms=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_tpms),"Original tpms");
-    lv_obj_add_event_cb(b_tpms,[](lv_event_t*){ tpms_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_aprs=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_aprs),"Original aprs");
-    lv_obj_add_event_cb(b_aprs,[](lv_event_t*){ aprs_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_adsb=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_adsb),"Original adsb");
-    lv_obj_add_event_cb(b_adsb,[](lv_event_t*){ adsb_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_mic=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_mic),"Original mic");
-    lv_obj_add_event_cb(b_mic,[](lv_event_t*){ mic_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_gps=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_gps),"Original gps");
-    lv_obj_add_event_cb(b_gps,[](lv_event_t*){ gps_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_car=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_car),"Original car");
-    lv_obj_add_event_cb(b_car,[](lv_event_t*){ car_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_nodes=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_nodes),"Original nodes");
-    lv_obj_add_event_cb(b_nodes,[](lv_event_t*){ nodes_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_configuration=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_configuration),"Original configuration");
-    lv_obj_add_event_cb(b_configuration,[](lv_event_t*){ configuration_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_send_message=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_send_message),"Original send_message");
-    lv_obj_add_event_cb(b_send_message,[](lv_event_t*){ send_message_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_channels=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_channels),"Original channels");
-    lv_obj_add_event_cb(b_channels,[](lv_event_t*){ channels_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_meshtastic=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_meshtastic),"Original meshtastic");
-    lv_obj_add_event_cb(b_meshtastic,[](lv_event_t*){ meshtastic_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_espnow=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_espnow),"Original espnow");
-    lv_obj_add_event_cb(b_espnow,[](lv_event_t*){ espnow_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_lora=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_lora),"Original lora");
-    lv_obj_add_event_cb(b_lora,[](lv_event_t*){ lora_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_wifi_radio=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_wifi_radio),"Original wifi_radio");
-    lv_obj_add_event_cb(b_wifi_radio,[](lv_event_t*){ wifi_radio_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_calmati_remote=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_calmati_remote),"Original calmati_remote");
-    lv_obj_add_event_cb(b_calmati_remote,[](lv_event_t*){ calmati_remote_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_calmati_targets=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_calmati_targets),"Original calmati_targets");
-    lv_obj_add_event_cb(b_calmati_targets,[](lv_event_t*){ calmati_targets_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_calmati_result=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_calmati_result),"Original calmati_result");
-    lv_obj_add_event_cb(b_calmati_result,[](lv_event_t*){ calmati_result_screen_show("SIM RESULTS","/demo",false); },LV_EVENT_CLICKED,nullptr);
-    auto* b_settings=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_settings),"Original settings");
-    lv_obj_add_event_cb(b_settings,[](lv_event_t*){ settings_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_wifi=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_wifi),"Original wifi");
-    lv_obj_add_event_cb(b_wifi,[](lv_event_t*){ wifi_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_bluetooth=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_bluetooth),"Original bluetooth");
-    lv_obj_add_event_cb(b_bluetooth,[](lv_event_t*){ bluetooth_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_meta=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_meta),"Original meta");
-    lv_obj_add_event_cb(b_meta,[](lv_event_t*){ meta_screen_show(); },LV_EVENT_CLICKED,nullptr);
-    auto* b_printer=lv_button_create(screen);
-    lv_label_set_text(lv_label_create(b_printer),"Original printer");
-    lv_obj_add_event_cb(b_printer,[](lv_event_t*){ printer_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    std::size_t count=0;
+    const auto* entries=sim::screens(count);
+    for(std::size_t i=0;i<count;++i){
+        auto* btn=lv_button_create(screen);
+        lv_label_set_text(lv_label_create(btn),entries[i].name);
+        lv_obj_add_event_cb(btn,[](lv_event_t* e){
+            sim::leave_screen();
+            static_cast<const sim::Screen*>(lv_event_get_user_data(e))->show();
+        },LV_EVENT_CLICKED,const_cast<sim::Screen*>(&entries[i]));
+    }
 }
 }
 int main() {
@@ -210,34 +95,7 @@ int main() {
     lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,read_pointer);
     preview();
-    stopwatch_screen_create();
-    calendar_screen_create();
-    timer_screen_create();
-    alarm_screen_create();
-    time_screen_create();
-    usb_sd_screen_create();
-    mouse_screen_create();
-    webpanel_screen_create();
-    pager_screen_create();
-    tpms_screen_create();
-    aprs_screen_create();
-    adsb_screen_create();
-    mic_screen_create();
-    gps_screen_create();
-    car_screen_create();
-    nodes_screen_create();
-    configuration_screen_create();
-    send_message_screen_create();
-    channels_screen_create();
-    meshtastic_screen_create();
-    espnow_screen_create();
-    lora_screen_create();
-    wifi_radio_screen_create();
-    settings_screen_create();
-    wifi_screen_create();
-    bluetooth_screen_create();
-    meta_screen_create();
-    printer_screen_create();
+    sim::initialize_screens(lv_screen_active());
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -252,7 +110,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active() || gps_screen_is_active() || car_screen_is_active() || nodes_screen_is_active() || configuration_screen_is_active() || send_message_screen_is_active() || channels_screen_is_active() || meshtastic_screen_is_active() || espnow_screen_is_active() || lora_screen_is_active() || wifi_radio_screen_is_active() || calmati_remote_screen_is_active() || calmati_targets_screen_is_active() || calmati_result_screen_is_active() || settings_screen_is_active() || wifi_screen_is_active() || bluetooth_screen_is_active() || meta_screen_is_active() || printer_screen_is_active()) clock_screen_show(); else time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) sim::show_home();
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }
