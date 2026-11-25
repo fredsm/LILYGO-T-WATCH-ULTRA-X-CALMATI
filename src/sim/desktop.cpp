@@ -15,6 +15,13 @@
 #include "../aprs_screen.h"
 #include "../adsb_screen.h"
 #include "../mic_screen.h"
+#include "../gps_screen.h"
+#include "../car_screen.h"
+#include "../nodes_screen.h"
+#include "../configuration_screen.h"
+#include "../send_message_screen.h"
+#include "../channels_screen.h"
+#include "../meshtastic_screen.h"
 #include <ctime>
 void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
@@ -120,6 +127,27 @@ void preview() {
     auto* b_mic=lv_button_create(screen);
     lv_label_set_text(lv_label_create(b_mic),"Original mic");
     lv_obj_add_event_cb(b_mic,[](lv_event_t*){ mic_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_gps=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_gps),"Original gps");
+    lv_obj_add_event_cb(b_gps,[](lv_event_t*){ gps_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_car=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_car),"Original car");
+    lv_obj_add_event_cb(b_car,[](lv_event_t*){ car_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_nodes=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_nodes),"Original nodes");
+    lv_obj_add_event_cb(b_nodes,[](lv_event_t*){ nodes_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_configuration=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_configuration),"Original configuration");
+    lv_obj_add_event_cb(b_configuration,[](lv_event_t*){ configuration_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_send_message=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_send_message),"Original send_message");
+    lv_obj_add_event_cb(b_send_message,[](lv_event_t*){ send_message_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_channels=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_channels),"Original channels");
+    lv_obj_add_event_cb(b_channels,[](lv_event_t*){ channels_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_meshtastic=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_meshtastic),"Original meshtastic");
+    lv_obj_add_event_cb(b_meshtastic,[](lv_event_t*){ meshtastic_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -151,6 +179,12 @@ int main() {
     aprs_screen_create();
     adsb_screen_create();
     mic_screen_create();
+    gps_screen_create();
+    nodes_screen_create();
+    configuration_screen_create();
+    send_message_screen_create();
+    channels_screen_create();
+    meshtastic_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -165,7 +199,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active()) clock_screen_show(); else time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active() || gps_screen_is_active() || car_screen_is_active() || nodes_screen_is_active() || configuration_screen_is_active() || send_message_screen_is_active() || channels_screen_is_active() || meshtastic_screen_is_active()) clock_screen_show(); else time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }

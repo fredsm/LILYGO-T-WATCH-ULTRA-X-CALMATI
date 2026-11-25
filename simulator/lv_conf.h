@@ -14,3 +14,5 @@
 #define LV_FONT_MONTSERRAT_48 1
 #define LV_FONT_MONTSERRAT_36 1
 #endif
+
+#define LV_FONT_MONTSERRAT_18 1
