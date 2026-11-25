@@ -224,6 +224,7 @@ int main() {
     adsb_screen_create();
     mic_screen_create();
     gps_screen_create();
+    car_screen_create();
     nodes_screen_create();
     configuration_screen_create();
     send_message_screen_create();
