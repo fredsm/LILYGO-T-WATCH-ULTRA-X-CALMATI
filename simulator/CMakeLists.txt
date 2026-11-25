@@ -12,3 +12,7 @@ add_executable(twatch_sim ../src/sim/main.cpp)
 target_link_libraries(twatch_sim PRIVATE lvgl)
 enable_testing()
 add_test(NAME lvgl_headless_smoke COMMAND twatch_sim)
+
+add_executable(watch_mock_test tests/watch_test.cpp)
+target_include_directories(watch_mock_test PRIVATE ../src/sim)
+add_test(NAME watch_mock_state COMMAND watch_mock_test)
