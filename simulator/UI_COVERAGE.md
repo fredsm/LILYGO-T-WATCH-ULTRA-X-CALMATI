@@ -2,10 +2,11 @@
 
 Inventory: **61** dedicated screen translation units; **61 integrated**, none pending. The earlier estimate of 60 omitted one unit.
 
-Verified at commit `5c6a3405bbdf64a8e3262cbbbd395364134ad99d`:
-[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45649991807).
-Linux and Windows each pass **69/69** tests; the SDL desktop build passes
-**70/70**, including the real SDL render-path smoke test.
+Verified at commit `766e34e9f8886292a8b3da16a3486934f2d9933a`:
+[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45712681606).
+Linux and Windows native builds each pass **73/73** tests; Linux and Windows
+SDL desktop builds each pass **74/74**, including the real SDL render-path
+smoke test. The production firmware validation build also passes.
 
 Every dedicated screen links the original firmware translation unit, opens,
 renders, returns to the launcher and reopens. The complete navigation cycle also
@@ -81,4 +82,13 @@ or hardware validation. No UI redesign or production hardware changes were made.
 | src/wifi_screen.cpp | Headless + SDL smoke verified |
 | src/wpa3_sae_screen.cpp | Headless + SDL smoke verified |
 
-Additional coverage: original task manager is verified as a bonus entry. Watch face (main.cpp), onboarding and boot overlays are separate from the 61 dedicated screen inventory and are not claimed as covered.
+Additional coverage: original task manager and the original watch face from
+main.cpp are verified outside the 61 dedicated screen inventory. Tests cover
+clock face switching, repeated four-direction swipe round trips, Tools tile
+scrolling and edge returns, opening the original Stopwatch tile, firmware
+Power/Back routes and debounce, UTF-8 compose editing, confirmation, cancellation
+and hidden-field rejection. The desktop exposes touchable watch buttons below
+the unchanged 410 x 502 viewport. Onboarding, boot overlays and exhaustive
+manual touchscreen/visual verification remain outside this coverage.
+
+[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45712681606/artifacts/15069465546).
