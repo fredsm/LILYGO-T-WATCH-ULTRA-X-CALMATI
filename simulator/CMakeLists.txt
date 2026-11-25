@@ -63,7 +63,7 @@ add_library(simulator_ui STATIC ${SCREEN_SOURCES}
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
-    ../src/sim/mock/device_ui.cpp ../src/sim/mock/analysis_ui.cpp)
+    ../src/sim/mock/device_ui.cpp ../src/sim/mock/analysis_ui.cpp ../src/sim/mock/security_ui.cpp)
 target_include_directories(simulator_ui PUBLIC ../src/sim/mock)
 target_compile_definitions(simulator_ui PUBLIC TWATCH_SIMULATOR=1)
 target_link_libraries(simulator_ui PUBLIC lvgl)

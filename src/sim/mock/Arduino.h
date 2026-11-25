@@ -27,3 +27,6 @@ public:
 inline bool isDigit(char c){return std::isdigit(static_cast<unsigned char>(c));}
 
 inline void delay(unsigned long){}
+
+constexpr double DEG_TO_RAD=0.017453292519943295;
+constexpr double RAD_TO_DEG=57.29577951308232;

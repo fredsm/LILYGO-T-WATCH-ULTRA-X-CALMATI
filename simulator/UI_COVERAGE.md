@@ -1,6 +1,6 @@
 # Original UI coverage
 
-Inventory: **61** dedicated screen translation units; **40 integrated**, 21 pending. The earlier estimate of 60 omitted one unit.
+Inventory: **61** dedicated screen translation units; **50 integrated**, 11 pending. The earlier estimate of 60 omitted one unit.
 
 Inventory of dedicated screen translation units. Integrated means included in native build; verified means headless CI passed. Desktop interaction remains unverified for all. Additional UI in main.cpp, onboarding and other modules must be inventoried separately. No UI redesign before full coverage.
 
@@ -10,8 +10,8 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/alarm_screen.cpp | Integrated, unverified |
 | src/analyze_screen.cpp | Integrated; CI pending |
 | src/aprs_screen.cpp | Integrated, unverified |
-| src/arp_mitm_screen.cpp | Pending |
-| src/badusb_screen.cpp | Pending |
+| src/arp_mitm_screen.cpp | Integrated; CI pending |
+| src/badusb_screen.cpp | Integrated; CI pending |
 | src/ble_pair_screen.cpp | Integrated; CI pending |
 | src/bluetooth_screen.cpp | Integrated, unverified |
 | src/bt_analyze_screen.cpp | Integrated; CI pending |
@@ -23,10 +23,10 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/car_screen.cpp | Integrated, unverified |
 | src/channels_screen.cpp | Integrated, unverified |
 | src/configuration_screen.cpp | Integrated, unverified |
-| src/deauther_screen.cpp | Pending |
-| src/drone_screen.cpp | Pending |
+| src/deauther_screen.cpp | Integrated; CI pending |
+| src/drone_screen.cpp | Integrated; CI pending |
 | src/espnow_screen.cpp | Integrated, unverified |
-| src/evil_twin_screen.cpp | Pending |
+| src/evil_twin_screen.cpp | Integrated; CI pending |
 | src/gatt_explorer_screen.cpp | Pending |
 | src/gps_screen.cpp | Integrated, unverified |
 | src/lora_analyze_screen.cpp | Integrated; CI pending |
@@ -35,7 +35,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/meshtastic_screen.cpp | Integrated, unverified |
 | src/meta_screen.cpp | Integrated, unverified |
 | src/mic_screen.cpp | Integrated, unverified |
-| src/mifare_screen.cpp | Pending |
+| src/mifare_screen.cpp | Integrated; CI pending |
 | src/mouse_screen.cpp | Integrated, unverified |
 | src/nfc_credit_screen.cpp | Pending |
 | src/nfc_screen.cpp | Pending |
@@ -43,11 +43,11 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/nodes_screen.cpp | Integrated, unverified |
 | src/pager_screen.cpp | Integrated, unverified |
 | src/pet_screen.cpp | Pending |
-| src/phantom_flood_screen.cpp | Pending |
+| src/phantom_flood_screen.cpp | Integrated; CI pending |
 | src/portscan_screen.cpp | Integrated; CI pending |
 | src/printer_screen.cpp | Integrated, unverified |
-| src/rid_spoof_screen.cpp | Pending |
-| src/scan_screen.cpp | Pending |
+| src/rid_spoof_screen.cpp | Integrated; CI pending |
+| src/scan_screen.cpp | Integrated; CI pending |
 | src/send_message_screen.cpp | Integrated, unverified |
 | src/settings_screen.cpp | Integrated, unverified |
 | src/skimmer_screen.cpp | Pending |
@@ -66,6 +66,6 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/webpanel_screen.cpp | Integrated, unverified |
 | src/wifi_radio_screen.cpp | Integrated, unverified |
 | src/wifi_screen.cpp | Integrated, unverified |
-| src/wpa3_sae_screen.cpp | Pending |
+| src/wpa3_sae_screen.cpp | Integrated; CI pending |
 
 Additional coverage: watch face (main.cpp), onboarding, task manager, overlays and dialogs: pending.

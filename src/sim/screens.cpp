@@ -1,3 +1,13 @@
+#include "../arp_mitm_screen.h"
+#include "../badusb_screen.h"
+#include "../deauther_screen.h"
+#include "../wpa3_sae_screen.h"
+#include "../evil_twin_screen.h"
+#include "../drone_screen.h"
+#include "../rid_spoof_screen.h"
+#include "../phantom_flood_screen.h"
+#include "../mifare_screen.h"
+#include "../scan_screen.h"
 #include "screens.hpp"
 #include <ctime>
 #include "../stopwatch_screen.h"

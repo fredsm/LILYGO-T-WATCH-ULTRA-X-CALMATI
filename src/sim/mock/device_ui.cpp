@@ -28,7 +28,12 @@ namespace { std::vector<ble_scan_cb_t> ble_consumers; }
 bool ble_scan_add(ble_scan_cb_t cb){
  if(std::find(ble_consumers.begin(),ble_consumers.end(),cb)==ble_consumers.end())ble_consumers.push_back(cb);
  sim_ble_active=true;
- esp_ble_gap_cb_param_t p{}; cb(&p); return true;
+ esp_ble_gap_cb_param_t p{};
+ // Synthetic Remote ID advert consumed by the original drone decoder.
+ p.scan_rst.adv_data_len=30;p.scan_rst.ble_adv[0]=29;p.scan_rst.ble_adv[1]=0x16;
+ p.scan_rst.ble_adv[2]=0xfa;p.scan_rst.ble_adv[3]=0xff;p.scan_rst.ble_adv[4]=0x0d;
+ p.scan_rst.ble_adv[5]=2;p.scan_rst.ble_adv[6]=0x21;
+ std::memcpy(p.scan_rst.ble_adv+7,"SIM-DRONE-0001",14);cb(&p);return true;
 }
 void ble_scan_remove(ble_scan_cb_t cb){ble_consumers.erase(std::remove(ble_consumers.begin(),ble_consumers.end(),cb),ble_consumers.end());sim_ble_active=!ble_consumers.empty();}
 bool ble_scan_active(){return sim_ble_active;}
@@ -56,3 +61,8 @@ void clock_screen_set_manual_override(bool){}
 void clock_screen_set_dim_timeout(uint32_t){}
 void clock_screen_set_dim_brightness(uint8_t){}
 void clock_screen_apply_manual_time(int,int,int,int,int){}
+
+namespace {int ble_holds=0;}
+bool ble_stack_acquire(){++ble_holds;sim_ble_active=true;return true;}
+void ble_stack_release(){if(ble_holds)--ble_holds;sim_ble_active=ble_holds||!ble_consumers.empty();}
+void ble_gap_forward_set(ble_gap_forward_t){}
