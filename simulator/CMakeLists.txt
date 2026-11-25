@@ -58,7 +58,7 @@ foreach(row IN LISTS SCREEN_ROWS)
     list(APPEND SCREEN_NAMES "${screen}")
 endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
-    ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
+    ../src/task_manager.cpp ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
     ../src/sim/screens.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
@@ -78,3 +78,10 @@ set_tests_properties(ui_navigation_cycle PROPERTIES TIMEOUT 90)
 if(TWATCH_DESKTOP)
     target_link_libraries(twatch_desktop PRIVATE simulator_ui)
 endif()
+
+add_test(NAME ui_task_manager COMMAND screen_ui_test task_manager)
+
+add_executable(screen_interaction_test tests/screen_interaction_test.cpp)
+target_link_libraries(screen_interaction_test PRIVATE simulator_ui)
+add_test(NAME original_ui_interactions COMMAND screen_interaction_test)
+set_tests_properties(original_ui_interactions PROPERTIES TIMEOUT 90)

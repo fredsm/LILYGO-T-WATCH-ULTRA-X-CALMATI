@@ -66,3 +66,5 @@ namespace {int ble_holds=0;}
 bool ble_stack_acquire(){++ble_holds;sim_ble_active=true;return true;}
 void ble_stack_release(){if(ble_holds)--ble_holds;sim_ble_active=ble_holds||!ble_consumers.empty();}
 void ble_gap_forward_set(ble_gap_forward_t){}
+
+bool meta_glasses_is_running(){return meta;}

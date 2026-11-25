@@ -12,6 +12,7 @@ class String {
 public:
  String()=default; String(const char* p):s(p?p:""){} String(std::string p):s(p){}
  template<class T,typename std::enable_if<std::is_arithmetic<T>::value,int>::type=0> String(T v):s(std::to_string(v)){}
+ void toCharArray(char* out,size_t n)const{if(n){size_t copy=s.size()<n-1?s.size():n-1;std::memcpy(out,s.data(),copy);out[copy]=0;}}
  const char* c_str() const{return s.c_str();} unsigned length()const{return s.size();}
  char operator[](unsigned i)const{return i<s.size()?s[i]:0;}
  int indexOf(const char* p,unsigned from=0)const{auto i=s.find(p,from);return i==std::string::npos?-1:int(i);}

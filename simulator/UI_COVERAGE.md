@@ -1,6 +1,6 @@
 # Original UI coverage
 
-Inventory: **61** dedicated screen translation units; **60 integrated**, 1 pending. The earlier estimate of 60 omitted one unit.
+Inventory: **61** dedicated screen translation units; **61 integrated**, none pending. The earlier estimate of 60 omitted one unit.
 
 Inventory of dedicated screen translation units. Integrated means included in native build; verified means headless CI passed. Desktop interaction remains unverified for all. Additional UI in main.cpp, onboarding and other modules must be inventoried separately. No UI redesign before full coverage.
 
@@ -57,7 +57,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/threat_radar_screen.cpp | Integrated; CI pending |
 | src/time_screen.cpp | Integrated, unverified |
 | src/timer_screen.cpp | Integrated, unverified |
-| src/tools_screen.cpp | Pending |
+| src/tools_screen.cpp | Integrated; CI pending |
 | src/tpms_screen.cpp | Integrated, unverified |
 | src/usb_sd_screen.cpp | Integrated, unverified |
 | src/voice_screen.cpp | Integrated; CI pending |
@@ -68,4 +68,4 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/wifi_screen.cpp | Integrated, unverified |
 | src/wpa3_sae_screen.cpp | Integrated; CI pending |
 
-Additional coverage: watch face (main.cpp), onboarding, task manager, overlays and dialogs: pending.
+Additional coverage: original task manager is integrated as a bonus entry. Watch face (main.cpp), onboarding and boot overlays are separate from the 61 dedicated screen inventory and are not claimed as covered.

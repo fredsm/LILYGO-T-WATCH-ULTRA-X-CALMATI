@@ -26,7 +26,7 @@ struct SimRadio {
  int standby(){receiving=false;return 0;}
  float getRSSI(bool=false){return receiving ? -110.0f + std::fmod(frequency*7+lv_tick_get()/100,65.0f) : -127;}
 }; inline SimRadio radio;
-struct SimPmu {bool nfc=false;bool isEnableDLDO1()const{return nfc;}};
+struct SimPmu {int getBatteryPercent()const{return 75;} bool isCharging()const{return false;} bool nfc=false;bool isEnableDLDO1()const{return nfc;}};
 struct SimLilyGo { SimPmu pmu; void initNFC(){}  SimGps gps; SimRtc rtc; void powerControl(int power,bool on){if(power==POWER_NFC)pmu.nfc=on;} void initLoRa(){} void setBrightness(uint8_t){}  void vibrator() {} bool isCardReady() const { return true; } };
 inline SimLilyGo instance;
 

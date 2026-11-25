@@ -26,3 +26,5 @@ bool calmati_status(String& out){out="{}";return true;}
 bool calmati_aps(String& out){out="[]";return true;}
 bool calmati_get(const char*,String& out){out="[]";return true;}
 const char* calmati_ap_ssid(){return "SIM-CALMATI";}
+
+bool meshtastic_is_active(){return mesh;}

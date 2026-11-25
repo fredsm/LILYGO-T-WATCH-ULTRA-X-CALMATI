@@ -59,3 +59,4 @@ SIM_SCREEN(pet, pet_screen_create, pet_screen_show, pet_screen_is_active, nullpt
 SIM_SCREEN(skimmer, skimmer_screen_create, skimmer_screen_show, skimmer_screen_is_active, skimmer_screen_stop)
 SIM_SCREEN(voice, nullptr, show_voice, voice_active, nullptr)
 SIM_SCREEN(wardriver, wardriver_screen_create, wardriver_screen_show, wardriver_screen_is_active, nullptr)
+SIM_SCREEN(tools, tools_screen_create, tools_screen_show, tools_screen_is_active, nullptr)

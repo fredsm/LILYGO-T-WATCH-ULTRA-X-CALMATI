@@ -19,6 +19,8 @@
 #include "../mifare_screen.h"
 #include "../scan_screen.h"
 #include "screens.hpp"
+#include "../tools_screen.h"
+#include "../task_manager.h"
 #include <ctime>
 #include "../stopwatch_screen.h"
 #include "../calendar_screen.h"
@@ -68,10 +70,14 @@ void show_voice(){voice_screen_show();voice_screen=lv_screen_active();}
 bool voice_active(){return voice_screen && lv_screen_active()==voice_screen;}
 void show_results(){calmati_result_screen_show("SIM RESULTS","/demo",false);}
 void show_ports(){portscan_screen_show(0xc000020a,"SIM host");}
+lv_obj_t* task_screen=nullptr;
+void show_task(){task_manager_show();task_screen=lv_screen_active();}
+bool task_active(){return task_screen && lv_screen_active()==task_screen;}
 const sim::Screen registry[]={
 #define SIM_SCREEN(name,create,show,active,stop) {#name,create,show,active,stop},
 #include "screens.inc"
 #undef SIM_SCREEN
+ {"task_manager",nullptr,show_task,task_active,nullptr},
 };
 }
 namespace sim {
@@ -83,6 +89,5 @@ void leave_screen(){for(const auto& s:registry)if(s.active()&&s.stop)s.stop();}
 void show_home(){leave_screen();lv_screen_load(home_screen);}
 }
 void clock_screen_show(){sim::show_home();}
-void tools_screen_show(){sim::show_home();}
 bool clock_screen_uses_12h(){return false;}
 void clock_screen_get_local_time(struct tm* out){*out={};out->tm_year=126;out->tm_mon=10;out->tm_mday=25;out->tm_hour=12;out->tm_wday=3;}
