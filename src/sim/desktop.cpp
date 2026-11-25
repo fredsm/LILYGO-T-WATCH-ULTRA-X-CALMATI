@@ -4,6 +4,7 @@
 #include "mock/watch.hpp"
 #include "screens.hpp"
 #include "clock.hpp"
+#include "pointer.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -114,7 +115,7 @@ int main(int argc,char** argv) {
     uint32_t last=SDL_GetTicks();
     SDL_FingerID finger=0;bool touching=false;
     uint32_t pointer_event_at=last,held_read_at=last;
-    auto dispatch_pointer=[&](){pointer_event_at=SDL_GetTicks();lv_indev_read(input);};
+    auto dispatch_pointer=[&](){pointer_event_at=SDL_GetTicks();sim::dispatch_pointer(input,pressed);};
     while(running) {
         if(smoke && frame%5==0){
             const auto index=frame/5;
@@ -155,7 +156,7 @@ int main(int argc,char** argv) {
         watch.advance(delta); lv_tick_inc(delta); sim::tick();
         // Stationary holds still need reads for original long-press callbacks.
         if(pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
-            lv_indev_read(input);held_read_at=now;
+            sim::dispatch_pointer(input,pressed);held_read_at=now;
         }
         lv_timer_handler();
         sim::ButtonEvent event{};

@@ -1,5 +1,6 @@
 #include "../../src/sim/clock.hpp"
 #include "../../src/sim/screens.hpp"
+#include "../../src/sim/pointer.hpp"
 #include "../../src/wardriver_screen.h"
 #include "../../src/meshtastic_screen.h"
 #include "../../src/tools_screen.h"
@@ -14,7 +15,7 @@ lv_indev_t* input=nullptr;lv_point_t point{};bool pressed=false;
 void flush(lv_display_t* d,const lv_area_t*,uint8_t*){lv_display_flush_ready(d);}
 void read(lv_indev_t*,lv_indev_data_t* d){d->point=point;d->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
 void pump(){for(int i=0;i<15;++i){lv_tick_inc(20);sim::tick();lv_timer_handler();}}
-void sample(int x,int y,bool down){point={x,y};pressed=down;lv_tick_inc(20);lv_indev_read(input);lv_timer_handler();}
+void sample(int x,int y,bool down){point={x,y};pressed=down;lv_tick_inc(20);sim::dispatch_pointer(input,pressed);lv_timer_handler();}
 void swipe(int x,int y,int dx,int dy){
  sample(x,y,true);
  for(int i=1;i<=8;++i)sample(x+dx*i/8,y+dy*i/8,true);
@@ -25,7 +26,11 @@ lv_obj_t* label(lv_obj_t* parent,const char* text){
  for(unsigned i=0;i<lv_obj_get_child_count(parent);++i)if(auto* result=label(lv_obj_get_child(parent,i),text))return result;
  return nullptr;
 }
-bool check(bool condition,const char* name){std::printf("%s: %s\n",name,condition?"PASS":"FAIL");std::fflush(stdout);return condition;}
+bool check(bool condition,const char* name){
+ std::printf("%s: %s\n",name,condition?"PASS":"FAIL");
+ if(!condition){std::size_t count=0;const auto* entries=sim::screens(count);for(std::size_t i=0;i<count;++i)if(entries[i].active())std::printf("Active: %s\n",entries[i].name);}
+ std::fflush(stdout);return condition;
+}
 }
 int main(){
  lv_init();auto* d=lv_display_create(410,502);
