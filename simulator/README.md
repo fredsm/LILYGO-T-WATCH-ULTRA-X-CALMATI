@@ -68,5 +68,16 @@ pio run -e sim -t sim_build
 pio run -e sim_test -t sim_check
 ```
 
+With desktop dependencies installed, build and launch in one command:
+
+```sh
+pio run -e sim -t sim_run
+```
+
+Local PlatformIO is optional: the Windows CI artifact is the supported route
+for testing on machines without a desktop compiler, CMake or SDL2 development
+files. Intermediate implementation commits use `[skip ci]`; a final commit
+without that marker runs the Linux/Windows tests and packages the Windows EXE.
+
 The production PlatformIO target excludes `src/sim/`; no firmware screen or
 hardware backend is modified by this integration.
