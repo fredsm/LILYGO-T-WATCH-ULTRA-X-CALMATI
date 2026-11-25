@@ -8,13 +8,16 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <src/indev/lv_indev_private.h>
 namespace {
 std::array<uint16_t,410*32> buffer{};
 lv_indev_t* input=nullptr;lv_point_t point{};bool pressed=false;
 void flush(lv_display_t* d,const lv_area_t*,uint8_t*){lv_display_flush_ready(d);}
 void read(lv_indev_t*,lv_indev_data_t* d){d->point=point;d->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
 void pump(){for(int i=0;i<15;++i){lv_tick_inc(20);sim::tick();lv_timer_handler();}}
-void sample(int x,int y,bool down){point={x,y};pressed=down;lv_tick_inc(20);lv_indev_read(input);lv_timer_handler();}
+void sample(int x,int y,bool down){point={x,y};pressed=down;lv_tick_inc(20);lv_indev_read(input);lv_timer_handler();
+ std::printf("pointer %d,%d down=%d root=%d scroll=%d gesture=%d sum=%d,%d\n",x,y,down,input->pointer.act_obj==lv_screen_active(),input->pointer.scroll_obj!=nullptr,input->pointer.gesture_dir,input->pointer.gesture_sum.x,input->pointer.gesture_sum.y);
+}
 void swipe(int x,int y,int dx,int dy){
  sample(x,y,true);
  for(int i=1;i<=8;++i)sample(x+dx*i/8,y+dy*i/8,true);
