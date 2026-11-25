@@ -22,6 +22,12 @@
 #include "../send_message_screen.h"
 #include "../channels_screen.h"
 #include "../meshtastic_screen.h"
+#include "../espnow_screen.h"
+#include "../lora_screen.h"
+#include "../wifi_radio_screen.h"
+#include "../calmati_remote_screen.h"
+#include "../calmati_targets_screen.h"
+#include "../calmati_result_screen.h"
 #include <ctime>
 void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
@@ -148,6 +154,24 @@ void preview() {
     auto* b_meshtastic=lv_button_create(screen);
     lv_label_set_text(lv_label_create(b_meshtastic),"Original meshtastic");
     lv_obj_add_event_cb(b_meshtastic,[](lv_event_t*){ meshtastic_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_espnow=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_espnow),"Original espnow");
+    lv_obj_add_event_cb(b_espnow,[](lv_event_t*){ espnow_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_lora=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_lora),"Original lora");
+    lv_obj_add_event_cb(b_lora,[](lv_event_t*){ lora_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_wifi_radio=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_wifi_radio),"Original wifi_radio");
+    lv_obj_add_event_cb(b_wifi_radio,[](lv_event_t*){ wifi_radio_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_calmati_remote=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_calmati_remote),"Original calmati_remote");
+    lv_obj_add_event_cb(b_calmati_remote,[](lv_event_t*){ calmati_remote_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_calmati_targets=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_calmati_targets),"Original calmati_targets");
+    lv_obj_add_event_cb(b_calmati_targets,[](lv_event_t*){ calmati_targets_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* b_calmati_result=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(b_calmati_result),"Original calmati_result");
+    lv_obj_add_event_cb(b_calmati_result,[](lv_event_t*){ calmati_result_screen_show("SIM RESULTS","/demo",false); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -185,6 +209,9 @@ int main() {
     send_message_screen_create();
     channels_screen_create();
     meshtastic_screen_create();
+    espnow_screen_create();
+    lora_screen_create();
+    wifi_radio_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -199,7 +226,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active() || gps_screen_is_active() || car_screen_is_active() || nodes_screen_is_active() || configuration_screen_is_active() || send_message_screen_is_active() || channels_screen_is_active() || meshtastic_screen_is_active()) clock_screen_show(); else time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active() || pager_screen_is_active() || tpms_screen_is_active() || aprs_screen_is_active() || adsb_screen_is_active() || mic_screen_is_active() || gps_screen_is_active() || car_screen_is_active() || nodes_screen_is_active() || configuration_screen_is_active() || send_message_screen_is_active() || channels_screen_is_active() || meshtastic_screen_is_active() || espnow_screen_is_active() || lora_screen_is_active() || wifi_radio_screen_is_active() || calmati_remote_screen_is_active() || calmati_targets_screen_is_active() || calmati_result_screen_is_active()) clock_screen_show(); else time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }

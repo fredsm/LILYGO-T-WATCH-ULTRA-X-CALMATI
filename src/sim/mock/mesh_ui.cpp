@@ -16,9 +16,9 @@ void main_loop_request_lvgl_priority(int){}
 bool map_screen_available(){return false;}
 void map_screen_show(){tools_screen_show();}
 void map_screen_focus(double,double){tools_screen_show();}
-void espnow_screen_show(){tools_screen_show();}
-const EnowPeer* esp_now_link_peer_by_id(uint32_t){return nullptr;}
-bool esp_now_link_send_text_to(const char*,uint32_t){return false;}
+
+
+
 namespace { bool saved=false; double lat=0,lon=0; char lname[40]="Sim Watch",sname[5]="SIM"; bool announce=true; uint32_t interval=600000; int channel=0; MeshChannel channels[4]={{"LongFast",{},1,0,true},{"Demo",{},0,0,false},{},{}}; std::vector<MeshOutgoing> outgoing; std::vector<MeshMessage> messages; MeshTraceroute trace{}; }
 bool car_finder_save(double a,double b){lat=a;lon=b;saved=true;return true;}
 bool car_finder_clear(){saved=false;return true;}

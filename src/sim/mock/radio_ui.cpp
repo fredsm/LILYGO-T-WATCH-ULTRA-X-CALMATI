@@ -6,7 +6,7 @@
 #include <lvgl.h>
 #include <cstdio>
 namespace { bool p=false,scan=false,t=false,a=false,d=false,m=false; float freq=433.92f; PagerMode mode=PAGER_POCSAG_1200; TpmsFormat fmt=TPMS_FORMAT_FSK; bool f433=true; char call[16]="SIM-1"; uint32_t start=0,elapsed=0,seq=0; }
-bool lora_screen_is_powered(){return false;}
+
 bool pager_start(float f,PagerMode v){freq=f;mode=v;p=true;scan=false;return true;}
 void pager_stop(){p=scan=false;}
 bool pager_is_running(){return p;}
