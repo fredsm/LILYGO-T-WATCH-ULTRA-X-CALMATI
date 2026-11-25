@@ -5,7 +5,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | Source | Native status |
 |---|---|
 | src/adsb_screen.cpp | Pending |
-| src/alarm_screen.cpp | Pending |
+| src/alarm_screen.cpp | Integrated, unverified |
 | src/analyze_screen.cpp | Pending |
 | src/aprs_screen.cpp | Pending |
 | src/arp_mitm_screen.cpp | Pending |
@@ -53,8 +53,8 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/subghz_sentinel_screen.cpp | Pending |
 | src/tesla_cp_screen.cpp | Pending |
 | src/threat_radar_screen.cpp | Pending |
-| src/time_screen.cpp | Pending |
-| src/timer_screen.cpp | Pending |
+| src/time_screen.cpp | Integrated, unverified |
+| src/timer_screen.cpp | Integrated, unverified |
 | src/tools_screen.cpp | Pending |
 | src/tpms_screen.cpp | Pending |
 | src/usb_sd_screen.cpp | Pending |

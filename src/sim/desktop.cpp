@@ -4,10 +4,14 @@
 #include "mock/watch.hpp"
 #include "../stopwatch_screen.h"
 #include "../calendar_screen.h"
+#include "../timer_screen.h"
+#include "../alarm_screen.h"
+#include "../time_screen.h"
 #include <ctime>
 void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
-void time_screen_show() { lv_screen_load(preview_screen); }
+void clock_screen_show() { lv_screen_load(preview_screen); }
+bool clock_screen_uses_12h() { return false; }
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -80,6 +84,9 @@ void preview() {
     auto* cal=lv_button_create(screen);
     lv_label_set_text(lv_label_create(cal),"Original calendar");
     lv_obj_add_event_cb(cal,[](lv_event_t*){ calendar_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* time=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(time),"Original time menu");
+    lv_obj_add_event_cb(time,[](lv_event_t*){ time_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -100,6 +107,9 @@ int main() {
     preview();
     stopwatch_screen_create();
     calendar_screen_create();
+    timer_screen_create();
+    alarm_screen_create();
+    time_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -114,7 +124,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active()) clock_screen_show(); else time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }
