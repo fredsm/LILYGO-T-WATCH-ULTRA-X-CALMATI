@@ -8,6 +8,8 @@
 #include "../alarm_screen.h"
 #include "../time_screen.h"
 #include "../usb_sd_screen.h"
+#include "../mouse_screen.h"
+#include "../webpanel_screen.h"
 #include <ctime>
 void clock_screen_get_local_time(struct tm* out) { auto t=std::time(nullptr); *out=*std::localtime(&t); }
 static lv_obj_t* preview_screen=nullptr;
@@ -59,7 +61,7 @@ void preview() {
     auto* screen=lv_screen_active();
     preview_screen=screen;
     lv_obj_set_flex_flow(screen,LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(screen,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(screen,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
     auto* title=lv_label_create(screen);
     lv_label_set_text(title,"T-Watch Ultra | UI runtime preview");
     status=lv_label_create(screen);
@@ -92,6 +94,12 @@ void preview() {
     auto* usb=lv_button_create(screen);
     lv_label_set_text(lv_label_create(usb),"Original USB SD");
     lv_obj_add_event_cb(usb,[](lv_event_t*){ usb_sd_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* mouse=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(mouse),"Original mouse");
+    lv_obj_add_event_cb(mouse,[](lv_event_t*){ mouse_screen_show(); },LV_EVENT_CLICKED,nullptr);
+    auto* web=lv_button_create(screen);
+    lv_label_set_text(lv_label_create(web),"Original web panel");
+    lv_obj_add_event_cb(web,[](lv_event_t*){ webpanel_screen_show(); },LV_EVENT_CLICKED,nullptr);
 }
 }
 int main() {
@@ -116,6 +124,8 @@ int main() {
     alarm_screen_create();
     time_screen_create();
     usb_sd_screen_create();
+    mouse_screen_create();
+    webpanel_screen_create();
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
@@ -130,7 +140,7 @@ int main() {
             if(e.type==SDL_KEYDOWN && !e.key.repeat) {
                 if(e.key.keysym.sym==SDLK_ESCAPE) running=false;
                 if(e.key.keysym.sym==SDLK_p) { watch.button(sim::Button::power,true); watch.button(sim::Button::power,false); watch.set_display_on(!watch.display_on()); }
-                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active()) clock_screen_show(); else time_screen_show(); }
+                if(e.key.keysym.sym==SDLK_b) { watch.button(sim::Button::back,true); watch.button(sim::Button::back,false); if(time_screen_is_active() || usb_sd_screen_is_active() || mouse_screen_is_active() || webpanel_screen_is_active()) clock_screen_show(); else time_screen_show(); }
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }

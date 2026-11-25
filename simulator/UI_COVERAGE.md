@@ -34,7 +34,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/meta_screen.cpp | Pending |
 | src/mic_screen.cpp | Pending |
 | src/mifare_screen.cpp | Pending |
-| src/mouse_screen.cpp | Pending |
+| src/mouse_screen.cpp | Integrated, unverified |
 | src/nfc_credit_screen.cpp | Pending |
 | src/nfc_screen.cpp | Pending |
 | src/nfc_write_screen.cpp | Pending |
@@ -61,7 +61,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/voice_screen.cpp | Pending |
 | src/wardriver_screen.cpp | Pending |
 | src/waterfall_screen.cpp | Pending |
-| src/webpanel_screen.cpp | Pending |
+| src/webpanel_screen.cpp | Integrated, unverified |
 | src/wifi_radio_screen.cpp | Pending |
 | src/wifi_screen.cpp | Pending |
 | src/wpa3_sae_screen.cpp | Pending |
