@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 namespace {
 constexpr int W=410,H=502;
 std::array<uint16_t,W*H> pixels{};
@@ -79,7 +80,8 @@ void preview() {
     }
 }
 }
-int main() {
+int main(int argc,char** argv) {
+    const bool smoke=argc>1 && std::strcmp(argv[1],"--smoke")==0;
     SDL_SetMainReady();
     if(SDL_Init(SDL_INIT_VIDEO)!=0) { std::fprintf(stderr,"%s\n",SDL_GetError()); return 1; }
     auto* window=SDL_CreateWindow("T-Watch Ultra simulator",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,0);
@@ -96,9 +98,19 @@ int main() {
     lv_indev_set_read_cb(input,read_pointer);
     preview();
     sim::initialize_screens(lv_screen_active());
+    std::size_t screen_count=0;const auto* screens=sim::screens(screen_count);
+    unsigned frame=0;bool smoke_ok=true;
     bool running=true;
     uint32_t last=SDL_GetTicks();
     while(running) {
+        if(smoke && frame%5==0){
+            const auto index=frame/5;
+            sim::show_home();
+            if(index>=screen_count)break;
+            screens[index].show();
+            if(!screens[index].active()){smoke_ok=false;break;}
+        }
+        ++frame;
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type==SDL_QUIT) running=false;
@@ -114,7 +126,7 @@ int main() {
                 if(e.key.keysym.sym==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
             }
         }
-        auto now=SDL_GetTicks(); auto delta=now-last; last=now;
+        auto now=SDL_GetTicks(); auto delta=smoke?20u:now-last; last=now;
         watch.advance(delta); lv_tick_inc(delta); sim::tick(); lv_timer_handler();
         sim::ButtonEvent event{};
         while(watch.pop_button(event)) std::printf("button %d %s\n",static_cast<int>(event.button),event.pressed?"down":"up");
@@ -129,5 +141,5 @@ int main() {
     }
     lv_indev_delete(input); lv_display_delete(display); lv_deinit();
     SDL_DestroyTexture(texture); SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit();
-    return 0;
+    return smoke_ok?0:2;
 }

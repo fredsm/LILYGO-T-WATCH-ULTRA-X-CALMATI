@@ -35,6 +35,7 @@ constexpr double RAD_TO_DEG=57.29577951308232;
 #ifndef __GNUC__
 #define __attribute__(x)
 #endif
-inline size_t strlcpy(char* out,const char* in,size_t n){size_t len=std::strlen(in);if(n){size_t copy=len<n-1?len:n-1;std::memcpy(out,in,copy);out[copy]=0;}return len;}
+inline size_t sim_strlcpy(char* out,const char* in,size_t n){size_t len=std::strlen(in);if(n){size_t copy=len<n-1?len:n-1;std::memcpy(out,in,copy);out[copy]=0;}return len;}
 
+#define strlcpy sim_strlcpy
 constexpr double PI=3.14159265358979323846;

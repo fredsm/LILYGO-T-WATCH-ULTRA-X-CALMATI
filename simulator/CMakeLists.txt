@@ -34,9 +34,6 @@ target_link_libraries(shared_stopwatch PUBLIC lvgl)
 add_executable(stopwatch_ui_test tests/stopwatch_ui_test.cpp)
 target_link_libraries(stopwatch_ui_test PRIVATE shared_stopwatch)
 add_test(NAME original_stopwatch_ui COMMAND stopwatch_ui_test)
-if(TWATCH_DESKTOP)
-    target_link_libraries(twatch_desktop PRIVATE shared_stopwatch)
-endif()
 
 add_library(shared_calendar STATIC ../src/calendar_screen.cpp)
 target_include_directories(shared_calendar PRIVATE ../src/sim/mock)
@@ -44,9 +41,6 @@ target_link_libraries(shared_calendar PUBLIC lvgl)
 add_executable(calendar_ui_test tests/calendar_ui_test.cpp)
 target_link_libraries(calendar_ui_test PRIVATE shared_calendar)
 add_test(NAME original_calendar_ui COMMAND calendar_ui_test)
-if(TWATCH_DESKTOP)
-    target_link_libraries(twatch_desktop PRIVATE shared_calendar)
-endif()
 
 
 # screens.inc is the single source of truth for native source selection and UI tests.
@@ -77,6 +71,8 @@ add_test(NAME ui_navigation_cycle COMMAND screen_ui_test --all)
 set_tests_properties(ui_navigation_cycle PROPERTIES TIMEOUT 90)
 if(TWATCH_DESKTOP)
     target_link_libraries(twatch_desktop PRIVATE simulator_ui)
+    add_test(NAME sdl_all_screens COMMAND twatch_desktop --smoke)
+    set_tests_properties(sdl_all_screens PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 60)
 endif()
 
 add_test(NAME ui_task_manager COMMAND screen_ui_test task_manager)
