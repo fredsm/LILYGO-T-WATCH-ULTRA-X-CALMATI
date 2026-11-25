@@ -57,7 +57,7 @@ Inventory of dedicated screen translation units. Integrated means included in na
 | src/timer_screen.cpp | Integrated, unverified |
 | src/tools_screen.cpp | Pending |
 | src/tpms_screen.cpp | Pending |
-| src/usb_sd_screen.cpp | Pending |
+| src/usb_sd_screen.cpp | Integrated, unverified |
 | src/voice_screen.cpp | Pending |
 | src/wardriver_screen.cpp | Pending |
 | src/waterfall_screen.cpp | Pending |
