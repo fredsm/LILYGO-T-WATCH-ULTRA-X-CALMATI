@@ -35,7 +35,7 @@ consent is saved to disk. The original UI is compiled directly, not recreated.
 CI validates the integrated phases. Download its successful Windows
 artifact; previously downloaded EXEs do not contain these changes.
 
-The native build reuses all **61 `src/*_screen.cpp` translation units**, plus the
+The native build reuses all **62 `src/*_screen.cpp` translation units**, plus the
 original task manager. Screens are not reimplemented. The SDL launcher and CMake
 test inventory both read `src/sim/screens.inc`.
 
@@ -124,8 +124,8 @@ for testing on machines without a desktop compiler, CMake or SDL2 development
 files. Intermediate implementation commits use `[skip ci]`; a final commit
 without that marker runs the Linux/Windows tests and packages the Windows EXE.
 
-The production PlatformIO target excludes `src/sim/`; no firmware screen or
-hardware backend is modified by this integration.
+The production PlatformIO target excludes `src/sim/`. Navigation and Quick
+Controls are shared firmware code; host hardware adapters remain simulator-only.
 
 See [acceptance checks](TESTING.md) for the automated scripts and a touchscreen checklist.
 
@@ -143,7 +143,7 @@ and `Credito` becomes `NFC Compare`. Dynamic status/error messages and NFC
 comparison output are translated too. Add future UI translations to the
 catalogue; stale keys and changed printf arguments fail the catalogue tests.
 
-## Simulator navigation customization
+## Shared firmware and simulator navigation
 
 From the clock, swipe up to open Tools. Time is the first tile and opens the
 original Alarm/Stopwatch/Timer/Calendar menu. Swipe down or press Back from Time
@@ -151,13 +151,16 @@ to return to Tools. A downward swipe at the top of Tools returns to the clock.
 
 Swipe down from the clock for Quick Controls: Wi-Fi, Bluetooth, GPS, LoRa, NFC
 and brightness. Radio tiles show ON/OFF with distinct colors and invoke the
-original radio-screen switch callbacks through the host mocks. Brightness
-cycles through 33%, 66% and 100%, sharing the desktop panel's brightness state.
+original radio-screen handlers (host adapters in the simulator, actual devices
+in firmware). Brightness cycles through 33%, 66% and 100%, updates Settings,
+and persists on SD when available. Wake restores the selected brightness.
 Swipe up, press Back or press Power to close Quick Controls. F4 returns home.
 A shared radio can remain on if another tool is using it; the panel reports this.
 
-These navigation and tile changes live in `src/sim/navigation.cpp` and host
-clock routing only. Physical firmware navigation and screens are unchanged.
+The clock gestures, Time tile and `src/quick_controls_screen.cpp` now run in
+both builds. Simulator navigation contains only launcher wrappers. Bluetooth
+and LoRa shortcuts retain other tools' radio ownership and show an explanation
+when the radio cannot be switched off.
 
 Quick Controls also includes a Settings shortcut beneath the radio tiles.
 The existing Back-from-home Settings shortcut remains available.

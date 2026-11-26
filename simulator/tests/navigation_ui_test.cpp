@@ -9,6 +9,7 @@
 #include "../../src/bluetooth_screen.h"
 #include "../../src/settings_screen.h"
 #include "../../src/ble_scan_manager.h"
+#include "../../src/sim/mock/esp_bt.h"
 #include "../../src/pager.h"
 #include "../../src/sim/mock/SD.h"
 #include "../../src/wardriver_screen.h"
@@ -120,7 +121,7 @@ int main(){
  ble_stack_acquire();
  auto* bt=label(lv_screen_active(),"Bluetooth");
  lv_obj_send_event(lv_obj_get_parent(bt),LV_EVENT_CLICKED,nullptr);pump();
- if(!check(bluetooth_screen_is_powered() && label(lv_screen_active(),"Radio still used by another tool"),"Bluetooth shared owner retained"))return 36;
+ if(!check(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_ENABLED && label(lv_screen_active(),"Radio still used by another tool"),"Bluetooth shared owner retained"))return 36;
  ble_stack_release();pump();
  pager_start(433.92f,PAGER_POCSAG_1200);
  auto* lora=label(lv_screen_active(),"LoRa");

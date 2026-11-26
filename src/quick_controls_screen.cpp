@@ -1,5 +1,6 @@
 #include "quick_controls_screen.h"
 #include <LilyGoLib.h>
+#include <esp_bt.h>
 #include "pager.h"
 #include "tpms.h"
 #include "aprs.h"
@@ -25,6 +26,7 @@ void tile_icons_passthrough(lv_obj_t* obj){
         tile_icons_passthrough(child);
     }
 }
+bool bluetooth_on(){return esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_ENABLED;}
 bool lora_on(){return lora_screen_is_powered() || pager_is_running() || tpms_is_running() || aprs_is_running() || lora_analyze_is_running();}
 void gps_power(bool on){if(on)gps_screen_power_on();else gps_screen_power_off();}
 bool nfc_on(){return instance.pmu.isEnableDLDO1();}
@@ -35,7 +37,7 @@ struct Control {
 };
 Control controls[]={
     {"Wi-Fi",LV_SYMBOL_WIFI,wifi_radio_screen_set_powered,wifi_radio_screen_is_powered},
-    {"Bluetooth",LV_SYMBOL_BLUETOOTH,bluetooth_screen_set_powered,bluetooth_screen_is_powered},
+    {"Bluetooth",LV_SYMBOL_BLUETOOTH,bluetooth_screen_set_powered,bluetooth_on},
     {"GPS",LV_SYMBOL_GPS,gps_power,gps_screen_is_powered},
     {"LoRa",LV_SYMBOL_CALL,lora_screen_set_powered,lora_on},
     {"NFC",LV_SYMBOL_CHARGE,nfc_screen_set_powered,nfc_on},

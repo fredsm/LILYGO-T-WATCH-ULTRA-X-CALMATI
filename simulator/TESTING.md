@@ -38,3 +38,16 @@ radio behavior, real sensor timing, or exhaustive visual/touchscreen equivalence
 Quick Controls acceptance: toggle each radio twice, verify its original status
 page agrees, and cycle brightness through all three levels. Time must stay the
 first Tools tile; Back/down from Time returns to Tools.
+
+## Shared firmware controls
+
+The simulator now compiles the production Quick Controls screen and uses the
+production home gesture and physical-button handlers. Navigation tests also
+check Bluetooth stack ownership, LoRa pager ownership, and brightness settings
+persistence. Firmware CI compiles the actual ESP32 target separately.
+
+On the physical watch, check each shortcut against its status screen and home
+icon. Verify Time is first in Tools, Time returns to Tools, Settings opens from
+Quick Controls, and brightness survives dim/wake (and reboot with writable SD).
+Repeat the Power/Back radio-screen cycle and left/right home swipes. These
+on-device checks are still required; host tests cannot verify radio hardware.
