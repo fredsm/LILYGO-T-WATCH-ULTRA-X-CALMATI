@@ -2,10 +2,10 @@
 
 Inventory: **61** dedicated screen translation units; **61 integrated**, none pending. The earlier estimate of 60 omitted one unit.
 
-Verified at commit `40970b04c3d4cc71fa94257406f3590ba3933770`:
-[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45755718676).
-Linux and Windows native builds each pass **74/74** tests; Linux and Windows
-SDL desktop builds each pass **76/76**, including the real SDL render-path
+Verified at commit `4f644d3585d46eb142456e3368f610eae61c2065`:
+[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45865569030).
+Linux and Windows native builds each pass **77/77** tests; Linux and Windows
+SDL desktop builds each pass **79/79**, including the real SDL render-path
 smoke test. The production firmware validation build also passes.
 
 Every dedicated screen links the original firmware translation unit, opens,
@@ -16,7 +16,7 @@ ownership, simulated USB execution, NFC write/read and before/after captures,
 GATT enumeration, PNG tile decoding and voice response.
 
 These are automated host checks, not a claim of exhaustive manual visual review
-or hardware validation. No UI redesign or production hardware changes were made.
+or hardware validation. Production hardware behavior remains unchanged.
 
 | Source | Native status |
 |---|---|
@@ -108,4 +108,22 @@ Exhaustive manual touchscreen/visual verification and real hardware behavior
 remain outside automated host coverage. See [acceptance checks](TESTING.md)
 for the included scripts and hands-on touchscreen checklist.
 
-[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45755718676/artifacts/15088000862).
+[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45865569030/artifacts/15139528971).
+
+## Simulator customization on dev
+
+The English-only host build has 210 file-scoped translation entries, including
+clock weather/countdown wording. Original firmware source files are unchanged.
+The catalog now has 63 entries: 61 dedicated original screens, Task Manager and
+the new host-only Quick Controls screen.
+
+Clock swipe up opens Tools; its first tile is Time. Time opens the original
+utility menu and returns to Tools on swipe down or Back. Clock swipe down opens
+Quick Controls with Wi-Fi, Bluetooth, GPS, LoRa, NFC, brightness and Settings.
+Radio controls reuse the original switch callbacks through host adapters.
+Brightness cycles 33/66/100%. Settings also remains accessible via Back at home.
+
+Tests cover repeated swipe round trips, Time's first-tile position and touch
+activation, the nested Stopwatch path, every quick radio toggled on/off, all
+brightness presets, Settings touch activation and Back navigation. The SDL
+end-to-end test covers the new routes and Settings shortcut as well.
