@@ -2,10 +2,10 @@
 
 Inventory: **61** dedicated screen translation units; **61 integrated**, none pending. The earlier estimate of 60 omitted one unit.
 
-Verified at commit `766e34e9f8886292a8b3da16a3486934f2d9933a`:
-[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45712681606).
-Linux and Windows native builds each pass **73/73** tests; Linux and Windows
-SDL desktop builds each pass **74/74**, including the real SDL render-path
+Verified at commit `40970b04c3d4cc71fa94257406f3590ba3933770`:
+[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45755718676).
+Linux and Windows native builds each pass **74/74** tests; Linux and Windows
+SDL desktop builds each pass **76/76**, including the real SDL render-path
 smoke test. The production firmware validation build also passes.
 
 Every dedicated screen links the original firmware translation unit, opens,
@@ -88,7 +88,24 @@ clock face switching, repeated four-direction swipe round trips, Tools tile
 scrolling and edge returns, opening the original Stopwatch tile, firmware
 Power/Back routes and debounce, UTF-8 compose editing, confirmation, cancellation
 and hidden-field rejection. The desktop exposes touchable watch buttons below
-the unchanged 410 x 502 viewport. Onboarding, boot overlays and exhaustive
-manual touchscreen/visual verification remain outside this coverage.
+the unchanged 410 x 502 viewport.
 
-[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45712681606/artifacts/15069465546).
+Phases 4-6 add a separate hardware panel with shared battery, charging,
+brightness, display power, GPS fix/satellite count and virtual SD presence.
+Default brightness is now 100%. The original skull splash/layout and original
+onboarding source are reused; tests verify fade timing, optional acceptance and
+session-only consent. SD removal blocks virtual reads/writes without erasing
+its in-memory contents.
+
+The SDL end-to-end test starts through the splash and injects mouse, native
+finger and keyboard events through the desktop event loop. It checks four-way
+swipe round trips, panel battery updates on the original clock, brightness
+synchronization, charging/GPS/SD adapters, Power while the display is off,
+panel keyboard isolation and close/reopen, catalog access, compose editing,
+Escape cancellation and final return to the clock. Premature exit fails the test.
+
+Exhaustive manual touchscreen/visual verification and real hardware behavior
+remain outside automated host coverage. See [acceptance checks](TESTING.md)
+for the included scripts and hands-on touchscreen checklist.
+
+[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45755718676/artifacts/15088000862).

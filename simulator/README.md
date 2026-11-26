@@ -126,3 +126,5 @@ without that marker runs the Linux/Windows tests and packages the Windows EXE.
 
 The production PlatformIO target excludes `src/sim/`; no firmware screen or
 hardware backend is modified by this integration.
+
+See [acceptance checks](TESTING.md) for the automated scripts and a touchscreen checklist.
