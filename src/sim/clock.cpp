@@ -49,23 +49,12 @@ void refresh_status_icons(){
     if(gps_on)clock_screen_set_sat_count(instance.gps.satellites.isValid()
         ? instance.gps.satellites.value() : 0);
 }
-void home_gesture(lv_event_t* e){
-    if(stealth_active())return;
-    auto* input=lv_event_get_indev(e);if(!input)return;
-    auto dir=lv_indev_get_gesture_dir(input);
-    if(dir==LV_DIR_TOP)tools_screen_show();
-    else if(dir==LV_DIR_BOTTOM)show_quick_controls();
-    else on_clock_gesture(e);
-}
-void power_button_click(){if(quick_controls_active())show_home();else original_power_click();}
+void home_gesture(lv_event_t* e){on_clock_gesture(e);}
+void power_button_click(){original_power_click();}
 void back_button_click(){
     static bool seen=false;static uint32_t last=0;
-    const auto now=lv_tick_get();
-    if(seen && now-last<250)return;
-    seen=true;last=now;
-    if(quick_controls_active())show_home();
-    else if(time_screen_is_active())tools_screen_show();
-    else original_back_click();
+    const auto now=lv_tick_get();if(seen && now-last<250)return;
+    seen=true;last=now;original_back_click();
 }
 lv_obj_t* create_clock(){
     if(!clock_screen){

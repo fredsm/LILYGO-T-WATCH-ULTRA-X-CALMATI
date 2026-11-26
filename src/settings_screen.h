@@ -22,3 +22,6 @@ bool settings_get_screenshot_long_press();
 // SD-state-change branch and once at boot, so the toggle never lies
 // about whether the feature can actually write a file right now.
 void settings_screen_apply_sd_state();
+
+int settings_get_brightness();
+void settings_set_brightness(int level);

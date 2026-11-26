@@ -255,3 +255,11 @@ bool wifi_radio_screen_is_powered()
 {
     return wifi_powered;
 }
+
+void wifi_radio_screen_set_powered(bool on)
+{
+    if (!toggle_sw) return;
+    if (on) lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
+    else lv_obj_clear_state(toggle_sw, LV_STATE_CHECKED);
+    on_toggle(nullptr);
+}

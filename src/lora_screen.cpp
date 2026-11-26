@@ -1,4 +1,5 @@
 #include "lora_screen.h"
+#include "lora_analyze_screen.h"
 #include "meshtastic.h"
 #include "pager.h"
 #include "tpms.h"
@@ -241,4 +242,15 @@ bool lora_screen_is_active()
 bool lora_screen_is_powered()
 {
     return lora_powered;
+}
+
+void lora_screen_set_powered(bool on)
+{
+    if (!toggle_sw) return;
+    // Do not cut power beneath another shared-radio consumer.
+    if (!on && (pager_is_running() || tpms_is_running() || aprs_is_running() || lora_analyze_is_running())) return;
+    if (on && lora_analyze_is_running()) lora_analyze_screen_stop();
+    if (on) lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
+    else lv_obj_clear_state(toggle_sw, LV_STATE_CHECKED);
+    on_toggle(nullptr);
 }

@@ -1,4 +1,5 @@
 #include "time_screen.h"
+#include "tools_screen.h"
 #include "alarm_screen.h"
 #include "stopwatch_screen.h"
 #include "timer_screen.h"
@@ -10,15 +11,13 @@ void clock_screen_show();
 
 static lv_obj_t *time_screen;
 
-// Swipe DOWN to return to the clock face — mirrors the swipe-UP entry from
-// the clock. Other directions are no-ops so a sloppy left/right swipe inside
-// a tile doesn't accidentally page away.
+// Swipe DOWN returns to Tools, which owns the Time tile.
 static void on_gesture(lv_event_t *e)
 {
     lv_indev_t *indev = lv_event_get_indev(e);
     lv_dir_t dir = lv_indev_get_gesture_dir(indev);
     if (dir == LV_DIR_BOTTOM)
-        clock_screen_show();
+        tools_screen_show();
 }
 
 // ---- Tile helper -----------------------------------------------------------

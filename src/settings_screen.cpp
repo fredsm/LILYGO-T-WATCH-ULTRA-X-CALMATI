@@ -1137,3 +1137,13 @@ void settings_screen_apply_sd_state()
             lv_color_make(0x00, 0x55, 0x00), LV_PART_MAIN);
     }
 }
+
+int settings_get_brightness(){return s_brightness;}
+void settings_set_brightness(int level){
+    if (!brightness_slider) return;
+    if (level < 1) level = 1;
+    if (level > DEVICE_MAX_BRIGHTNESS_LEVEL) level = DEVICE_MAX_BRIGHTNESS_LEVEL;
+    lv_slider_set_value(brightness_slider, level, LV_ANIM_OFF);
+    on_brightness_changed(nullptr);
+    settings_save_to_sd();
+}

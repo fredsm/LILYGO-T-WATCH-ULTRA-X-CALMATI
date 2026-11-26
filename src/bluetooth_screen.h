@@ -13,3 +13,6 @@ void bluetooth_screen_create();
 void bluetooth_screen_show();
 bool bluetooth_screen_is_active();
 bool bluetooth_screen_is_powered();
+
+// Shared by the status screen and quick controls.
+void bluetooth_screen_set_powered(bool on);

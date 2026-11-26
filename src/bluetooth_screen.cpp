@@ -258,3 +258,11 @@ bool bluetooth_screen_is_powered()
 {
     return s_radio_wanted;
 }
+
+void bluetooth_screen_set_powered(bool on)
+{
+    if (!toggle_sw) return;
+    if (on) lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
+    else lv_obj_clear_state(toggle_sw, LV_STATE_CHECKED);
+    on_toggle(nullptr);
+}

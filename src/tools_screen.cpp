@@ -1,4 +1,5 @@
 #include "tools_screen.h"
+#include "time_screen.h"
 #include "esp32-hal-tinyusb.h"    // usb_persist_restart(RESTART_BOOTLOADER) — tile Download
 #include "gps_screen.h"           // gps_screen_power_on() per la tile UDDA
 #include "meshtastic.h"           // meshtastic_set_active/announce/short_name
@@ -1572,6 +1573,27 @@ static void draw_car_icon(lv_obj_t *tile)
     lv_obj_center(hole);
 }
 
+static void add_time_tile(lv_obj_t* grid){
+    auto* time_tile=lv_obj_create(grid);lv_obj_set_size(time_tile,180,180);
+    lv_obj_set_style_bg_color(time_tile,lv_color_black(),0);lv_obj_set_style_bg_opa(time_tile,LV_OPA_COVER,0);
+    lv_obj_set_style_radius(time_tile,14,0);lv_obj_set_style_pad_all(time_tile,0,0);
+    lv_obj_set_style_border_width(time_tile,1,0);lv_obj_set_style_border_color(time_tile,lv_color_hex(0x004400),0);
+    lv_obj_clear_flag(time_tile,LV_OBJ_FLAG_SCROLLABLE);
+    auto* label=lv_label_create(time_tile);lv_label_set_text(label,"Time");
+    lv_obj_set_style_text_font(label,&lv_font_montserrat_20,0);lv_obj_set_style_text_color(label,lv_color_hex(0x00cc00),0);
+    lv_obj_align(label,LV_ALIGN_BOTTOM_MID,0,-12);
+    auto* face=lv_obj_create(time_tile);lv_obj_set_size(face,88,88);lv_obj_align(face,LV_ALIGN_TOP_MID,0,24);
+    lv_obj_set_style_radius(face,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(face,lv_color_hex(0x101b25),0);
+    lv_obj_set_style_border_color(face,lv_color_hex(0x65caff),0);lv_obj_set_style_border_width(face,3,0);
+    lv_obj_set_style_pad_all(face,0,0);lv_obj_clear_flag(face,LV_OBJ_FLAG_SCROLLABLE);
+    static const lv_point_precise_t hands[]={{41,16},{41,41},{62,53}};
+    auto* hand=lv_line_create(face);lv_line_set_points(hand,hands,3);lv_obj_set_style_line_color(hand,lv_color_white(),0);
+    lv_obj_set_style_line_width(hand,4,0);lv_obj_set_style_line_rounded(hand,true,0);
+    tile_icons_passthrough(time_tile);
+    lv_obj_add_event_cb(time_tile,[](lv_event_t*){time_screen_show();},LV_EVENT_CLICKED,nullptr);
+    lv_obj_move_to_index(time_tile,0);
+}
+
 void tools_screen_create()
 {
     tools_screen = lv_obj_create(NULL);
@@ -1615,8 +1637,8 @@ void tools_screen_create()
     //   [Skimmers]  [Evil Twin]
     //   [Flock]
     // The timepiece tiles (Alarm / Stopwatch / Timer / Calendar) used to live
-    // at the bottom of this grid; they moved to the TIME screen (swipe up
-    // from the clock face).
+    // at the bottom of this grid; the first Time tile now opens their menu.
+    add_time_tile(grid);
     lv_obj_t *t_scanner = make_tile(grid, "Scanner");
     t_duress            = make_tile(grid, "Duress");
     lv_obj_t *t_wifi    = make_tile(grid, "WiFi");

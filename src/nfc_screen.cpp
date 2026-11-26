@@ -342,3 +342,11 @@ void nfc_screen_worker()
         set_read_btn_scanning(false);
     }
 }
+
+void nfc_screen_set_powered(bool on)
+{
+    if (!toggle_sw) return;
+    if (on) lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
+    else lv_obj_clear_state(toggle_sw, LV_STATE_CHECKED);
+    on_toggle(nullptr);
+}

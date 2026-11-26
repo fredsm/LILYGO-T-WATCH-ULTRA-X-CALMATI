@@ -14,3 +14,6 @@ void wifi_radio_screen_create();
 void wifi_radio_screen_show();
 bool wifi_radio_screen_is_active();
 bool wifi_radio_screen_is_powered();
+
+// Shared by the status screen and quick controls.
+void wifi_radio_screen_set_powered(bool on);

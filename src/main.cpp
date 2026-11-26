@@ -72,6 +72,7 @@
 #include "alarm_screen.h"
 #include "calendar_screen.h"
 #include "time_screen.h"
+#include "quick_controls_screen.h"
 #include "airtag.h"
 #include "flipper.h"
 #include "skimmer.h"
@@ -690,9 +691,9 @@ static void on_clock_gesture(lv_event_t *e)
         meshtastic_mark_read();
         meshtastic_screen_show();
     } else if (dir == LV_DIR_BOTTOM) {   // swipe down from clock face
-        tools_screen_show();
+        quick_controls_screen_show();
     } else if (dir == LV_DIR_TOP) {      // swipe up from clock face
-        time_screen_show();
+        tools_screen_show();
     }
 }
 
@@ -917,7 +918,7 @@ void clock_screen_set_dim_timeout(uint32_t ms)
     s_last_activity_ms = millis();
     if (s_is_dimmed) {
         s_is_dimmed = false;
-        instance.setBrightness(DEVICE_MAX_BRIGHTNESS_LEVEL);
+        instance.setBrightness(settings_get_brightness());
     }
 }
 
@@ -933,7 +934,7 @@ static void dim_reset_activity()
     s_last_activity_ms = millis();
     if (s_is_dimmed) {
         s_is_dimmed = false;
-        instance.setBrightness(DEVICE_MAX_BRIGHTNESS_LEVEL);
+        instance.setBrightness(settings_get_brightness());
     }
 }
 
@@ -1773,6 +1774,7 @@ void setup()
     alarm_screen_create();
     calendar_screen_create();
     time_screen_create();
+    quick_controls_screen_create();
     wardriver_screen_create();
     lv_obj_add_event_cb(clock_screen, on_clock_gesture, LV_EVENT_GESTURE, NULL);
     // Hold the boot splash to a minimum ~1.5 s, then reveal the clock.
@@ -1816,7 +1818,7 @@ void setup()
                 configuration_screen_show();
             // configuration_screen: swipe-RIGHT is unbound, so power
             // button is intentionally a no-op there too.
-            else if (settings_screen_is_active())
+            else if (settings_screen_is_active() || quick_controls_screen_is_active())
                 clock_screen_show();
         }
     }, POWER_EVENT, NULL);
@@ -1903,6 +1905,8 @@ void loop()
             if (clock_vibrate) instance.vibrator();
             if (settings_screen_is_active()) {
                 clock_screen_show();
+            } else if (time_screen_is_active()) {
+                tools_screen_show();
             } else if (nfc_write_screen_is_active()) {
                 nfc_screen_show();
             } else if (nfc_screen_is_active()) {

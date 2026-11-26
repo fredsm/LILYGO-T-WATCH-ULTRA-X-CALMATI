@@ -8,6 +8,9 @@
 #include "../../src/wifi_radio_screen.h"
 #include "../../src/bluetooth_screen.h"
 #include "../../src/settings_screen.h"
+#include "../../src/ble_scan_manager.h"
+#include "../../src/pager.h"
+#include "../../src/sim/mock/SD.h"
 #include "../../src/wardriver_screen.h"
 #include "../../src/meshtastic_screen.h"
 #include "../../src/tools_screen.h"
@@ -114,8 +117,20 @@ int main(){
    sim::show_quick_controls();pump();}
 
  }
+ ble_stack_acquire();
+ auto* bt=label(lv_screen_active(),"Bluetooth");
+ lv_obj_send_event(lv_obj_get_parent(bt),LV_EVENT_CLICKED,nullptr);pump();
+ if(!check(bluetooth_screen_is_powered() && label(lv_screen_active(),"Radio still used by another tool"),"Bluetooth shared owner retained"))return 36;
+ ble_stack_release();pump();
+ pager_start(433.92f,PAGER_POCSAG_1200);
+ auto* lora=label(lv_screen_active(),"LoRa");
+ lv_obj_send_event(lv_obj_get_parent(lora),LV_EVENT_CLICKED,nullptr);pump();
+ if(!check(pager_is_running() && label(lv_screen_active(),"Radio still used by another tool"),"LoRa shared owner retained"))return 37;
+ pager_stop();pump();
  auto* brightness=label(lv_screen_active(),"Brightness");if(!brightness)return 26;
- for(int expected:{85,170,255}){lv_obj_send_event(lv_obj_get_parent(brightness),LV_EVENT_CLICKED,nullptr);pump();if(sim::hardware.watch.brightness()!=expected)return 27;}
+ for(int expected:{85,170,255}){lv_obj_send_event(lv_obj_get_parent(brightness),LV_EVENT_CLICKED,nullptr);pump();if(sim::hardware.watch.brightness()!=expected || settings_get_brightness()!=expected)return 27;
+  auto saved=sim_sd_files.find("/Settings/settings.txt");
+  if(saved==sim_sd_files.end() || saved->second->find("brightness="+std::to_string(expected))==std::string::npos)return 35;}
  sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Back closes shortcuts"))return 28;
  sim::show_quick_controls();pump();sample(205,425,true);sample(205,425,false);pump();
  if(!check(settings_screen_is_active(),"Settings shortcut opens original settings"))return 29;
