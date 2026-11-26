@@ -58,7 +58,7 @@ static void scan_task(void *)
 
 static void print_all()
 {
-    lv_label_set_text(status_label, "invio CALMATI...");
+    lv_label_set_text(status_label, "Sending CALMATI...");
     lv_refr_now(NULL);
     int ok = 0;
     for (int i = 0; i < s_found_n; i++) {
@@ -70,7 +70,7 @@ static void print_all()
         }
         delay(50);
     }
-    char b[48]; snprintf(b, sizeof(b), "CALMATI inviato a %d/%d", ok, s_found_n);
+    char b[48]; snprintf(b, sizeof(b), "CALMATI sent to %d/%d", ok, s_found_n);
     lv_label_set_text(status_label, b);
 }
 
@@ -93,7 +93,7 @@ static void build_results()
         lv_obj_t *l = lv_label_create(list_box);
         lv_obj_set_style_text_font(l, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(l, lv_color_make(0x88,0x88,0x88), LV_PART_MAIN);
-        lv_label_set_text(l, "nessuna stampante (porta 9100) trovata");
+        lv_label_set_text(l, "No printers found (port 9100)");
     }
     if (s_found_n > 0) lv_obj_clear_flag(btn, LV_OBJ_FLAG_HIDDEN);
     else               lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
@@ -111,15 +111,15 @@ static void on_refresh(lv_timer_t *)
             s_state = ST_SCAN; s_run = true;
             xTaskCreatePinnedToCore(scan_task, "prscan", 4096, nullptr, 1, &s_task, 0);
         } else {
-            lv_label_set_text(status_label, "connessione WiFi...");
+            lv_label_set_text(status_label, "Connecting to WiFi...");
         }
     } else if (s_state == ST_SCAN) {
-        char b[40]; snprintf(b, sizeof(b), "scan rete %d%%  (trovate %d)", s_pct, s_found_n);
+        char b[40]; snprintf(b, sizeof(b), "Network scan %d%%  (%d found)", s_pct, s_found_n);
         lv_label_set_text(status_label, b);
         if (!s_scanning) { s_state = ST_RESULTS; }
     } else if (s_state == ST_RESULTS && !s_built) {
         s_built = true;
-        char b[40]; snprintf(b, sizeof(b), "%d stampanti - tocca STAMPA", s_found_n);
+        char b[40]; snprintf(b, sizeof(b), "%d printers - tap PRINT", s_found_n);
         lv_label_set_text(status_label, b);
         build_results();
     }
@@ -155,7 +155,7 @@ void printer_screen_create()
     lv_obj_t *sub = lv_label_create(s_scr);
     lv_obj_set_style_text_font(sub, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(sub, lv_color_make(0x66,0x88,0x77), LV_PART_MAIN);
-    lv_label_set_text(sub, "stampanti di rete (TCP 9100) - solo rete tua");
+    lv_label_set_text(sub, "Network printers (TCP 9100) - your network only");
     lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 72);
 
     status_label = lv_label_create(s_scr);
@@ -192,7 +192,7 @@ void printer_screen_create()
     btn_lbl = lv_label_create(btn);
     lv_obj_set_style_text_color(btn_lbl, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(btn_lbl, &lv_font_montserrat_28, LV_PART_MAIN);
-    lv_label_set_text(btn_lbl, "STAMPA CALMATI");
+    lv_label_set_text(btn_lbl, "PRINT CALMATI");
     lv_obj_center(btn_lbl);
 
     lv_obj_add_event_cb(s_scr, on_gesture, LV_EVENT_GESTURE, NULL);

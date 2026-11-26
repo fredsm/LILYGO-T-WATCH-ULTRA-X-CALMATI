@@ -48,11 +48,11 @@ static void spoof_start()
 
 static void set_btn(bool on)
 {
-    lv_label_set_text(btn_lbl, on ? "STOP" : "TRASMETTI");
+    lv_label_set_text(btn_lbl, on ? "STOP" : "TRANSMIT");
     lv_obj_set_style_bg_color(btn, on ? lv_color_make(0x99,0x22,0x22)
                                       : lv_color_make(0x00,0x88,0xcc), LV_PART_MAIN);
-    lv_label_set_text(status_label, on ? "IN TRASMISSIONE - drone fantasma live"
-                                       : "pronto");
+    lv_label_set_text(status_label, on ? "TRANSMITTING - synthetic drone active"
+                                       : "Ready");
 }
 
 static void on_btn(lv_event_t *)
@@ -100,7 +100,7 @@ void rid_spoof_screen_create()
     lv_obj_t *sub = lv_label_create(s_scr);
     lv_obj_set_style_text_font(sub, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(sub, lv_color_make(0x66,0x88,0x99), LV_PART_MAIN);
-    lv_label_set_text(sub, "drone fantasma - Remote ID ASTM F3411 (BLE)");
+    lv_label_set_text(sub, "Synthetic drone - Remote ID ASTM F3411 (BLE)");
     lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 78);
 
     id_label = lv_label_create(s_scr);
@@ -112,7 +112,7 @@ void rid_spoof_screen_create()
     status_label = lv_label_create(s_scr);
     lv_obj_set_style_text_font(status_label, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(status_label, lv_color_make(0x88,0x88,0x88), LV_PART_MAIN);
-    lv_label_set_text(status_label, "pronto");
+    lv_label_set_text(status_label, "Ready");
     lv_obj_align(status_label, LV_ALIGN_CENTER, 0, 20);
 
     btn = lv_obj_create(s_scr);
@@ -128,7 +128,7 @@ void rid_spoof_screen_create()
     btn_lbl = lv_label_create(btn);
     lv_obj_set_style_text_color(btn_lbl, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_text_font(btn_lbl, &lv_font_montserrat_28, LV_PART_MAIN);
-    lv_label_set_text(btn_lbl, "TRASMETTI");
+    lv_label_set_text(btn_lbl, "TRANSMIT");
     lv_obj_center(btn_lbl);
 
     lv_obj_add_event_cb(s_scr, on_gesture, LV_EVENT_GESTURE, NULL);

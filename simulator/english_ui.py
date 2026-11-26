@@ -1,4 +1,4 @@
-"""Generate English-only host copies, without editing firmware source files.
+"""Apply the exact UI translation catalogue (also retained as a regression record).
 
 The catalogue is scoped by filename and exact C++ string literal contents.
 Comments, identifiers, character literals and unmapped protocol/data strings

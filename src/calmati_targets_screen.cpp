@@ -82,15 +82,15 @@ static void populate() {
   lv_obj_clean(s_list);
 
   // Controls row: Refresh + Select all.
-  ctrl_btn(s_list, LV_SYMBOL_REFRESH "  Aggiorna", C_GREEN(), on_refresh);
-  ctrl_btn(s_list, "Sel. tutti", C_AMBER(), on_selall);
+  ctrl_btn(s_list, LV_SYMBOL_REFRESH "  Refresh", C_GREEN(), on_refresh);
+  ctrl_btn(s_list, "Select all", C_AMBER(), on_selall);
 
   String j;
   bool ok = calmati_aps(j);
   if (!ok) {
     s_hint = lv_label_create(s_list); lv_obj_set_width(s_hint, lv_pct(100));
     lv_obj_set_style_text_color(s_hint, C_MUTE(), LV_PART_MAIN);
-    lv_label_set_text(s_hint, "AP non raggiungibile"); return;
+    lv_label_set_text(s_hint, "AP unreachable"); return;
   }
 
   static int idxs[40]; static String names[40]; static bool sels[40];
@@ -98,7 +98,7 @@ static void populate() {
   if (n == 0) {
     s_hint = lv_label_create(s_list); lv_obj_set_width(s_hint, lv_pct(100));
     lv_obj_set_style_text_color(s_hint, C_MUTE(), LV_PART_MAIN);
-    lv_label_set_text(s_hint, "nessun AP - fai SCAN, attendi, poi Aggiorna"); return;
+    lv_label_set_text(s_hint, "No APs - SCAN, wait, then Refresh"); return;
   }
 
   for (int k = 0; k < n; k++) {
@@ -155,7 +155,7 @@ static void build() {
     lv_obj_t *bl = lv_label_create(bk);
     lv_obj_set_style_text_font(bl, &lv_font_montserrat_18, LV_PART_MAIN);
     lv_obj_set_style_text_color(bl, C_INK(), LV_PART_MAIN);
-    lv_label_set_text(bl, LV_SYMBOL_LEFT "  INDIETRO");
+    lv_label_set_text(bl, LV_SYMBOL_LEFT "  BACK");
     lv_obj_center(bl);
     lv_obj_add_flag(bl, LV_OBJ_FLAG_EVENT_BUBBLE);
   }
@@ -181,7 +181,7 @@ void calmati_targets_screen_show() {
   lv_obj_clean(s_list);
   lv_obj_t *l = lv_label_create(s_list); lv_obj_set_width(l, lv_pct(100));
   lv_obj_set_style_text_color(l, C_MUTE(), LV_PART_MAIN);
-  lv_label_set_text(l, "caricamento AP...");
+  lv_label_set_text(l, "Loading APs...");
   lv_scr_load(s_screen);
   lv_timer_t *t = lv_timer_create(on_populate_timer, 350, nullptr);
   lv_timer_set_repeat_count(t, 1);

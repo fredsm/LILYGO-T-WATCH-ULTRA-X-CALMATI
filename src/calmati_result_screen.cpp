@@ -86,21 +86,21 @@ static void populate() {
   lv_obj_t *rl = lv_label_create(rb);
   lv_obj_set_style_text_font(rl, &lv_font_montserrat_18, LV_PART_MAIN);
   lv_obj_set_style_text_color(rl, C_GREEN(), LV_PART_MAIN);
-  lv_label_set_text(rl, LV_SYMBOL_REFRESH "  Aggiorna"); lv_obj_center(rl);
+  lv_label_set_text(rl, LV_SYMBOL_REFRESH "  Refresh"); lv_obj_center(rl);
   lv_obj_add_flag(rl, LV_OBJ_FLAG_EVENT_BUBBLE);
 
   String j;
   if (!calmati_get(s_endpoint, j)) {
     lv_obj_t *m = lv_label_create(s_list); lv_obj_set_width(m, lv_pct(100));
     lv_obj_set_style_text_color(m, C_MUTE(), LV_PART_MAIN);
-    lv_label_set_text(m, "AP non raggiungibile"); return;
+    lv_label_set_text(m, "AP unreachable"); return;
   }
   static String labels[60]; static String metas[60];
   int n = parse_rows(j, labels, metas, 60);
   if (n == 0) {
     lv_obj_t *m = lv_label_create(s_list); lv_obj_set_width(m, lv_pct(100));
     lv_obj_set_style_text_color(m, C_MUTE(), LV_PART_MAIN);
-    lv_label_set_text(m, "nessun risultato - fai lo scan e attendi"); return;
+    lv_label_set_text(m, "No results - scan and wait"); return;
   }
 
   lv_color_t hi = s_alert ? C_VIOLET() : C_GREEN();
@@ -158,7 +158,7 @@ static void build() {
   lv_obj_t *bl = lv_label_create(bk);
   lv_obj_set_style_text_font(bl, &lv_font_montserrat_18, LV_PART_MAIN);
   lv_obj_set_style_text_color(bl, C_INK(), LV_PART_MAIN);
-  lv_label_set_text(bl, LV_SYMBOL_LEFT "  INDIETRO"); lv_obj_center(bl);
+  lv_label_set_text(bl, LV_SYMBOL_LEFT "  BACK"); lv_obj_center(bl);
   lv_obj_add_flag(bl, LV_OBJ_FLAG_EVENT_BUBBLE);
 
   s_list = lv_obj_create(s_screen);
@@ -185,7 +185,7 @@ void calmati_result_screen_show(const char *title, const char *endpoint, bool al
   s_active = true;
   lv_obj_t *l = lv_label_create(s_list); lv_obj_set_width(l, lv_pct(100));
   lv_obj_set_style_text_color(l, C_MUTE(), LV_PART_MAIN);
-  lv_label_set_text(l, "caricamento...");
+  lv_label_set_text(l, "Loading...");
   lv_scr_load(s_screen);
   lv_timer_t *t = lv_timer_create(on_populate_timer, 350, nullptr);
   lv_timer_set_repeat_count(t, 1);

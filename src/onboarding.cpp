@@ -27,23 +27,23 @@ void clock_screen_show();
 
 // --- bilingual authorized-use disclaimer -------------------------------------
 static const char *DISCLAIMER =
-"IT\n"
-"13:37 e' uno strumento di RICERCA sulla SICUREZZA e a scopo EDUCATIVO. Include "
-"funzioni radio (WiFi, Bluetooth, LoRa) che possono interferire con reti e "
-"dispositivi.\n\n"
-"USALO SOLO su apparecchiature, reti e sistemi di tua PROPRIETA' o per i quali "
-"hai un'AUTORIZZAZIONE ESPLICITA e SCRITTA a effettuare test. L'uso non "
-"autorizzato (deauth, intercettazione, scansione di reti o telecamere altrui) "
-"puo' costituire REATO secondo la legge.\n\n"
-"Sei l'UNICO RESPONSABILE dell'uso che ne fai. L'autore NON e' responsabile di "
-"danni, perdite o usi illeciti. Software fornito \"COSI' COM'E'\", SENZA "
-"GARANZIE.\n\n"
-"Procedendo dichiari di aver letto e compreso, di avere l'eta' legale e di "
-"accettare questi termini e le leggi applicabili.\n\n"
-"Privacy: l'email (facoltativa) sara' usata SOLO per notificarti gli "
-"aggiornamenti; puoi chiederne la cancellazione. Un ID installazione casuale e "
-"anonimo puo' essere inviato per contare le installazioni. Nessun altro dato.\n\n"
-"------------------------------\n\n"
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
+""
 "EN\n"
 "13:37 is a SECURITY RESEARCH and EDUCATIONAL tool. It includes radio features "
 "(WiFi, Bluetooth, LoRa) that can interfere with networks and devices.\n\n"
@@ -139,7 +139,7 @@ static void on_email_focus(lv_event_t *e)
 static void on_accept(lv_event_t *)
 {
     if (!lv_obj_has_state(cb, LV_STATE_CHECKED)) {
-        lv_label_set_text(hint, "Spunta la conferma per procedere / tick the box to continue");
+        lv_label_set_text(hint, "Tick the box to continue");
         lv_obj_set_style_text_color(hint, lv_color_make(0xFF, 0x66, 0x44), LV_PART_MAIN);
         return;
     }
@@ -169,7 +169,7 @@ void onboarding_screen_create()
     lv_obj_t *title = lv_label_create(screen);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_set_style_text_color(title, lv_color_make(0xFF, 0xAA, 0x33), LV_PART_MAIN);
-    lv_label_set_text(title, "USO AUTORIZZATO / AUTHORIZED USE");
+    lv_label_set_text(title, "AUTHORIZED USE");
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 24);   // lower: clears the rounded top + no box overlap
 
     // scrollable disclaimer
@@ -190,7 +190,7 @@ void onboarding_screen_create()
     lv_label_set_text(txt, DISCLAIMER);
 
     cb = lv_checkbox_create(screen);
-    lv_checkbox_set_text(cb, "Confermo l'uso autorizzato / I confirm authorized use");
+    lv_checkbox_set_text(cb, "I confirm authorized use");
     lv_obj_set_style_text_font(cb, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(cb, lv_color_white(), LV_PART_MAIN);
     // Bigger tick box — the default indicator is tiny and hard to hit.
@@ -203,7 +203,7 @@ void onboarding_screen_create()
     lv_obj_t *el = lv_label_create(screen);
     lv_obj_set_style_text_font(el, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(el, lv_color_make(0x88, 0x88, 0x88), LV_PART_MAIN);
-    lv_label_set_text(el, "Email per aggiornamenti (opzionale) / updates email (optional):");
+    lv_label_set_text(el, "Updates email (optional):");
     lv_obj_align(el, LV_ALIGN_TOP_MID, 0, 366);
 
     email_ta = lv_textarea_create(screen);
@@ -233,7 +233,7 @@ void onboarding_screen_create()
     lv_obj_t *bl = lv_label_create(btn);
     lv_obj_set_style_text_font(bl, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_set_style_text_color(bl, lv_color_white(), LV_PART_MAIN);
-    lv_label_set_text(bl, "ACCETTO / ACCEPT");
+    lv_label_set_text(bl, "ACCEPT");
     lv_obj_center(bl);
 
     keyboard = lv_keyboard_create(screen);

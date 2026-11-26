@@ -112,8 +112,8 @@ static void on_refresh(lv_timer_t *)
         s_last_ms = millis();
         flood_step();
     }
-    lv_label_set_text_fmt(count_label, s_flooding ? "FLOOD attivo - %lu inviati"
-                                                  : "%lu phantom inviati",
+    lv_label_set_text_fmt(count_label, s_flooding ? "FLOOD active - %lu sent"
+                                                  : "%lu phantoms sent",
                           (unsigned long)s_sent);
 }
 
@@ -150,13 +150,13 @@ void phantom_flood_screen_create()
     lv_obj_set_style_text_color(sub, lv_color_make(0x99,0x66,0x88), LV_PART_MAIN);
     lv_obj_set_style_text_align(sub, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_width(sub, 380);
-    lv_label_set_text(sub, "inonda i radar anti-stalking di\nFindMy fantasma - col nome che scegli");
+    lv_label_set_text(sub, "Broadcast synthetic Find My trackers\nusing your chosen name");
     lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 78);
 
     lv_obj_t *nm_lbl = lv_label_create(s_scr);
     lv_obj_set_style_text_font(nm_lbl, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(nm_lbl, lv_color_make(0xaa,0xaa,0xaa), LV_PART_MAIN);
-    lv_label_set_text(nm_lbl, "Nome:");
+    lv_label_set_text(nm_lbl, "Name:");
     lv_obj_align(nm_lbl, LV_ALIGN_TOP_MID, -120, 130);
 
     name_ta = lv_textarea_create(s_scr);
@@ -170,7 +170,7 @@ void phantom_flood_screen_create()
     count_label = lv_label_create(s_scr);
     lv_obj_set_style_text_font(count_label, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_set_style_text_color(count_label, lv_color_make(0xff,0xaa,0xdd), LV_PART_MAIN);
-    lv_label_set_text(count_label, "0 phantom inviati");
+    lv_label_set_text(count_label, "0 phantoms sent");
     lv_obj_align(count_label, LV_ALIGN_CENTER, 0, 40);
 
     btn = lv_obj_create(s_scr);

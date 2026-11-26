@@ -91,7 +91,7 @@ static void upload_task(void *)
     }
     if (WiFi.status() != WL_CONNECTED) {
         s_you_txt[0] = '\0';
-        snprintf(s_reply_txt, sizeof(s_reply_txt), "WiFi UDDA non connesso. Riprova.");
+        snprintf(s_reply_txt, sizeof(s_reply_txt), "UDDA WiFi not connected. Try again.");
         if (s_wav) { free(s_wav); s_wav = nullptr; }
         s_upl_done = true; s_task = nullptr;
         vTaskDelete(nullptr);
@@ -105,7 +105,7 @@ static void upload_task(void *)
     }
     if (WiFi.localIP()[0] == 0) {
         s_you_txt[0] = '\0';
-        snprintf(s_reply_txt, sizeof(s_reply_txt), "UDDA: nessun IP (DHCP). Riprova.");
+        snprintf(s_reply_txt, sizeof(s_reply_txt), "UDDA: no IP address (DHCP). Try again.");
         if (s_wav) { free(s_wav); s_wav = nullptr; }
         s_upl_done = true; s_task = nullptr;
         vTaskDelete(nullptr);
@@ -150,7 +150,7 @@ static void upload_task(void *)
         if (!http.begin(cli, url)) {
             Serial.printf("[VOICE] tent.%d http.begin FALLITO\n", attempt);
             snprintf(s_reply_txt, sizeof(s_reply_txt),
-                     "Non contatto UDDA %s (tent.%d)", host, attempt);
+                     "Cannot reach UDDA %s (attempt %d)", host, attempt);
             vTaskDelay(pdMS_TO_TICKS(1200));
             continue;
         }
@@ -169,7 +169,7 @@ static void upload_task(void *)
             ok = true;
         } else {
             snprintf(s_reply_txt, sizeof(s_reply_txt),
-                     "Errore HTTP %d (tent.%d/3) UDDA %s tuo %s",
+                     "HTTP error %d (attempt %d/3) UDDA %s local %s",
                      code, attempt, host, WiFi.localIP().toString().c_str());
             vTaskDelay(pdMS_TO_TICKS(1200));
         }
@@ -209,13 +209,13 @@ static void tick_cb(lv_timer_t *)
     case V_REC: {
         kitt_set(mic_rec_level());
         uint32_t el = mic_rec_elapsed_ms();
-        char b[40]; snprintf(b, sizeof(b), "Registro... %lus", (unsigned long)(el / 1000));
+        char b[40]; snprintf(b, sizeof(b), "Recording... %lus", (unsigned long)(el / 1000));
         set_status(b);
         if (el >= REC_CAP_MS) {
             mic_rec_stop();
             s_state = V_SAVE;
-            set_status("Salvo...");
-            lv_label_set_text(s_btnlbl, "ATTENDI");
+            set_status("Saving...");
+            lv_label_set_text(s_btnlbl, "WAIT");
         }
         break;
     }
@@ -223,8 +223,8 @@ static void tick_cb(lv_timer_t *)
         if (!mic_rec_is_recording()) {           // file finalizzato
             kitt_set(0);
             if (mic_rec_bytes() == 0 || !load_wav()) {
-                set_status(mic_rec_bytes() == 0 ? "Nessun audio" : "Errore lettura audio");
-                lv_label_set_text(s_btnlbl, "PARLA");
+                set_status(mic_rec_bytes() == 0 ? "No audio" : "Audio read error");
+                lv_label_set_text(s_btnlbl, "SPEAK");
                 s_state = V_IDLE;
                 break;
             }
@@ -232,28 +232,28 @@ static void tick_cb(lv_timer_t *)
             s_upl_done = false;
             s_upl_start = millis();
             s_state = V_UPLOAD;
-            set_status("UDDA pensa... (~30s)");
+            set_status("UDDA is thinking... (~30s)");
             xTaskCreatePinnedToCore(upload_task, "voice_up", 16384, nullptr, 1, &s_task, 0);
         }
         break;
     case V_UPLOAD:
         if (s_upl_done) {
             if (s_you_txt[0]) {
-                char b[300]; snprintf(b, sizeof(b), "Tu: %s", s_you_txt);
+                char b[300]; snprintf(b, sizeof(b), "You: %s", s_you_txt);
                 lv_label_set_text(s_you, b);
             } else {
                 lv_label_set_text(s_you, "");
             }
-            lv_label_set_text(s_udda, s_reply_txt[0] ? s_reply_txt : "(nessuna risposta)");
-            set_status("Pronto - swipe su per uscire");
-            lv_label_set_text(s_btnlbl, "ANCORA");
+            lv_label_set_text(s_udda, s_reply_txt[0] ? s_reply_txt : "(no response)");
+            set_status("Ready - swipe up to exit");
+            lv_label_set_text(s_btnlbl, "AGAIN");
             s_state = V_DONE;
         } else if (millis() - s_upl_start > 100000) {
             // watchdog: se dopo 100s non ha risposto, sblocca e fai riprovare
             lv_label_set_text(s_you, "");
-            lv_label_set_text(s_udda, "Timeout: UDDA non risponde. Stessa rete WiFi?");
-            set_status("Timeout - riprova");
-            lv_label_set_text(s_btnlbl, "ANCORA");
+            lv_label_set_text(s_udda, "Timeout: UDDA did not respond. Same WiFi network?");
+            set_status("Timeout - try again");
+            lv_label_set_text(s_btnlbl, "AGAIN");
             s_state = V_DONE;
         }
         break;
@@ -292,7 +292,7 @@ static void ensure_wifi()
     char ssid[40], pass[68];
     read_wifi2(ssid, sizeof(ssid), pass, sizeof(pass));
     if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == String(ssid)) {
-        set_status("Su UDDA");
+        set_status("Connected to UDDA");
         return;
     }
     WiFi.mode(WIFI_STA);
@@ -300,14 +300,14 @@ static void ensure_wifi()
     WiFi.disconnect();                 // lascia l'eventuale rete di casa
     if (pass[0]) WiFi.begin(ssid, pass);
     else         WiFi.begin(ssid);     // hotspot aperto
-    set_status("Connetto a UDDA...");
+    set_status("Connecting to UDDA...");
 }
 
 static void on_btn(lv_event_t *)
 {
     if (s_state == V_IDLE || s_state == V_DONE) {
         if (s_task) {                    // upload precedente ancora in corso
-            set_status("Attendo la risposta precedente...");
+            set_status("Waiting for the previous response...");
             return;
         }
         // Il WiFi ATTIVO disturba il codec audio (mic muto). Quindi lo
@@ -327,8 +327,8 @@ static void on_btn(lv_event_t *)
     } else if (s_state == V_REC) {
         mic_rec_stop();
         s_state = V_SAVE;
-        set_status("Salvo...");
-        lv_label_set_text(s_btnlbl, "ATTENDI");
+        set_status("Saving...");
+        lv_label_set_text(s_btnlbl, "WAIT");
     }
 }
 
@@ -355,14 +355,14 @@ static void build()
     lv_obj_t *title = lv_label_create(s_scr);
     lv_obj_set_style_text_color(title, lv_color_make(0x00, 0xCC, 0x66), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_label_set_text(title, "Assistente UDDA");
+    lv_label_set_text(title, "UDDA Assistant");
 
     s_status = lv_label_create(s_scr);
     lv_obj_set_style_text_color(s_status, lv_color_make(0x88, 0x88, 0x88), LV_PART_MAIN);
     lv_obj_set_width(s_status, lv_pct(92));
     lv_label_set_long_mode(s_status, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_text(s_status, "Tocca PARLA e fai la domanda");
+    lv_label_set_text(s_status, "Tap SPEAK and ask your question");
 
     // voicebox KITT: riquadro nero con 3 colonne di segmenti rossi rettangolari.
     // Sized to ~3/4 of the 410 px display width so the ESP-SR wake-word
@@ -412,7 +412,7 @@ static void build()
     lv_obj_add_event_cb(s_btn, on_btn, LV_EVENT_CLICKED, nullptr);
     s_btnlbl = lv_label_create(s_btn);
     lv_obj_set_style_text_font(s_btnlbl, &lv_font_montserrat_28, LV_PART_MAIN);
-    lv_label_set_text(s_btnlbl, "PARLA");
+    lv_label_set_text(s_btnlbl, "SPEAK");
     lv_obj_center(s_btnlbl);
 
     s_you = lv_label_create(s_scr);
@@ -437,10 +437,10 @@ void voice_screen_show()
     // Non azzerare se c'e' un upload in corso (rientro durante l'attesa).
     if (s_state != V_UPLOAD && s_state != V_SAVE) {
         s_state = V_IDLE;
-        lv_label_set_text(s_btnlbl, "PARLA");
+        lv_label_set_text(s_btnlbl, "SPEAK");
         lv_label_set_text(s_you, "");
         lv_label_set_text(s_udda, "");
-        set_status("Tocca PARLA e fai la domanda");
+        set_status("Tap SPEAK and ask your question");
         kitt_set(0);
     }
     lv_scr_load(s_scr);

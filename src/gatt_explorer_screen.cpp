@@ -58,7 +58,7 @@ static void gx_cb(esp_gattc_cb_event_t ev, esp_gatt_if_t gi, esp_ble_gattc_cb_pa
         if (p->reg.status == ESP_GATT_OK) { s_if = gi; s_reg = true; }
         break;
     case ESP_GATTC_OPEN_EVT:
-        if (p->open.status != ESP_GATT_OK) { addline("connessione fallita"); s_enum_done = true; break; }
+        if (p->open.status != ESP_GATT_OK) { addline("Connection failed"); s_enum_done = true; break; }
         s_conn = p->open.conn_id;
         esp_ble_gattc_send_mtu_req(gi, s_conn);
         break;
@@ -136,7 +136,7 @@ static void gx_scan_cb(esp_ble_gap_cb_param_t *param)
     if (s_dev_n >= GX_MAX) return;
     GxDev &d = s_dev[s_dev_n];
     memcpy(d.bda, r.bda, 6); d.type = r.ble_addr_type; d.rssi = (int8_t)r.rssi;
-    strncpy(d.name, name[0] ? name : "(senza nome)", sizeof(d.name)-1); d.name[sizeof(d.name)-1] = '\0';
+    strncpy(d.name, name[0] ? name : "(no name)", sizeof(d.name)-1); d.name[sizeof(d.name)-1] = '\0';
     s_dev_n++;
 }
 
@@ -148,7 +148,7 @@ static void start_enum(const GxDev &dev)
     s_line_n = 0; s_enum_done = false; s_connecting = true;
     s_view = VIEW_ENUM;
     lv_label_set_text(title_label, "GATT");
-    lv_label_set_text(info_label, "connessione + enumerazione...");
+    lv_label_set_text(info_label, "Connecting and enumerating...");
     gx_begin();
     esp_bd_addr_t a; memcpy(a, dev.bda, 6);
     esp_ble_gattc_open(s_if, a, dev.type, true);
@@ -166,13 +166,13 @@ static void build_device_list()
 {
     lv_obj_clean(list_box);
     uint32_t nsel = s_dev_n;
-    char info[24]; snprintf(info, sizeof(info), "%d device - tocca", (int)nsel);
+    char info[24]; snprintf(info, sizeof(info), "%d devices - tap to select", (int)nsel);
     lv_label_set_text(info_label, info);
     if (s_dev_n == 0) {
         lv_obj_t *l = lv_label_create(list_box);
         lv_obj_set_style_text_color(l, lv_color_make(0x00,0x66,0x66), LV_PART_MAIN);
         lv_obj_set_style_text_font(l, &lv_font_montserrat_16, LV_PART_MAIN);
-        lv_label_set_text(l, "Scansione BLE...");
+        lv_label_set_text(l, "Scanning BLE...");
         return;
     }
     static int idxbuf[GX_MAX];
@@ -208,8 +208,8 @@ static void build_device_list()
 static void build_enum_list()
 {
     lv_obj_clean(list_box);
-    lv_label_set_text(info_label, s_enum_done ? "enumerazione completa (swipe-su = indietro)"
-                                              : "connessione + enumerazione...");
+    lv_label_set_text(info_label, s_enum_done ? "Enumeration complete (swipe up to return)"
+                                              : "Connecting and enumerating...");
     int n = s_line_n;
     for (int i = 0; i < n; i++) {
         bool svc = strncmp(s_line[i], "SVC", 3) == 0;
@@ -266,7 +266,7 @@ void gatt_explorer_screen_create()
     info_label = lv_label_create(s_scr);
     lv_obj_set_style_text_font(info_label, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(info_label, lv_color_make(0x88,0x88,0x88), LV_PART_MAIN);
-    lv_label_set_text(info_label, "Scansione BLE...");
+    lv_label_set_text(info_label, "Scanning BLE...");
     lv_obj_align(info_label, LV_ALIGN_TOP_MID, 0, 62);
 
     list_box = lv_obj_create(s_scr);

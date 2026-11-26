@@ -62,9 +62,9 @@ static void refresh()
         // Nothing parked yet — just the SAVE prompt.
         show(s_arrow, false); show(s_dist, false); show(s_map_btn, false); show(s_clr_btn, false);
         show(s_hint, true);
-        lv_label_set_text(s_save_lbl, LV_SYMBOL_GPS "  SALVA POSIZIONE AUTO");
-        lv_label_set_text(s_hint, "Parcheggi? Premi per fissare\nqui la posizione dell'auto.");
-        lv_label_set_text(s_status, lock ? "GPS pronto" : "Attendo il fix GPS...");
+        lv_label_set_text(s_save_lbl, LV_SYMBOL_GPS "  SAVE CAR LOCATION");
+        lv_label_set_text(s_hint, "Parking? Tap to save\nyour car's location here.");
+        lv_label_set_text(s_status, lock ? "GPS ready" : "Waiting for GPS fix...");
         lv_obj_set_style_text_color(s_status,
             lock ? lv_color_make(0x00, 0xCC, 0x66) : lv_color_make(0xFF, 0xCC, 0x00), LV_PART_MAIN);
         return;
@@ -72,17 +72,17 @@ static void refresh()
 
     // A car is saved — show recall UI.
     show(s_map_btn, true); show(s_clr_btn, true);
-    lv_label_set_text(s_save_lbl, LV_SYMBOL_GPS "  AGGIORNA");
+    lv_label_set_text(s_save_lbl, LV_SYMBOL_GPS "  UPDATE");
 
     char hint[64];
-    snprintf(hint, sizeof(hint), "auto: %.5f, %.5f", clat, clon);
+    snprintf(hint, sizeof(hint), "car: %.5f, %.5f", clat, clon);
     lv_label_set_text(s_hint, hint);
     show(s_hint, true);
 
     if (!lock) {
         show(s_arrow, false); show(s_dist, true);
         lv_label_set_text(s_dist, "-- m");
-        lv_label_set_text(s_status, "Auto salvata · attendo il tuo fix GPS");
+        lv_label_set_text(s_status, "Car saved - waiting for GPS fix");
         lv_obj_set_style_text_color(s_status, lv_color_make(0xFF, 0xCC, 0x00), LV_PART_MAIN);
         return;
     }
@@ -109,9 +109,9 @@ static void refresh()
     show(s_arrow, true);
 
     if (moving) {
-        lv_label_set_text(s_status, "Segui la freccia");
+        lv_label_set_text(s_status, "Follow the arrow");
     } else {
-        lv_label_set_text(s_status, LV_SYMBOL_UP " Nord in alto · cammina per orientare");
+        lv_label_set_text(s_status, LV_SYMBOL_UP " North up - walk to get your heading");
     }
     lv_obj_set_style_text_color(s_status, lv_color_make(0x00, 0xCC, 0x66), LV_PART_MAIN);
 }
@@ -119,7 +119,7 @@ static void refresh()
 static void on_save(lv_event_t *)
 {
     if (!(gps_screen_has_lock() && instance.gps.location.isValid())) {
-        lv_label_set_text(s_status, "Nessun fix GPS: non salvo");
+        lv_label_set_text(s_status, "No GPS fix: location not saved");
         lv_obj_set_style_text_color(s_status, lv_color_make(0xFF, 0x66, 0x00), LV_PART_MAIN);
         return;
     }
@@ -185,14 +185,14 @@ static void car_screen_create()
     lv_obj_t *title = lv_label_create(s_screen);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN);
     lv_obj_set_style_text_color(title, lv_color_make(0x00, 0xCC, 0x66), LV_PART_MAIN);
-    lv_label_set_text(title, LV_SYMBOL_GPS "  AUTO");
+    lv_label_set_text(title, LV_SYMBOL_GPS "  CAR FINDER");
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 18);
 
     s_status = lv_label_create(s_screen);
     lv_obj_set_style_text_font(s_status, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(s_status, lv_color_make(0x88, 0x88, 0x88), LV_PART_MAIN);
     lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_text(s_status, "Attendo il fix GPS...");
+    lv_label_set_text(s_status, "Waiting for GPS fix...");
     lv_obj_align(s_status, LV_ALIGN_TOP_MID, 0, 56);
 
     // Direction arrow (neon outline). Hidden until a car + fix are available.
@@ -220,15 +220,15 @@ static void car_screen_create()
     lv_obj_align(s_hint, LV_ALIGN_TOP_MID, 0, 356);
 
     // Buttons (kept in the central band, off the rounded corners).
-    s_map_btn = make_btn(LV_SYMBOL_DIRECTORY "  MAPPA", LV_ALIGN_BOTTOM_MID, -82, -84, 150,
+    s_map_btn = make_btn(LV_SYMBOL_DIRECTORY "  MAP", LV_ALIGN_BOTTOM_MID, -82, -84, 150,
                          lv_color_make(0x00, 0x88, 0xCC), on_map, nullptr);
-    s_clr_btn = make_btn(LV_SYMBOL_TRASH "  CANCELLA", LV_ALIGN_BOTTOM_MID, 82, -84, 150,
+    s_clr_btn = make_btn(LV_SYMBOL_TRASH "  CLEAR", LV_ALIGN_BOTTOM_MID, 82, -84, 150,
                          lv_color_make(0xCC, 0x44, 0x44), on_clear, nullptr);
     s_save_btn = make_btn("", LV_ALIGN_BOTTOM_MID, 0, -26, 330,   // 12px higher + bigger
                           lv_color_make(0x00, 0xCC, 0x66), on_save, &s_save_lbl);
     lv_obj_set_height(s_save_btn, 54);
     lv_obj_set_style_text_font(s_save_lbl, &lv_font_montserrat_18, LV_PART_MAIN);
-    lv_label_set_text(s_save_lbl, LV_SYMBOL_GPS "  SALVA POSIZIONE AUTO");
+    lv_label_set_text(s_save_lbl, LV_SYMBOL_GPS "  SAVE CAR LOCATION");
 
     s_timer = lv_timer_create(on_timer, 1000, NULL);
 }

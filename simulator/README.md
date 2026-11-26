@@ -129,19 +129,19 @@ Controls are shared firmware code; host hardware adapters remain simulator-only.
 
 See [acceptance checks](TESTING.md) for the automated scripts and a touchscreen checklist.
 
-## Simulator language
+## English firmware and simulator UI
 
-The simulator UI is English. `english_ui.py` and the file-scoped catalogue in
-`english_ui.json` translate exact string literals in generated build copies of
-the original screens, Task Manager and onboarding. The original firmware files
-are untouched. Navigation and callbacks remain shared; only display wording
-changes. Brands (Calmati, UDDA), device names, user messages, protocol commands
-and storage/configuration identifiers retain their original spelling.
+The 210 approved UI translations now live directly in the original firmware
+sources, including clock weather/countdown text and onboarding. The simulator
+compiles those exact sources without a translation step, so rendering tests
+also verify the wording shipped to the watch. The file-scoped catalogue remains
+as a regression record: tests require the English values and reject the old
+Italian UI literals. Comments and identifiers are not translated.
 
-Onboarding keeps the existing English disclaimer once. `Auto` becomes `Car`,
-and `Credito` becomes `NFC Compare`. Dynamic status/error messages and NFC
-comparison output are translated too. Add future UI translations to the
-catalogue; stale keys and changed printf arguments fail the catalogue tests.
+Brands (Calmati, UDDA), device names, user messages, protocol commands and
+storage/configuration identifiers retain their original spelling. Onboarding
+keeps the existing English disclaimer once. `Auto` becomes `Car`, and `Credito`
+becomes `NFC Compare`; dynamic status/error messages are included.
 
 ## Shared firmware and simulator navigation
 

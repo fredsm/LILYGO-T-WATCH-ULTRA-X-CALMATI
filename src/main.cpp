@@ -338,7 +338,7 @@ static void update_defcon_countdown(const struct tm *now_in)
     if (diff > 0) {
         long d = diff / 86400, h = (diff % 86400) / 3600, m = (diff % 3600) / 60;
         lv_label_set_text_fmt(defcon_countdown,
-            "DEF CON 35  " LV_SYMBOL_RIGHT "  %ldg %ldh %ldm", d, h, m);
+            "DEF CON 35  " LV_SYMBOL_RIGHT "  %ldd %ldh %ldm", d, h, m);
     } else if (diff > -4L * 86400) {         // during the con (5-8 Aug)
         lv_label_set_text(defcon_countdown, LV_SYMBOL_WARNING "  DEF CON 35  " LV_SYMBOL_WARNING);
     } else {
@@ -1248,17 +1248,17 @@ static void update_clock()
     if (defcon_vegas) {
         char wbuf[64];
         if (weather_is_fetching()) {
-            snprintf(wbuf, sizeof(wbuf), LV_SYMBOL_REFRESH "  meteo...");
+            snprintf(wbuf, sizeof(wbuf), LV_SYMBOL_REFRESH "  weather...");
         } else {
             WeatherSample w = weather_get();
             if (!w.valid) {
-                snprintf(wbuf, sizeof(wbuf), LV_SYMBOL_REFRESH "  meteo -");
+                snprintf(wbuf, sizeof(wbuf), LV_SYMBOL_REFRESH "  weather -");
             } else {
                 uint32_t age_min = w.age_ms / 60000UL;
                 const char *age_lbl =
-                    (age_min < 1)     ? "ora" :
+                    (age_min < 1)     ? "now" :
                     (age_min < 60)    ? nullptr :
-                    (age_min < 24*60) ? nullptr : "vecchio";
+                    (age_min < 24*60) ? nullptr : "stale";
                 if (age_lbl)
                     snprintf(wbuf, sizeof(wbuf), "%.0fC  %d%%  %d hPa  %s",
                              w.temp_c, w.humidity_pct, w.pressure_hpa, age_lbl);
@@ -1490,7 +1490,7 @@ void setup()
     lv_obj_set_style_text_font(defcon_vegas, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_set_style_text_color(defcon_vegas, lv_color_make(0x00, 0xE8, 0xFF), LV_PART_MAIN);
     lv_obj_set_style_text_letter_space(defcon_vegas, 2, LV_PART_MAIN);
-    lv_label_set_text(defcon_vegas, LV_SYMBOL_REFRESH "  meteo");
+    lv_label_set_text(defcon_vegas, LV_SYMBOL_REFRESH "  weather");
     lv_obj_align(defcon_vegas, LV_ALIGN_CENTER, 0, 112);
     lv_obj_add_flag(defcon_vegas, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(defcon_vegas, 20);   // generous tap zone

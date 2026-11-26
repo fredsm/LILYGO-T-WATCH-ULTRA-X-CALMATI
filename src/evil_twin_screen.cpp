@@ -47,7 +47,7 @@ static void show_aps()
         lv_obj_t *l = lv_label_create(list_box);
         lv_obj_set_style_text_font(l, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(l, lv_color_make(0x00, 0x66, 0x00), LV_PART_MAIN);
-        lv_label_set_text(l, "Nessuna rete - tocca SCAN");
+        lv_label_set_text(l, "No networks - tap SCAN");
         lv_obj_add_flag(l, LV_OBJ_FLAG_FLOATING);
         lv_obj_center(l);
         return;
@@ -137,7 +137,7 @@ static void rebuild_cred_list()
         lv_obj_t *w = lv_label_create(live_list);
         lv_obj_set_style_text_font(w, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(w, lv_color_make(0x66, 0x66, 0x66), LV_PART_MAIN);
-        lv_label_set_text(w, "In attesa di una vittima...\n\nQuando qualcuno inserisce la\npassword nel portale, appare qui\ne su SD /EvilTwin/creds.txt");
+        lv_label_set_text(w, "Waiting for a portal submission...\n\nSubmitted passwords appear here\nand on SD /EvilTwin/creds.txt");
         lv_obj_set_style_text_align(w, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         lv_obj_add_flag(w, LV_OBJ_FLAG_FLOATING);
         lv_obj_center(w);
@@ -185,17 +185,17 @@ static void rebuild_cred_list()
         lv_obj_set_style_text_color(sec, sec_col, LV_PART_MAIN);
         lv_label_set_long_mode(sec, LV_LABEL_LONG_DOT);
         lv_obj_set_width(sec, 350);
-        lv_label_set_text(sec, creds[i].secret[0] ? creds[i].secret : "(vuota)");
+        lv_label_set_text(sec, creds[i].secret[0] ? creds[i].secret : "(empty)");
 
         // Verify verdict tag under the secret — a plain-language read on
         // whether we've round-tripped the real AP with this password yet.
         const char *tag;
         switch (vs) {
-        case EV_VERIFY_OK:      tag = LV_SYMBOL_OK      " VERIFICATA"; break;
-        case EV_VERIFY_WRONG:   tag = LV_SYMBOL_CLOSE   " SBAGLIATA";  break;
-        case EV_VERIFY_TESTING: tag = LV_SYMBOL_REFRESH " verifico..."; break;
-        case EV_VERIFY_PENDING: tag = LV_SYMBOL_REFRESH " in coda";    break;
-        default:                tag = "AP fuori portata";              break;
+        case EV_VERIFY_OK:      tag = LV_SYMBOL_OK      " VERIFIED"; break;
+        case EV_VERIFY_WRONG:   tag = LV_SYMBOL_CLOSE   " INCORRECT";  break;
+        case EV_VERIFY_TESTING: tag = LV_SYMBOL_REFRESH " verifying..."; break;
+        case EV_VERIFY_PENDING: tag = LV_SYMBOL_REFRESH " queued";    break;
+        default:                tag = "AP out of range";              break;
         }
         lv_obj_t *verdict = lv_label_create(card);
         lv_obj_set_style_text_font(verdict, &lv_font_montserrat_14, LV_PART_MAIN);
@@ -212,7 +212,7 @@ static void rebuild_cred_list()
 static void refresh_live()
 {
     lv_label_set_text_fmt(live_ssid, LV_SYMBOL_WARNING "  \"%s\"", evil_portal_ssid());
-    lv_label_set_text_fmt(live_sub, LV_SYMBOL_WIFI " %d client   ·   %d credenziali",
+    lv_label_set_text_fmt(live_sub, LV_SYMBOL_WIFI " %d clients   ·   %d credentials",
                           evil_portal_client_count(), evil_portal_cred_count());
     int c = evil_portal_cred_count();
 
@@ -243,22 +243,22 @@ static void update_status()
     lv_color_t  col = lv_color_make(0x88, 0x88, 0x88);
     switch (s_state) {
     case EST_IDLE:
-        txt = "Tocca SCAN per trovare le reti";
+        txt = "Tap SCAN to find networks";
         break;
     case EST_SCANNING:
-        txt = "Scansione...";
+        txt = "Scanning...";
         col = lv_color_make(0xFF, 0xCC, 0x00);
         break;
     case EST_LIST:
         if (s_target >= 0)
-            snprintf(buf, sizeof(buf), "Bersaglio: %s (ch %d)",
+            snprintf(buf, sizeof(buf), "Target: %s (ch %d)",
                      s_aps[s_target].ssid[0] ? s_aps[s_target].ssid : "(hidden)",
                      s_aps[s_target].channel);
         else
-            snprintf(buf, sizeof(buf), "%d reti - toccane una", s_ap_count);
+            snprintf(buf, sizeof(buf), "%d networks - tap one", s_ap_count);
         break;
     case EST_RUNNING:
-        txt = "Portale attivo - swipe su per fermare";
+        txt = "Portal active - swipe up to stop";
         col = lv_color_make(0xEE, 0x44, 0xAA);
         break;
     }
@@ -287,13 +287,13 @@ static void update_buttons()
     }
     lv_obj_clear_flag(btn_scan, LV_OBJ_FLAG_HIDDEN);
     const char *sl = (s_state == EST_SCANNING) ? "SCAN..." :
-                     (s_target >= 0)           ? "RISCAN"  : "SCAN";
+                     (s_target >= 0)           ? "RESCAN"  : "SCAN";
     lv_label_set_text(btn_scan_lbl, sl);
     lv_obj_set_style_bg_color(btn_scan, lv_color_make(0x00, 0x66, 0x99), LV_PART_MAIN);
 
     if (s_target >= 0 && s_state != EST_SCANNING) {
         lv_obj_clear_flag(btn_atk, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(btn_atk_lbl, "CLONA");
+        lv_label_set_text(btn_atk_lbl, "CLONE");
         lv_obj_set_style_bg_color(btn_atk, lv_color_make(0xCC, 0x33, 0xAA), LV_PART_MAIN);
         lv_obj_align(btn_scan, LV_ALIGN_LEFT_MID,  6, 0);
         lv_obj_align(btn_atk,  LV_ALIGN_RIGHT_MID, -6, 0);
@@ -426,13 +426,13 @@ void evil_twin_screen_create()
     lv_obj_t *warn = lv_label_create(screen);
     lv_obj_set_style_text_font(warn, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(warn, lv_color_make(0x88, 0x55, 0x55), LV_PART_MAIN);
-    lv_label_set_text(warn, "Solo su reti che sei autorizzato a testare");
+    lv_label_set_text(warn, "Only on networks you are authorized to test");
     lv_obj_align(warn, LV_ALIGN_TOP_MID, 0, 50);
 
     status_label = lv_label_create(screen);
     lv_obj_set_style_text_font(status_label, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(status_label, lv_color_make(0x99, 0x55, 0x88), LV_PART_MAIN);
-    lv_label_set_text(status_label, "Tocca SCAN per trovare le reti");
+    lv_label_set_text(status_label, "Tap SCAN to find networks");
     lv_obj_align(status_label, LV_ALIGN_TOP_MID, 0, 74);
 
     lv_obj_t *btn_row = lv_obj_create(screen);
@@ -451,7 +451,7 @@ void evil_twin_screen_create()
     btn_atk = make_button(btn_row, 196, 48, lv_color_make(0xCC, 0x33, 0xAA), &btn_atk_lbl);
     lv_obj_align(btn_atk, LV_ALIGN_RIGHT_MID, -6, 0);
     lv_obj_add_event_cb(btn_atk, on_attack_btn, LV_EVENT_CLICKED, NULL);
-    lv_label_set_text(btn_atk_lbl, "CLONA");
+    lv_label_set_text(btn_atk_lbl, "CLONE");
     lv_obj_add_flag(btn_atk, LV_OBJ_FLAG_HIDDEN);
 
     // AP list (shown idle/list).

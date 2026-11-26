@@ -43,8 +43,8 @@ screen reopening, navigation and sample NFC, BLE, portscan and voice workflows.
 Double-click interaction-test.cmd for the SDL navigation, keyboard, touch-button
 and hardware-panel regression checks. Results are saved in interaction-test.log.
 
-The simulator UI is English, including onboarding and status messages.
-Auto is now Car; Credito is NFC Compare. Physical firmware text is unchanged.
+Both simulator and physical firmware UI are English, including onboarding
+and status messages. Auto is now Car; Credito is NFC Compare.
 
 Quick Controls toggles Wi-Fi, Bluetooth, GPS, LoRa and NFC. Brightness cycles
 33%, 66%, 100% and saves through Settings. Swipe up, Back or Power closes it.

@@ -1673,13 +1673,13 @@ void tools_screen_create()
     lv_obj_t *t_mifare  = make_tile(grid, "Mifare");
     lv_obj_t *t_waterfall = make_tile(grid, "Waterfall");
     lv_obj_t *t_espnow  = make_tile(grid, "ESP-NOW");
-    lv_obj_t *t_car     = make_tile(grid, "Auto");
+    lv_obj_t *t_car     = make_tile(grid, "Car");
     lv_obj_t *t_udda    = make_tile(grid, "UDDA");
     lv_obj_t *t_adsb    = make_tile(grid, "ADS-B");
     lv_obj_t *t_mic     = make_tile(grid, "Mic Rec");
     lv_obj_t *t_assist  = make_tile(grid, "Assist");
     lv_obj_t *t_panel   = make_tile(grid, "Panel");
-    lv_obj_t *t_credito = make_tile(grid, "Credito");
+    lv_obj_t *t_credito = make_tile(grid, "NFC Compare");
     // WPA3 SAE Overflow — flood a WPA3-SAE AP with random SAE Commit frames
     // to DoS its authentication path. Injection reuses the same primitive as
     // the deauther; PMF (mandatory on WPA3) doesn't protect against this.

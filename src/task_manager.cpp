@@ -169,7 +169,7 @@ static void refresh()
         lv_obj_t *e = lv_label_create(s_list);
         lv_obj_set_style_text_font(e, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(e, lv_color_make(0x00, 0x99, 0x55), LV_PART_MAIN);
-        lv_label_set_text(e, LV_SYMBOL_OK "  Tutto spento.\n\nNessuna radio o scansione attiva:\nbatteria al sicuro.");
+        lv_label_set_text(e, LV_SYMBOL_OK "  Everything is off.\n\nNo active radios or scans:\nsaving battery.");
         lv_obj_set_style_text_align(e, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     }
 }

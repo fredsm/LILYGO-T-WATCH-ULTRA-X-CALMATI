@@ -193,7 +193,7 @@ static void on_timer(lv_timer_t *)
     if (!s_active || lv_screen_active() != screen) return;
     do_frame();
     if (millis() - s_lastShow > 500) {
-        lv_label_set_text_fmt(info_lbl, "Ch %d (2.4)   pkt %lu   tap = canale",
+        lv_label_set_text_fmt(info_lbl, "Ch %d (2.4)   pkt %lu   tap = channel",
                               fftChans[s_chIdx], (unsigned long)(s_pkts - s_lastPkt));
         s_lastPkt = s_pkts;
         s_lastShow = millis();
@@ -208,7 +208,7 @@ static void on_canvas_click(lv_event_t *)
     s_epoch = 0;
     if (fb) memset(fb, 0, (size_t)CV_W * CV_H * 2);
     lv_obj_invalidate(canvas);
-    lv_label_set_text_fmt(title_lbl, "Analizzatore Banda  Ch %d", fftChans[s_chIdx]);
+    lv_label_set_text_fmt(title_lbl, "Band Analyzer  Ch %d", fftChans[s_chIdx]);
     s_lastPkt = s_pkts;
 }
 
@@ -235,13 +235,13 @@ void waterfall_screen_create()
     title_lbl = lv_label_create(screen);
     lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_set_style_text_color(title_lbl, lv_color_make(0x00, 0xFF, 0x00), LV_PART_MAIN);
-    lv_label_set_text(title_lbl, "Analizzatore Banda  Ch 6");
+    lv_label_set_text(title_lbl, "Band Analyzer  Ch 6");
     lv_obj_align(title_lbl, LV_ALIGN_TOP_MID, 0, 8);
 
     info_lbl = lv_label_create(screen);
     lv_obj_set_style_text_font(info_lbl, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(info_lbl, lv_color_make(0x00, 0x88, 0x00), LV_PART_MAIN);
-    lv_label_set_text(info_lbl, "tap = canale   swipe su = esci");
+    lv_label_set_text(info_lbl, "tap = channel   swipe up = exit");
     lv_obj_align(info_lbl, LV_ALIGN_TOP_MID, 0, 36);
 
     // buffer canvas in PSRAM (355 KB), scritto direttamente come un framebuffer

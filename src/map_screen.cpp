@@ -570,7 +570,7 @@ void map_screen_create()
     lv_obj_set_style_pad_hor(car_label, 3, LV_PART_MAIN);
     lv_obj_set_style_pad_ver(car_label, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(car_label, 3, LV_PART_MAIN);
-    lv_label_set_text(car_label, "AUTO");
+    lv_label_set_text(car_label, "CAR");
     lv_obj_add_flag(car_label, LV_OBJ_FLAG_HIDDEN);
 
     // Info badge floating at the top: "MAP z<level> lat,lon"

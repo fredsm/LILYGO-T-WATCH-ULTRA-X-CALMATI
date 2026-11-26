@@ -41,7 +41,7 @@ static uint8_t   s_cap_mac[6] = {0};         // device chosen for labelling
 static const char *LBL_WAY  = "WAYFARER";
 static const char *LBL_HEAD = "HEADLINER";
 static const char *LBL_OAK  = "OAKLEY";
-static const char *LBL_OTH  = "ALTRO";
+static const char *LBL_OTH  = "OTHER";
 
 static void show_capture(int idx);
 static void hide_capture();
@@ -128,8 +128,8 @@ static void show_detail(uint16_t id)
         lv_obj_add_flag(s_detail_img, LV_OBJ_FLAG_HIDDEN);
     }
     lv_label_set_text(s_detail_lbl, model_name(id));
-    if (ok) lv_label_set_text_fmt(s_detail_sub, "0x%04X  ·  tocca per chiudere", id);
-    else    lv_label_set_text_fmt(s_detail_sub, "manca /meta/%s.bin sulla SD", fam);
+    if (ok) lv_label_set_text_fmt(s_detail_sub, "0x%04X  ·  tap to close", id);
+    else    lv_label_set_text_fmt(s_detail_sub, "Missing /meta/%s.bin on SD", fam);
     lv_obj_move_foreground(s_detail);
     lv_obj_clear_flag(s_detail, LV_OBJ_FLAG_HIDDEN);
 }
@@ -179,12 +179,12 @@ static void refresh()
     int n = meta_glasses_count();
     if (cap)
         lv_label_set_text_fmt(s_status,
-            LV_SYMBOL_SAVE "  CATTURA · %d salvati · tocca un occhiale",
+            LV_SYMBOL_SAVE "  CAPTURE · %d saved · tap a device",
             meta_glasses_capture_total());
     else
         lv_label_set_text_fmt(s_status,
-            n > 0 ? LV_SYMBOL_EYE_OPEN "  %d occhiali smart rilevati"
-                  : LV_SYMBOL_REFRESH "  Scansione BLE...  (%d)", n);
+            n > 0 ? LV_SYMBOL_EYE_OPEN "  %d smart glasses detected"
+                  : LV_SYMBOL_REFRESH "  Scanning BLE...  (%d)", n);
 
     int got = meta_glasses_get(s_shown, 16);
     s_shown_n = got;
@@ -200,9 +200,9 @@ static void refresh()
         lv_obj_set_style_text_font(e, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(e, lv_color_make(0x55, 0x66, 0x99), LV_PART_MAIN);
         lv_label_set_text(e,
-            "Nessun occhiale smart nei paraggi.\n\n"
-            "Rileva Ray-Ban Stories/Meta,\n"
-            "Oakley Meta e Quest via BLE\n"
+            "No smart glasses nearby.\n\n"
+            "Detects Ray-Ban Stories/Meta,\n"
+            "Oakley Meta and Quest over BLE\n"
             "(company id Meta/Luxottica).");
         lv_obj_set_style_text_align(e, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         return;
@@ -229,7 +229,7 @@ static void show_capture(int idx)
         "%02X:%02X:%02X:%02X:%02X:%02X\nid 0x%04X · %d dBm · %ux",
         h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
         h.id, (int)h.rssi, (unsigned)h.hits);
-    lv_label_set_text(s_cap_result, "Scegli il modello che hai davanti per salvarlo");
+    lv_label_set_text(s_cap_result, "Select the model to save a sample");
     lv_obj_set_style_text_color(s_cap_result, lv_color_make(0x88, 0x88, 0x88), LV_PART_MAIN);
     lv_obj_move_foreground(s_cap);
     lv_obj_clear_flag(s_cap, LV_OBJ_FLAG_HIDDEN);
@@ -258,7 +258,7 @@ static void add_nearest_row()
     lv_obj_t *l = lv_label_create(row);
     lv_obj_set_style_text_font(l, &lv_font_montserrat_18, LV_PART_MAIN);
     lv_obj_set_style_text_color(l, lv_color_make(0x00, 0xFF, 0x66), LV_PART_MAIN);
-    lv_label_set_text_fmt(l, LV_SYMBOL_GPS "  CATTURA IL PIU' VICINO  (%d dBm)",
+    lv_label_set_text_fmt(l, LV_SYMBOL_GPS "  CAPTURE NEAREST  (%d dBm)",
                           (int)s_shown[0].rssi);
     lv_obj_center(l);
     lv_obj_add_flag(l, LV_OBJ_FLAG_EVENT_BUBBLE);
@@ -270,12 +270,12 @@ static void on_cap_label(lv_event_t *e)
     bool ok = meta_glasses_save_labeled(s_cap_mac, lbl);
     if (ok) {
         lv_label_set_text_fmt(s_cap_result,
-            LV_SYMBOL_OK "  salvato [%s] · tot %d\n(ritoccalo per un altro campione)",
+            LV_SYMBOL_OK "  Saved [%s] · total %d\n(tap again for another sample)",
             lbl, meta_glasses_capture_total());
         lv_obj_set_style_text_color(s_cap_result, lv_color_make(0x00, 0xCC, 0x55), LV_PART_MAIN);
     } else {
         lv_label_set_text(s_cap_result,
-            LV_SYMBOL_WARNING "  non salvato (device sparito o SD non pronta)");
+            LV_SYMBOL_WARNING "  Not saved (device lost or SD unavailable)");
         lv_obj_set_style_text_color(s_cap_result, lv_color_make(0xFF, 0x66, 0x00), LV_PART_MAIN);
     }
 }
@@ -335,7 +335,7 @@ void meta_screen_create()
     s_status = lv_label_create(s_screen);
     lv_obj_set_style_text_font(s_status, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(s_status, lv_color_make(0x88, 0x88, 0x88), LV_PART_MAIN);
-    lv_label_set_text(s_status, LV_SYMBOL_REFRESH "  Scansione BLE...");
+    lv_label_set_text(s_status, LV_SYMBOL_REFRESH "  Scanning BLE...");
     lv_obj_align(s_status, LV_ALIGN_TOP_MID, 0, 60);
 
     s_list = lv_obj_create(s_screen);
@@ -432,7 +432,7 @@ void meta_screen_create()
     lv_obj_t *ct = lv_label_create(s_cap);
     lv_obj_set_style_text_font(ct, &lv_font_montserrat_24, LV_PART_MAIN);
     lv_obj_set_style_text_color(ct, lv_color_make(0x00, 0xCC, 0x55), LV_PART_MAIN);
-    lv_label_set_text(ct, LV_SYMBOL_SAVE "  REGISTRA MODELLO");
+    lv_label_set_text(ct, LV_SYMBOL_SAVE "  RECORD MODEL");
     lv_obj_align(ct, LV_ALIGN_TOP_MID, 0, 26);
 
     s_cap_info = lv_label_create(s_cap);
@@ -446,7 +446,7 @@ void meta_screen_create()
         { "Ray-Ban Stories (Wayfarer)", LBL_WAY },
         { "Ray-Ban Meta (Headliner)",   LBL_HEAD },
         { "Oakley Meta",                LBL_OAK },
-        { "Altro / sconosciuto",        LBL_OTH },
+        { "Other / unknown",        LBL_OTH },
     };
     for (int i = 0; i < 4; i++) {
         lv_obj_t *b = lv_obj_create(s_cap);
@@ -491,7 +491,7 @@ void meta_screen_create()
     lv_obj_t *cxl = lv_label_create(cx);
     lv_obj_set_style_text_font(cxl, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(cxl, lv_color_make(0xAA, 0xAA, 0xAA), LV_PART_MAIN);
-    lv_label_set_text(cxl, LV_SYMBOL_CLOSE "  CHIUDI");
+    lv_label_set_text(cxl, LV_SYMBOL_CLOSE "  CLOSE");
     lv_obj_center(cxl);
     lv_obj_add_flag(cxl, LV_OBJ_FLAG_EVENT_BUBBLE);
 

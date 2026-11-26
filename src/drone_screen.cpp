@@ -17,19 +17,19 @@ void tools_screen_show();
 static const char *ua_type(uint8_t t) {
     switch (t) {
     case 0:  return "None";
-    case 1:  return "Aereo";
-    case 2:  return "Multirotore";
-    case 3:  return "Elicottero";
+    case 1:  return "Airplane";
+    case 2:  return "Multirotor";
+    case 3:  return "Helicopter";
     case 4:  return "Gyroplane";
     case 5:  return "VTOL";
     case 6:  return "Ornithopter";
-    case 7:  return "Aliante";
+    case 7:  return "Glider";
     case 8:  return "Kite";
     case 9:  return "Free Balloon";
     case 10: return "Captive Balloon";
     case 11: return "Airship";
-    case 12: return "Paracadute";
-    case 15: return "Altro";
+    case 12: return "Parachute";
+    case 15: return "Other";
     default: return "?";
     }
 }
@@ -121,14 +121,14 @@ static void build_list()
         for (int j = i+1; j < n; j++)
             if (list[j].rssi > list[i].rssi) { Drone t=list[i]; list[i]=list[j]; list[j]=t; }
 
-    char cbuf[24]; snprintf(cbuf, sizeof(cbuf), "%d droni", n);
+    char cbuf[24]; snprintf(cbuf, sizeof(cbuf), "%d drones", n);
     lv_label_set_text(count_label, cbuf);
 
     if (n == 0) {
         lv_obj_t *l = lv_label_create(list_box);
         lv_obj_set_style_text_font(l, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(l, lv_color_make(0x00,0x66,0x66), LV_PART_MAIN);
-        lv_label_set_text(l, "Scansione Remote ID...\nnessun drone in trasmissione");
+        lv_label_set_text(l, "Scanning Remote ID...\nno drones broadcasting");
         return;
     }
     for (int i = 0; i < n; i++) {
@@ -155,7 +155,7 @@ static void build_list()
         lv_obj_t *l2 = lv_label_create(card);
         lv_obj_set_style_text_font(l2, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_set_style_text_color(l2, lv_color_make(0xaa,0xaa,0xaa), LV_PART_MAIN);
-        lv_label_set_text_fmt(l2, "%s   %d dBm", d.uatype != 0xFF ? ua_type(d.uatype) : "tipo ?", d.rssi);
+        lv_label_set_text_fmt(l2, "%s   %d dBm", d.uatype != 0xFF ? ua_type(d.uatype) : "unknown type", d.rssi);
     }
 }
 
@@ -196,13 +196,13 @@ void drone_screen_create()
     lv_obj_t *sub = lv_label_create(s_scr);
     lv_obj_set_style_text_font(sub, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(sub, lv_color_make(0x66,0x88,0x99), LV_PART_MAIN);
-    lv_label_set_text(sub, "Remote ID ASTM F3411 (BLE) - passivo");
+    lv_label_set_text(sub, "Remote ID ASTM F3411 (BLE) - passive");
     lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 60);
 
     count_label = lv_label_create(s_scr);
     lv_obj_set_style_text_font(count_label, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(count_label, lv_color_make(0x88,0x88,0x88), LV_PART_MAIN);
-    lv_label_set_text(count_label, "0 droni");
+    lv_label_set_text(count_label, "0 drones");
     lv_obj_align(count_label, LV_ALIGN_TOP_MID, 0, 84);
 
     list_box = lv_obj_create(s_scr);

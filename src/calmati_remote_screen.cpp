@@ -41,10 +41,10 @@ static void set_dot(lv_color_t c) {
 
 // ---- connection (deferred until after the screen is shown) ----------------
 static void on_connect_timer(lv_timer_t *t) {
-  set_status("connessione...", C_AMBER());
+  set_status("Connecting...", C_AMBER());
   bool ok = calmati_connect();
-  if (ok) { set_status("connesso a CALMATI", C_GREEN()); set_dot(C_GREEN()); }
-  else    { set_status("AP non trovato", C_RED());       set_dot(C_RED());   }
+  if (ok) { set_status("Connected to CALMATI", C_GREEN()); set_dot(C_GREEN()); }
+  else    { set_status("AP not found", C_RED());       set_dot(C_RED());   }
   lv_timer_del(t);
 }
 
@@ -61,7 +61,7 @@ static void send_channel() {
   char b[20]; snprintf(b, sizeof(b), "channel -s %d", s_channel);
   String out; calmati_send(b, out);
   if (s_chlbl) lv_label_set_text_fmt(s_chlbl, "%d", s_channel);
-  set_status(String("canale ") + s_channel, C_AMBER());
+  set_status(String("channel ") + s_channel, C_AMBER());
 }
 static void on_ch_up(lv_event_t *)   { if (s_channel < 14) s_channel++; send_channel(); }
 static void on_ch_down(lv_event_t *) { if (s_channel > 1)  s_channel--; send_channel(); }
@@ -69,7 +69,7 @@ static void on_ch_down(lv_event_t *) { if (s_channel > 1)  s_channel--; send_cha
 // Result views (read the dongle's live lists).
 static void on_res_skim(lv_event_t *) { s_active = false; calmati_result_screen_show("SKIMMER",  "/skimmers", true);  }
 static void on_res_ble(lv_event_t *)  { s_active = false; calmati_result_screen_show("BLE",      "/ble",      false); }
-static void on_res_sta(lv_event_t *)  { s_active = false; calmati_result_screen_show("STAZIONI", "/stations", false); }
+static void on_res_sta(lv_event_t *)  { s_active = false; calmati_result_screen_show("STATIONS", "/stations", false); }
 
 static void on_gesture(lv_event_t *e) {
   lv_dir_t dir = lv_indev_get_gesture_dir(lv_event_get_indev(e));
@@ -184,7 +184,7 @@ static void build() {
   s_status = lv_label_create(chip);
   lv_obj_set_style_text_font(s_status, &lv_font_montserrat_16, LV_PART_MAIN);
   lv_obj_set_style_text_color(s_status, C_MUTE(), LV_PART_MAIN);
-  lv_label_set_text(s_status, "pronto");
+  lv_label_set_text(s_status, "Ready");
   lv_obj_align(s_status, LV_ALIGN_LEFT_MID, 34, 0);
 
   // --- hero controls: SCAN / STOP ---
@@ -237,7 +237,7 @@ static void build() {
   // --- result views (read the dongle's live lists) ---
   make_btn(s_grid, "R:Skim", "", C_VIOLET(), false, on_res_skim);
   make_btn(s_grid, "R:BLE",  "", C_VIOLET(), false, on_res_ble);
-  make_btn(s_grid, "R:Staz", "", C_GREEN(),  false, on_res_sta);
+  make_btn(s_grid, "R:Stations", "", C_GREEN(),  false, on_res_sta);
 
   // Bottom spacer so the last row can scroll up into the tappable centre band.
   { lv_obj_t *sp = lv_obj_create(s_grid); lv_obj_set_size(sp, lv_pct(100), 60);
@@ -248,7 +248,7 @@ static void build() {
 void calmati_remote_screen_show() {
   if (!s_screen) build();
   s_active = true;
-  set_status("pronto", C_MUTE());
+  set_status("Ready", C_MUTE());
   set_dot(C_AMBER());
   lv_scr_load(s_screen);
   lv_timer_t *t = lv_timer_create(on_connect_timer, 400, nullptr);

@@ -19,7 +19,9 @@ class EnglishUITests(unittest.TestCase):
                 if name == 'original_clock.inc':
                     source = extract(source)
                 tokens = {m[0][1:-1] for m in TOKEN.finditer(source) if m[0].startswith('"')}
-                self.assertFalse(mapping.keys() - tokens, 'Stale translation keys')
+                self.assertFalse(set(mapping.values()) - tokens, 'English firmware text missing')
+                self.assertFalse((mapping.keys() - set(mapping.values())) & tokens,
+                                 'Italian UI text remains in firmware')
                 translated = translate(source, mapping)
                 mask = lambda s: TOKEN.sub(lambda m: '""' if m[0].startswith('"') else m[0], s)
                 self.assertEqual(mask(source), mask(translated))

@@ -215,16 +215,16 @@ static void refresh()
     lv_color_t bcol; const char *btext;
     if (top >= TR_LVL_LIKELY) {
         bcol = lv_color_make(0xFF, 0x22, 0x22);
-        btext = LV_SYMBOL_WARNING "  QUALCUNO TI STA SEGUENDO";
+        btext = LV_SYMBOL_WARNING "  SOMEONE IS FOLLOWING YOU";
     } else if (top == TR_LVL_POSSIBLE) {
         bcol = lv_color_make(0xCC, 0x88, 0x00);
-        btext = LV_SYMBOL_EYE_OPEN "  Possibile pedinamento";
+        btext = LV_SYMBOL_EYE_OPEN "  Possible tail";
     } else if (st.threats > 0) {
         bcol = lv_color_make(0x22, 0x44, 0x00);
-        btext = LV_SYMBOL_EYE_OPEN "  Dispositivi segnalati nei paraggi";
+        btext = LV_SYMBOL_EYE_OPEN "  Flagged devices nearby";
     } else {
         bcol = lv_color_make(0x00, 0x55, 0x2A);
-        btext = LV_SYMBOL_OK "  Aria pulita";
+        btext = LV_SYMBOL_OK "  All clear";
     }
     lv_obj_set_style_bg_color(s_banner, bcol, LV_PART_MAIN);
     lv_label_set_text(s_banner_lbl, btext);
@@ -251,11 +251,11 @@ static void refresh()
             lv_obj_set_style_text_font(empty, &lv_font_montserrat_16, LV_PART_MAIN);
             lv_obj_set_style_text_color(empty, lv_color_make(0x00, 0x77, 0x44), LV_PART_MAIN);
             lv_label_set_text(empty,
-                "Nessun dispositivo segnalato.\n\n"
-                "WiFi e BLE vengono scansionati\n"
-                "a turno: AirTag, Flipper, skimmer,\n"
-                "telecamere Flock ed evil-twin\n"
-                "appariranno qui appena rilevati.");
+                "No flagged devices.\n\n"
+                "WiFi and BLE scans alternate.\n"
+                "AirTags, Flippers, skimmers,\n"
+                "Flock cameras and evil twins\n"
+                "appear here when detected.");
             lv_obj_set_style_text_align(empty, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         } else {
             for (int i = 0; i < nd; i++) add_dev_row(&devs[i], now);

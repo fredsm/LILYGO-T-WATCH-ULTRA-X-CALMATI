@@ -5,8 +5,6 @@ set(CLOCK_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/original_clock.inc")
 add_custom_command(OUTPUT "${CLOCK_INCLUDE}"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/extract_clock.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp" "${CLOCK_INCLUDE}"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.py"
-            "${CLOCK_INCLUDE}" "${CLOCK_INCLUDE}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.json"
     DEPENDS extract_clock.py english_ui.py english_ui.json ../src/main.cpp VERBATIM)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -52,18 +50,11 @@ add_test(NAME original_calendar_ui COMMAND calendar_ui_test)
 
 
 # screens.inc is the single source of truth for native source selection and UI tests.
-# Compile localized copies only in this host project. Firmware files stay intact.
+# English UI now lives in the firmware sources. Compile those exact files so
+# host rendering tests cannot hide untranslated firmware text.
 function(english_source original result)
     get_filename_component(source "${original}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-    get_filename_component(name "${source}" NAME)
-    get_filename_component(source_dir "${source}" DIRECTORY)
-    set(output "${CMAKE_CURRENT_BINARY_DIR}/english/${name}")
-    add_custom_command(OUTPUT "${output}"
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.py"
-                "${source}" "${output}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.json"
-        DEPENDS "${source}" english_ui.py english_ui.json VERBATIM)
-    set_source_files_properties("${output}" PROPERTIES INCLUDE_DIRECTORIES "${source_dir}")
-    set(${result} "${output}" PARENT_SCOPE)
+    set(${result} "${source}" PARENT_SCOPE)
 endfunction()
 english_source("../src/onboarding.cpp" ENGLISH_ONBOARDING)
 english_source("../src/task_manager.cpp" ENGLISH_TASK_MANAGER)

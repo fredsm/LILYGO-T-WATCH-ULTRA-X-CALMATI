@@ -41,7 +41,7 @@ static bool     s_valid[2] = { false, false };
 static char     s_uid[2][24];
 static struct tm s_time[2];
 
-static const char *slot_name(int s) { return s == 0 ? "PRIMA" : "DOPO"; }
+static const char *slot_name(int s) { return s == 0 ? "BEFORE" : "AFTER"; }
 
 // ---- RFAL ----
 static void cr_on_notify(rfalNfcState st)
@@ -84,8 +84,8 @@ static void cr_set_scanning(bool on)
     lv_color_t dc = on ? lv_color_make(0xCC, 0x22, 0x22) : CR_GREEN;
     lv_obj_set_style_bg_color(cr_prima_btn, pc, LV_PART_MAIN);
     lv_obj_set_style_bg_color(cr_dopo_btn,  dc, LV_PART_MAIN);
-    lv_label_set_text(cr_prima_lbl, on ? "STOP" : "PRIMA");
-    lv_label_set_text(cr_dopo_lbl,  on ? "STOP" : "DOPO");
+    lv_label_set_text(cr_prima_lbl, on ? "STOP" : "BEFORE");
+    lv_label_set_text(cr_dopo_lbl,  on ? "STOP" : "AFTER");
 }
 
 // Legge tutte le pagine nel buffer dello slot. Ritorna quante pagine lette.
@@ -135,7 +135,7 @@ static bool cr_save_sd(int slot, const char *diff)
     for (int pg = 4; pg < NPAGES; pg++) {
         if (!page_nonzero(slot, pg)) continue;
         const uint8_t *b = &s_slot[slot][pg * 4];
-        f.printf("pag %3d: %02X %02X %02X %02X\n", pg, b[0], b[1], b[2], b[3]);
+        f.printf("page %3d: %02X %02X %02X %02X\n", pg, b[0], b[1], b[2], b[3]);
     }
     if (diff && diff[0]) f.print(diff);
     f.close();
@@ -146,18 +146,18 @@ static bool cr_save_sd(int slot, const char *diff)
 static int cr_build_diff(char *buf, int bufsize)
 {
     int n = 0, changed = 0;
-    n += snprintf(buf + n, bufsize - n, "--- CAMBIATO (PRIMA->DOPO) ---\n");
+    n += snprintf(buf + n, bufsize - n, "--- CHANGED (BEFORE->AFTER) ---\n");
     for (int pg = 0; pg < NPAGES && n < bufsize - 80; pg++) {
         const uint8_t *a = &s_slot[0][pg * 4];
         const uint8_t *b = &s_slot[1][pg * 4];
         if (memcmp(a, b, 4) == 0) continue;
         changed++;
         n += snprintf(buf + n, bufsize - n,
-                      "pag %d: %02X%02X%02X%02X -> %02X%02X%02X%02X\n",
+                      "page %d: %02X%02X%02X%02X -> %02X%02X%02X%02X\n",
                       pg, a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]);
     }
     if (changed == 0)
-        snprintf(buf, bufsize, "--- NESSUN CAMBIAMENTO ---\n(chip identico: dato non sul chip)\n");
+        snprintf(buf, bufsize, "--- NO CHANGES ---\n(chip unchanged: data not on chip)\n");
     return changed;
 }
 
@@ -165,7 +165,7 @@ static void cr_process(int slot)
 {
     int pages = cr_full_read(slot);
     if (pages < 52) {   // non siamo arrivati almeno a pag.51
-        lv_label_set_text(cr_status, "Lettura incompleta, riprova");
+        lv_label_set_text(cr_status, "Incomplete read, try again");
         return;
     }
     clock_screen_get_local_time(&s_time[slot]);
@@ -182,7 +182,7 @@ static void cr_process(int slot)
 
     char out[900];
     int n = 0;
-    n += snprintf(out + n, sizeof(out) - n, "%s salvato  %02d:%02d:%02d\n",
+    n += snprintf(out + n, sizeof(out) - n, "%s saved  %02d:%02d:%02d\n",
                   slot_name(slot), s_time[slot].tm_hour, s_time[slot].tm_min, s_time[slot].tm_sec);
     n += snprintf(out + n, sizeof(out) - n, "UID %s\n", s_uid[slot]);
     n += snprintf(out + n, sizeof(out) - n, "50: %02X %02X %02X %02X\n", p50[0], p50[1], p50[2], p50[3]);
@@ -192,16 +192,16 @@ static void cr_process(int slot)
     diff[0] = '\0';
     if (slot == 1 && s_valid[0]) {              // DOPO con PRIMA disponibile
         if (strcmp(s_uid[0], s_uid[1]) != 0)
-            n += snprintf(out + n, sizeof(out) - n, "!! UID PRIMA != DOPO (tessere diverse) !!\n");
+            n += snprintf(out + n, sizeof(out) - n, "!! BEFORE UID != AFTER UID (different cards) !!\n");
         cr_build_diff(diff, sizeof(diff));
         n += snprintf(out + n, sizeof(out) - n, "%s", diff);
     }
 
     bool sd = cr_save_sd(slot, diff);
     n += snprintf(out + n, sizeof(out) - n, sd ? "[SD ok /frantic/verify_log.txt]"
-                                              : "[SD non pronta: solo a schermo]");
+                                              : "[SD unavailable: display only]");
     lv_label_set_text(cr_result, out);
-    lv_label_set_text_fmt(cr_status, "%s letto (%d pag)", slot_name(slot), pages);
+    lv_label_set_text_fmt(cr_status, "%s read (%d pages)", slot_name(slot), pages);
 }
 
 static void cr_start(int slot)
@@ -212,7 +212,7 @@ static void cr_start(int slot)
     cr_ready  = false;
     cr_state  = CR_SCAN;
     cr_set_scanning(true);
-    lv_label_set_text_fmt(cr_status, "%s: avvicina la tessera", slot_name(slot));
+    lv_label_set_text_fmt(cr_status, "%s: hold the card near the watch", slot_name(slot));
     cr_discover();               // <-- avvia davvero la scansione RFAL
 }
 
@@ -275,8 +275,8 @@ void nfc_credit_screen_create()
     lv_obj_center(lt);
 
     // Due tasti PRIMA / DOPO
-    cr_prima_btn = mk_btn(cr_screen, CR_BLUE,  -92, &cr_prima_lbl, "PRIMA");
-    cr_dopo_btn  = mk_btn(cr_screen, CR_GREEN, +92, &cr_dopo_lbl,  "DOPO");
+    cr_prima_btn = mk_btn(cr_screen, CR_BLUE,  -92, &cr_prima_lbl, "BEFORE");
+    cr_dopo_btn  = mk_btn(cr_screen, CR_GREEN, +92, &cr_dopo_lbl,  "AFTER");
     lv_obj_add_event_cb(cr_prima_btn, cr_on_prima, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(cr_dopo_btn,  cr_on_dopo,  LV_EVENT_CLICKED, NULL);
 
@@ -287,7 +287,7 @@ void nfc_credit_screen_create()
     lv_obj_set_style_text_align(cr_status, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_width(cr_status, 380);
     lv_label_set_long_mode(cr_status, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(cr_status, "PRIMA prima del pasto/ricarica, DOPO subito dopo");
+    lv_label_set_text(cr_status, "BEFORE a purchase/top-up, AFTER immediately after");
     lv_obj_align(cr_status, LV_ALIGN_TOP_MID, 0, 188);
 
     // Pannello risultati scrollabile
@@ -312,7 +312,7 @@ void nfc_credit_screen_create()
     lv_obj_t *hint = lv_label_create(cr_screen);
     lv_obj_set_style_text_color(hint, CR_DIM, LV_PART_MAIN);
     lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
-    lv_label_set_text(hint, "Swipe su / Boot per tornare");
+    lv_label_set_text(hint, "Swipe up / Back button to return");
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -6);
 }
 

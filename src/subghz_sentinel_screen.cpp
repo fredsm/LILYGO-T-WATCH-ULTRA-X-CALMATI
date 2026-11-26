@@ -40,7 +40,7 @@ static void on_refresh(lv_timer_t *)
 {
     if (lv_scr_act() != s_scr) return;
     if (s_pending) { s_pending = false; sentinel_begin(); }
-    if (!s_radio_ok) { lv_label_set_text(status_label, "radio non pronta"); return; }
+    if (!s_radio_ok) { lv_label_set_text(status_label, "Radio not ready"); return; }
 
     float r = radio.getRSSI(false);         // instantaneous channel RSSI
 
@@ -55,7 +55,7 @@ static void on_refresh(lv_timer_t *)
     if (s_warm < SENT_WARMUP) {             // still calibrating
         s_warm_sum += r; s_warm++;
         s_base = (float)(s_warm_sum / s_warm);
-        st = "calibrazione..."; col = lv_color_make(0x00,0xcc,0xff);
+        st = "Calibrating..."; col = lv_color_make(0x00,0xcc,0xff);
         s_hi_run = 0;
     } else {
         float delta = r - s_base;           // how far ABOVE the calibrated floor
@@ -63,12 +63,12 @@ static void on_refresh(lv_timer_t *)
         if (delta > 15.0f) s_hi_run++; else s_hi_run = 0;
 
         if (s_hi_run > 20)      { st = "JAMMING!"; col = lv_color_make(0xff,0x33,0x33); }
-        else if (delta > 8.0f)  { st = "RUMORE";   col = lv_color_make(0xff,0xbb,0x00); }
-        else                    { st = "QUIETE";   col = lv_color_make(0x33,0xcc,0x55); }
+        else if (delta > 8.0f)  { st = "NOISE";   col = lv_color_make(0xff,0xbb,0x00); }
+        else                    { st = "QUIET";   col = lv_color_make(0x33,0xcc,0x55); }
     }
 
     lv_label_set_text_fmt(rssi_label, "%d dBm", (int)r);
-    lv_label_set_text_fmt(floor_label, "fondo %d dBm", (int)s_base);
+    lv_label_set_text_fmt(floor_label, "Baseline %d dBm", (int)s_base);
     lv_label_set_text(status_label, st);
     lv_obj_set_style_text_color(status_label, col, LV_PART_MAIN);
     lv_obj_set_width(bar_fill, lv_pct(rssi_to_pct(r)));
@@ -105,7 +105,7 @@ void subghz_sentinel_screen_create()
     lv_obj_t *sub = lv_label_create(s_scr);
     lv_obj_set_style_text_font(sub, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(sub, lv_color_make(0x66,0x99,0x88), LV_PART_MAIN);
-    lv_label_set_text(sub, "jamming SubGHz 868 MHz - pausa la mesh");
+    lv_label_set_text(sub, "868 MHz interference monitor - pauses mesh");
     lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 78);
 
     status_label = lv_label_create(s_scr);
@@ -123,7 +123,7 @@ void subghz_sentinel_screen_create()
     floor_label = lv_label_create(s_scr);
     lv_obj_set_style_text_font(floor_label, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(floor_label, lv_color_make(0x88,0x88,0x88), LV_PART_MAIN);
-    lv_label_set_text(floor_label, "fondo -- dBm");
+    lv_label_set_text(floor_label, "Baseline -- dBm");
     lv_obj_align(floor_label, LV_ALIGN_CENTER, 0, 48);
 
     lv_obj_t *bar_bg = lv_obj_create(s_scr);

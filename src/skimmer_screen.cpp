@@ -118,9 +118,9 @@ static void sk_scan_cb(esp_ble_gap_cb_param_t *param)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 static const char *prox_txt(int rssi) {
-    if (rssi > -55) return "VICINO";
-    if (rssi > -75) return "MEDIO";
-    return "LONTANO";
+    if (rssi > -55) return "NEAR";
+    if (rssi > -75) return "MEDIUM";
+    return "FAR";
 }
 static lv_color_t prox_col(int rssi) {
     if (rssi > -55) return lv_color_make(0xff, 0x44, 0x44);
@@ -132,7 +132,7 @@ static int rssi_pct(int rssi) {
     return p < 6 ? 6 : (p > 100 ? 100 : p);
 }
 static const char *cat_name_of(int idx) {
-    return idx == RENAMED_ROW ? "RINOMINATO (FFE0)" : CAT[idx];
+    return idx == RENAMED_ROW ? "RENAMED (FFE0)" : CAT[idx];
 }
 
 // ── DETAIL ────────────────────────────────────────────────────────────────────
@@ -218,8 +218,8 @@ static void reset_state()
     s_last_sig[0] = '\0';
     if (!vrow[0]) return;
     for (int j = 0; j < NVIS; j++) { lv_obj_add_flag(vrow[j], LV_OBJ_FLAG_HIDDEN); vidx[j] = -1; }
-    lv_label_set_text(check_label, "in ascolto...");
-    lv_label_set_text(verdict_label, LV_SYMBOL_OK " AREA PULITA");
+    lv_label_set_text(check_label, "Listening...");
+    lv_label_set_text(verdict_label, LV_SYMBOL_OK " AREA CLEAR");
     lv_obj_set_style_text_color(verdict_label, C_GREEN, LV_PART_MAIN);
     lv_obj_set_style_bg_color(verdict_label, lv_color_make(0x08, 0x1a, 0x12), LV_PART_MAIN);
 }
@@ -288,20 +288,20 @@ static void compute_and_render()
     int nname = 0, nsvc = 0;
     for (int a = 0; a < n; a++) (s_dev[order[a]].svc_only ? nsvc : nname)++;
 
-    if (n == 0) lv_label_set_text(check_label, "in ascolto...");
-    else lv_label_set_text_fmt(check_label, "%d dispositiv%s in zona", n, n == 1 ? "o" : "i");
+    if (n == 0) lv_label_set_text(check_label, "Listening...");
+    else lv_label_set_text_fmt(check_label, "%d device%s nearby", n, n == 1 ? "" : "s");
 
     if (nname > 0) {
-        char b[36]; snprintf(b, sizeof(b), LV_SYMBOL_WARNING " %d SKIMMER TROVATO", nname);
+        char b[36]; snprintf(b, sizeof(b), LV_SYMBOL_WARNING " %d SKIMMER FOUND", nname);
         lv_label_set_text(verdict_label, b);
         lv_obj_set_style_text_color(verdict_label, C_RED, LV_PART_MAIN);
         lv_obj_set_style_bg_color(verdict_label, C_ROWBG_HIT, LV_PART_MAIN);
     } else if (nsvc > 0) {
-        lv_label_set_text(verdict_label, "! segnale FFE0 - verifica");
+        lv_label_set_text(verdict_label, "! FFE0 signal - verify");
         lv_obj_set_style_text_color(verdict_label, C_AMBER, LV_PART_MAIN);
         lv_obj_set_style_bg_color(verdict_label, lv_color_make(0x1a, 0x14, 0x00), LV_PART_MAIN);
     } else {
-        lv_label_set_text(verdict_label, LV_SYMBOL_OK " AREA PULITA");
+        lv_label_set_text(verdict_label, LV_SYMBOL_OK " AREA CLEAR");
         lv_obj_set_style_text_color(verdict_label, C_GREEN, LV_PART_MAIN);
         lv_obj_set_style_bg_color(verdict_label, lv_color_make(0x08, 0x1a, 0x12), LV_PART_MAIN);
     }
@@ -316,11 +316,11 @@ static void render_detail()
 
     char buf[320], gps[48];
     if (s_lock_gps) snprintf(gps, sizeof(gps), "GPS %.5f, %.5f", s_lock_lat, s_lock_lon);
-    else            snprintf(gps, sizeof(gps), "GPS: nessun fix");
+    else            snprintf(gps, sizeof(gps), "GPS: no fix");
 
     if (!skimmer_probe_done()) {
         snprintf(buf, sizeof(buf),
-                 "%02X:%02X:%02X:%02X:%02X:%02X\n%s\n\nsondaggio GATT in corso...",
+                 "%02X:%02X:%02X:%02X:%02X:%02X\n%s\n\nGATT probe in progress...",
                  s_tgt_mac[0],s_tgt_mac[1],s_tgt_mac[2],s_tgt_mac[3],s_tgt_mac[4],s_tgt_mac[5], gps);
         lv_obj_add_flag(detail_prox, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(detail_bar_bg, LV_OBJ_FLAG_HIDDEN);
@@ -402,7 +402,7 @@ void skimmer_screen_create()
     check_label = lv_label_create(s_scr);
     lv_obj_set_style_text_font(check_label, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(check_label, C_CYAN, LV_PART_MAIN);
-    lv_label_set_text(check_label, "in ascolto...");
+    lv_label_set_text(check_label, "Listening...");
     lv_obj_align(check_label, LV_ALIGN_TOP_MID, 0, 40);
 
     list_box = lv_obj_create(s_scr);
@@ -429,7 +429,7 @@ void skimmer_screen_create()
     lv_obj_set_style_text_align(verdict_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_width(verdict_label, 262);
     lv_obj_align(verdict_label, LV_ALIGN_BOTTOM_LEFT, 26, -16);
-    lv_label_set_text(verdict_label, LV_SYMBOL_OK " AREA PULITA");
+    lv_label_set_text(verdict_label, LV_SYMBOL_OK " AREA CLEAR");
 
     lv_obj_t *btn = lv_button_create(s_scr);
     lv_obj_set_size(btn, 66, 52);
@@ -518,7 +518,7 @@ void skimmer_screen_create()
     lv_obj_t *ptl = lv_label_create(card);
     lv_obj_set_style_text_font(ptl, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_set_style_text_color(ptl, C_RED, LV_PART_MAIN);
-    lv_label_set_text(ptl, LV_SYMBOL_WARNING " SKIMMER TROVATO");
+    lv_label_set_text(ptl, LV_SYMBOL_WARNING " SKIMMER FOUND");
 
     pop_model = lv_label_create(card);
     lv_obj_set_style_text_font(pop_model, &lv_font_montserrat_28, LV_PART_MAIN);
@@ -540,7 +540,7 @@ void skimmer_screen_create()
     lv_obj_t *cbl = lv_label_create(cbtn);
     lv_obj_set_style_text_color(cbl, C_RED, LV_PART_MAIN);
     lv_obj_set_style_text_font(cbl, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_label_set_text(cbl, "CHIUDI");
+    lv_label_set_text(cbl, "CLOSE");
     lv_obj_center(cbl);
 
     reset_state();

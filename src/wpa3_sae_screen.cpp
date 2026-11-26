@@ -51,7 +51,7 @@ static void show_aps()
         lv_obj_t *l = lv_label_create(list_box);
         lv_obj_set_style_text_font(l, &lv_font_montserrat_16, LV_PART_MAIN);
         lv_obj_set_style_text_color(l, lv_color_make(0x66, 0x66, 0x99), LV_PART_MAIN);
-        lv_label_set_text(l, "Nessuna rete WPA3 - tocca SCAN");
+        lv_label_set_text(l, "No WPA3 networks - tap SCAN");
         lv_obj_add_flag(l, LV_OBJ_FLAG_FLOATING);
         lv_obj_center(l);
         return;
@@ -102,22 +102,22 @@ static void update_status()
     lv_color_t  col = lv_color_make(0x88, 0x88, 0x99);
     switch (s_state) {
     case SST_IDLE:
-        txt = "Tocca SCAN per trovare AP WPA3";
+        txt = "Tap SCAN to find WPA3 APs";
         break;
     case SST_SCANNING:
-        txt = "Scansione...";
+        txt = "Scanning...";
         col = lv_color_make(0xFF, 0xCC, 0x00);
         break;
     case SST_LIST:
         if (s_target >= 0)
-            snprintf(buf, sizeof(buf), "Bersaglio: %s (ch %d)",
+            snprintf(buf, sizeof(buf), "Target: %s (ch %d)",
                      s_aps[s_target].ssid[0] ? s_aps[s_target].ssid : "(hidden)",
                      s_aps[s_target].channel);
         else
-            snprintf(buf, sizeof(buf), "%d reti WPA3 - toccane una", s_ap_count);
+            snprintf(buf, sizeof(buf), "%d WPA3 networks - tap one", s_ap_count);
         break;
     case SST_RUNNING:
-        txt = "SAE Overflow attivo - swipe su per fermare";
+        txt = "SAE Overflow active - swipe up to stop";
         col = lv_color_make(0x44, 0xAA, 0xFF);
         break;
     }
@@ -137,7 +137,7 @@ static void update_buttons()
     }
     lv_obj_clear_flag(btn_scan, LV_OBJ_FLAG_HIDDEN);
     const char *sl = (s_state == SST_SCANNING) ? "SCAN..." :
-                     (s_target >= 0)           ? "RISCAN"  : "SCAN";
+                     (s_target >= 0)           ? "RESCAN"  : "SCAN";
     lv_label_set_text(btn_scan_lbl, sl);
     lv_obj_set_style_bg_color(btn_scan, lv_color_make(0x00, 0x66, 0x99), LV_PART_MAIN);
 
@@ -297,13 +297,13 @@ void wpa3_sae_screen_create()
     lv_obj_t *warn = lv_label_create(screen);
     lv_obj_set_style_text_font(warn, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(warn, lv_color_make(0x55, 0x66, 0x88), LV_PART_MAIN);
-    lv_label_set_text(warn, "Solo su reti che sei autorizzato a testare");
+    lv_label_set_text(warn, "Only on networks you are authorized to test");
     lv_obj_align(warn, LV_ALIGN_TOP_MID, 0, 50);
 
     status_label = lv_label_create(screen);
     lv_obj_set_style_text_font(status_label, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(status_label, lv_color_make(0x66, 0x99, 0xCC), LV_PART_MAIN);
-    lv_label_set_text(status_label, "Tocca SCAN per trovare AP WPA3");
+    lv_label_set_text(status_label, "Tap SCAN to find WPA3 APs");
     lv_obj_align(status_label, LV_ALIGN_TOP_MID, 0, 74);
 
     lv_obj_t *btn_row = lv_obj_create(screen);
