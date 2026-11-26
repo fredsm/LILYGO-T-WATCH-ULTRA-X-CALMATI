@@ -49,3 +49,6 @@ Auto is now Car; Credito is NFC Compare. Physical firmware text is unchanged.
 Quick Controls toggles Wi-Fi, Bluetooth, GPS, LoRa and NFC. Brightness cycles
 33%, 66%, 100%. Swipe up, Back or Power closes it. These are simulator-only
 layout changes; the physical watch firmware is unchanged.
+
+Quick Controls also includes a Settings shortcut beneath the radio tiles.
+The existing Back-from-home Settings shortcut remains available.

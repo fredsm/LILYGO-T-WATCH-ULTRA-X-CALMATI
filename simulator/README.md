@@ -158,3 +158,6 @@ A shared radio can remain on if another tool is using it; the panel reports this
 
 These navigation and tile changes live in `src/sim/navigation.cpp` and host
 clock routing only. Physical firmware navigation and screens are unchanged.
+
+Quick Controls also includes a Settings shortcut beneath the radio tiles.
+The existing Back-from-home Settings shortcut remains available.

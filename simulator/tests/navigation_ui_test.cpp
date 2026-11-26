@@ -7,6 +7,7 @@
 #include "../../src/lora_screen.h"
 #include "../../src/wifi_radio_screen.h"
 #include "../../src/bluetooth_screen.h"
+#include "../../src/settings_screen.h"
 #include "../../src/wardriver_screen.h"
 #include "../../src/meshtastic_screen.h"
 #include "../../src/tools_screen.h"
@@ -89,5 +90,8 @@ int main(){
  auto* brightness=label(lv_screen_active(),"Brightness");if(!brightness)return 26;
  for(int expected:{85,170,255}){lv_obj_send_event(lv_obj_get_parent(brightness),LV_EVENT_CLICKED,nullptr);pump();if(sim::hardware.watch.brightness()!=expected)return 27;}
  sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Back closes shortcuts"))return 28;
+ sim::show_quick_controls();pump();sample(205,425,true);sample(205,425,false);pump();
+ if(!check(settings_screen_is_active(),"Settings shortcut opens original settings"))return 29;
+ sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Settings Back returns home"))return 30;
  lv_indev_delete(input);lv_deinit();return 0;
 }

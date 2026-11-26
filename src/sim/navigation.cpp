@@ -8,6 +8,7 @@
 #include "../wifi_radio_screen.h"
 #include "../bluetooth_screen.h"
 #include "../nfc_screen.h"
+#include "../settings_screen.h"
 #include <cstdint>
 namespace {
 lv_obj_t* quick=nullptr;
@@ -108,9 +109,16 @@ void initialize_navigation(){
         int value=hardware.watch.brightness();instance.setBrightness(value<100?170:value<200?255:85);
         refresh_quick_controls();
     },LV_EVENT_CLICKED,nullptr);
+    auto* settings=lv_button_create(quick);lv_obj_set_size(settings,250,40);
+    lv_obj_align(settings,LV_ALIGN_TOP_MID,0,405);lv_obj_set_style_radius(settings,14,0);
+    lv_obj_set_style_bg_color(settings,lv_color_hex(0x26394c),0);
+    auto* settings_label=lv_label_create(settings);
+    lv_label_set_text(settings_label,LV_SYMBOL_SETTINGS "  Settings");lv_obj_center(settings_label);
+    tile_icons_passthrough(settings);
+    lv_obj_add_event_cb(settings,[](lv_event_t*){settings_screen_show();},LV_EVENT_CLICKED,nullptr);
     notice=lv_label_create(quick);lv_label_set_text(notice,"Swipe up to close");
     lv_obj_set_width(notice,340);lv_obj_set_style_text_align(notice,LV_TEXT_ALIGN_CENTER,0);
-    lv_obj_align(notice,LV_ALIGN_BOTTOM_MID,0,-48);
+    lv_obj_align(notice,LV_ALIGN_BOTTOM_MID,0,-20);
     lv_obj_add_event_cb(quick,[](lv_event_t* e){auto* input=lv_event_get_indev(e);
         if(input&&lv_indev_get_gesture_dir(input)==LV_DIR_TOP)show_home();
     },LV_EVENT_GESTURE,nullptr);
