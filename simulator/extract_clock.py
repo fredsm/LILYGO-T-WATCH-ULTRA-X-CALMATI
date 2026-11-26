@@ -12,6 +12,10 @@ FUNCTIONS = (
     'bat_color', 'build_battery_widget', 'build_analog_clock',
     'update_defcon_countdown', 'update_analog_clock', 'build_lora_indicator',
     'realign_status_icons', 'update_battery', 'layout_battery_indicators',
+    'update_lora_indicator', 'update_bt_indicator', 'update_wifi_indicator',
+    'update_sd_indicator', 'update_nfc_indicator', 'update_wardriver_indicator',
+    'clock_screen_set_lora_active', 'clock_screen_set_gps_active',
+    'clock_screen_set_sat_count',
     'build_clock_icon', 'resize_clock_text', 'update_clock',
     'clock_screen_set_analog_face', 'clock_screen_set_12h',
     'clock_screen_uses_12h', 'clock_screen_set_show_day',
@@ -50,7 +54,7 @@ def extract(source):
     parts = ['\n'.join(headers),
              between(source, 'static lv_obj_t *clock_screen;', 'static lv_color_t bat_color'),
              between(source, '#define CLOCK_TEXT_PAD_X', 'static void resize_clock_text()'),
-             'static void update_clock();\n']
+             'static void update_clock();\nstatic bool sd_was_ready = false;\n']
     parts.extend(function(source, name) for name in FUNCTIONS)
     layout = between(source, '    clock_screen = lv_obj_create(NULL);', '    gps_screen_create();')
     parts.append('static void create_original_clock() {\n' + layout + '\n}\n')

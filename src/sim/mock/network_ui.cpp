@@ -3,7 +3,6 @@
 #include "../../meshtastic.h"
 #include <cstring>
 namespace {bool active=false,mesh=false,connected=false; EnowPeer peer={{2,0,0,0,0,1},123,"SIM peer",0,false};}
-void clock_screen_set_lora_active(bool){}
 void meshtastic_set_active(bool v){mesh=v;}
 float meshtastic_get_rssi(){return -70;}
 bool meshtastic_get_cad(){return false;}

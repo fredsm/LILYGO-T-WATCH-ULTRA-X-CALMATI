@@ -33,6 +33,29 @@ lv_obj_t* label(lv_obj_t* parent,const char* text){
  for(unsigned i=0;i<lv_obj_get_child_count(parent);++i)if(auto* result=label(lv_obj_get_child(parent,i),text))return result;
  return nullptr;
 }
+lv_obj_t* status_icon(lv_obj_t* obj,const char* name){
+ const char* symbol=nullptr;
+ if(!std::strcmp(name,"Wi-Fi"))symbol=LV_SYMBOL_WIFI;
+ if(!std::strcmp(name,"Bluetooth"))symbol=LV_SYMBOL_BLUETOOTH;
+ if(!std::strcmp(name,"GPS"))symbol=LV_SYMBOL_GPS;
+ if(!std::strcmp(name,"SD"))symbol=LV_SYMBOL_SD_CARD;
+ if(symbol && lv_obj_check_type(obj,&lv_label_class)
+    && !std::strncmp(lv_label_get_text(obj),symbol,std::strlen(symbol)))return obj;
+ if(!std::strcmp(name,"LoRa") && lv_obj_check_type(obj,&lv_arc_class)
+    && lv_obj_get_width(obj)==22)return obj;
+ if(!std::strcmp(name,"NFC") && lv_obj_check_type(obj,&lv_image_class)
+    && lv_obj_get_width(obj)==26)return obj;
+ for(unsigned i=0;i<lv_obj_get_child_count(obj);++i)
+  if(auto* found=status_icon(lv_obj_get_child(obj,i),name))return found;
+ return nullptr;
+}
+bool highlighted(lv_obj_t* home,const char* name,bool on){
+ auto* icon=status_icon(home,name);if(!icon)return false;
+ auto color=!std::strcmp(name,"LoRa")?lv_obj_get_style_arc_color(icon,LV_PART_INDICATOR)
+     : !std::strcmp(name,"NFC")?lv_obj_get_style_image_recolor(icon,LV_PART_MAIN)
+     : lv_obj_get_style_text_color(icon,LV_PART_MAIN);
+ return lv_color_to_u32(color)==lv_color_to_u32(lv_color_hex(on?0x00ff80:0x333333));
+}
 bool check(bool condition,const char* name){
  std::printf("%s: %s\n",name,condition?"PASS":"FAIL");
  if(!condition){std::size_t count=0;const auto* entries=sim::screens(count);for(std::size_t i=0;i<count;++i)if(entries[i].active())std::printf("Active: %s\n",entries[i].name);}
@@ -85,7 +108,11 @@ int main(){
   auto* name=label(lv_screen_active(),toggle.name);if(!name)return 24;
   auto* button=lv_obj_get_parent(name);lv_area_t a;lv_obj_get_coords(button,&a);int x=(a.x1+a.x2)/2,y=(a.y1+a.y2)/2;
   for(int i=0;i<2;++i){bool before=toggle.on();sample(x,y,true);sample(x,y,false);pump();
-   if(!check(toggle.on()!=before,toggle.name)||!sim::quick_controls_active())return 25;}
+   if(!check(toggle.on()!=before,toggle.name)||!sim::quick_controls_active())return 25;
+   sim::show_home();for(int j=0;j<4;++j)pump();
+   if(!check(highlighted(home,toggle.name,toggle.on()),"home icon follows toggle"))return 31;
+   sim::show_quick_controls();pump();}
+
  }
  auto* brightness=label(lv_screen_active(),"Brightness");if(!brightness)return 26;
  for(int expected:{85,170,255}){lv_obj_send_event(lv_obj_get_parent(brightness),LV_EVENT_CLICKED,nullptr);pump();if(sim::hardware.watch.brightness()!=expected)return 27;}
@@ -93,5 +120,13 @@ int main(){
  sim::show_quick_controls();pump();sample(205,425,true);sample(205,425,false);pump();
  if(!check(settings_screen_is_active(),"Settings shortcut opens original settings"))return 29;
  sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Settings Back returns home"))return 30;
+ for(bool ready:{false,true}){
+  sim::hardware.sd_ready=ready;for(int j=0;j<4;++j)pump();
+  if(!check(highlighted(home,"SD",ready),"home SD icon follows simulated card"))return 32;
+ }
+ gps_screen_power_on();sim::hardware.satellites=12;for(int j=0;j<4;++j)pump();
+ if(!check(label(home,LV_SYMBOL_GPS " 12")!=nullptr,"home GPS satellite count"))return 33;
+ gps_screen_power_off();pump();
+ if(!check(label(home,LV_SYMBOL_GPS)!=nullptr && highlighted(home,"GPS",false),"GPS off clears count and highlight"))return 34;
  lv_indev_delete(input);lv_deinit();return 0;
 }

@@ -8,8 +8,6 @@
 #include <cstring>
 void tools_screen_show();
 void meshtastic_mark_read(){}
-void clock_screen_set_gps_active(bool){}
-void clock_screen_set_sat_count(uint32_t){}
 void clock_screen_set_utc_offset(int){}
 bool clock_screen_manual_time_active(){return true;}
 void timezone_note_detected(int){}

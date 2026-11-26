@@ -6,3 +6,5 @@ inline int esp_bt_controller_get_status(){return sim_ble_active?ESP_BT_CONTROLLE
 using esp_power_level_t=int;
 enum {ESP_PWR_LVL_N0=4,ESP_BLE_PWR_TYPE_DEFAULT=0};
 inline int esp_ble_tx_power_get(int){return ESP_PWR_LVL_N0;}
+
+inline bool btStarted(){return sim_ble_active;}

@@ -44,7 +44,11 @@ struct SimRadio {
  float getRSSI(bool=false){return receiving ? -110.0f + std::fmod(frequency*7+lv_tick_get()/100,65.0f) : -127;}
 }; inline SimRadio radio;
 struct SimPmu {int getBatteryPercent()const{return sim::hardware.watch.battery();} bool isCharging()const{return sim::hardware.watch.charging();} bool nfc=false;bool isEnableDLDO1()const{return nfc;}};
-struct SimLilyGo { SimPmu pmu; void initNFC(){}  SimGps gps; SimRtc rtc; void powerControl(int power,bool on){if(power==POWER_NFC)pmu.nfc=on;} void initLoRa(){} void setBrightness(uint8_t v){sim::hardware.watch.set_brightness(v);} void vibrator() {} bool isCardReady() const { return sim::hardware.sd_ready; } };
+// Card-detect and mount adapters read only the simulation control panel.
+constexpr int EXPANDS_SD_DET=10;
+constexpr int HIGH=1;
+struct SimIo { int digitalRead(int)const{return sim::hardware.sd_ready?0:HIGH;} };
+struct SimLilyGo { SimIo io; bool installSD(){return sim::hardware.sd_ready;} void uninstallSD(){} SimPmu pmu; void initNFC(){}  SimGps gps; SimRtc rtc; void powerControl(int power,bool on){if(power==POWER_NFC)pmu.nfc=on;} void initLoRa(){} void setBrightness(uint8_t v){sim::hardware.watch.set_brightness(v);} void vibrator() {} bool isCardReady() const { return sim::hardware.sd_ready; } };
 inline SimLilyGo instance;
 
 struct SimSerial { void println(const char* s){std::puts(s);} void print(const char* s){std::printf("%s",s);}  template<class... Args> void printf(const char* fmt, Args... args) { std::printf(fmt,args...); } };

@@ -5,6 +5,12 @@
 // that struct definition in this header; the simulator pins the same version.
 #include <src/widgets/span/lv_span_private.h>
 #include "mock/LilyGoLib.h"
+#include "mock/esp_wifi.h"
+#include "mock/esp_bt.h"
+#include "../pager.h"
+#include "../tpms.h"
+#include "../aprs.h"
+#include "../usb_sd.h"
 #include "../defcon_img.h"
 #include "../boot_skull_img.h"
 #include "../nfc_icon.h"
@@ -34,6 +40,15 @@ void clock_screen_show();
 void clock_screen_get_local_time(struct tm* out){instance.rtc.getDateTime(out);}
 
 namespace sim {
+// Use the firmware renderers against host-only device state.
+void refresh_status_icons(){
+    update_lora_indicator();update_bt_indicator();update_wifi_indicator();
+    update_sd_indicator();update_nfc_indicator();update_wardriver_indicator();
+    const bool gps_on=gps_screen_is_powered();
+    clock_screen_set_gps_active(gps_on);
+    if(gps_on)clock_screen_set_sat_count(instance.gps.satellites.isValid()
+        ? instance.gps.satellites.value() : 0);
+}
 void home_gesture(lv_event_t* e){
     if(stealth_active())return;
     auto* input=lv_event_get_indev(e);if(!input)return;
@@ -61,6 +76,7 @@ lv_obj_t* create_clock(){
         update_clock();
         update_battery();
         layout_battery_indicators();
+        refresh_status_icons();
     }
     return clock_screen;
 }
@@ -69,6 +85,7 @@ void refresh_clock(){
     if(lv_tick_get()-last_update_ms>=1000){
         last_update_ms=lv_tick_get();
         update_clock();update_battery();layout_battery_indicators();
+        refresh_status_icons();
     }
 }
 }
