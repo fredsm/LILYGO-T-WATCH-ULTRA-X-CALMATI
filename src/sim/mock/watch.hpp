@@ -47,7 +47,7 @@ public:
 private:
     uint64_t now_=0,rtc_set_at_=0;
     int64_t rtc_base_=1704067200;
-    int battery_=100,brightness_=128;
+    int battery_=100,brightness_=255;
     bool charging_=false,display_on_=true,haptic_available_=true;
     bool power_=false,back_=false,motion_=false;
     std::deque<ButtonEvent> buttons_;

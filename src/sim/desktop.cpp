@@ -1,7 +1,11 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <lvgl.h>
-#include "mock/watch.hpp"
+#include "mock/hardware.hpp"
+#include "panel.hpp"
+#include "startup.hpp"
+#include "desktop_test.hpp"
+#include <memory>
 #include "screens.hpp"
 #include "clock.hpp"
 #include "pointer.hpp"
@@ -21,10 +25,9 @@ lv_display_t* controls_display=nullptr;
 lv_obj_t* watch_buttons[2]{};
 SDL_Texture* texture=nullptr;
 SDL_Renderer* renderer=nullptr;
-sim::Watch watch;
+sim::Watch& watch=sim::hardware.watch;
 lv_point_t pointer{};
 bool pressed=false;
-lv_obj_t* status=nullptr;
 lv_obj_t* screen_catalog=nullptr;
 void flush(lv_display_t* d,const lv_area_t* a,uint8_t* data) {
     auto* src=reinterpret_cast<const uint16_t*>(data);
@@ -39,44 +42,14 @@ void read_pointer(lv_indev_t*,lv_indev_data_t* d) {
     d->point=pointer;
     d->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
 }
-void refresh() {
-    lv_label_set_text_fmt(status,"Battery %d%% | Brightness %d\n%s | %s",watch.battery(),watch.brightness(),watch.charging()?"Charging":"Unplugged",watch.motion()?"Motion":"Stationary");
-}
-void battery_changed(lv_event_t* e) {
-    watch.set_battery(lv_slider_get_value(static_cast<lv_obj_t*>(lv_event_get_target(e))));
-    refresh();
-}
-void brightness_changed(lv_event_t* e) {
-    watch.set_brightness(lv_slider_get_value(static_cast<lv_obj_t*>(lv_event_get_target(e))));
-    refresh();
-}
-void charging_changed(lv_event_t* e) {
-    watch.set_charging(lv_obj_has_state(static_cast<lv_obj_t*>(lv_event_get_target(e)),LV_STATE_CHECKED));
-    refresh();
-}
 void preview() {
     auto* screen=lv_screen_active();
     lv_obj_set_flex_flow(screen,LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(screen,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
     auto* title=lv_label_create(screen);
     lv_label_set_text(title,"T-Watch Ultra | SIMULATED DATA");
-    status=lv_label_create(screen);
-    refresh();
-    auto* battery=lv_slider_create(screen);
-    lv_obj_set_width(battery,300);
-    lv_slider_set_range(battery,0,100);
-    lv_slider_set_value(battery,watch.battery(),LV_ANIM_OFF);
-    lv_obj_add_event_cb(battery,battery_changed,LV_EVENT_VALUE_CHANGED,nullptr);
-    auto* brightness=lv_slider_create(screen);
-    lv_obj_set_width(brightness,300);
-    lv_slider_set_range(brightness,0,255);
-    lv_slider_set_value(brightness,watch.brightness(),LV_ANIM_OFF);
-    lv_obj_add_event_cb(brightness,brightness_changed,LV_EVENT_VALUE_CHANGED,nullptr);
-    auto* charge=lv_checkbox_create(screen);
-    lv_checkbox_set_text(charge,"Charging");
-    lv_obj_add_event_cb(charge,charging_changed,LV_EVENT_VALUE_CHANGED,nullptr);
     auto* help=lv_label_create(screen);
-    lv_label_set_text(help,"P: power | B: back | M: motion");
+    lv_label_set_text(help,"F2: power | F3: back | F6: hardware");
     std::size_t count=0;
     const auto* entries=sim::screens(count);
     for(std::size_t i=0;i<count;++i){
@@ -115,7 +88,14 @@ uint32_t editing_key(SDL_Keycode key){
 }
 }
 int main(int argc,char** argv) {
-    const bool smoke=argc>1 && std::strcmp(argv[1],"--smoke")==0;
+    bool smoke=false,self_test=false,skip_boot=false,onboarding=false;
+    for(int i=1;i<argc;++i){
+        if(!std::strcmp(argv[i],"--smoke"))smoke=true;
+        else if(!std::strcmp(argv[i],"--self-test"))self_test=true;
+        else if(!std::strcmp(argv[i],"--skip-boot"))skip_boot=true;
+        else if(!std::strcmp(argv[i],"--onboarding"))onboarding=true;
+        else {std::fprintf(stderr,"Unknown option: %s\n",argv[i]);return 1;}
+    }
     SDL_SetMainReady();
     // Native touch is handled below; disable duplicate synthesized mouse events.
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,"0");
@@ -141,6 +121,15 @@ int main(int argc,char** argv) {
     screen_catalog=lv_screen_active();
     sim::initialize_screens(sim::create_clock());
     create_button_bar(display);
+    sim::HardwarePanel panel;
+    if(!panel.open(display)){std::fprintf(stderr,"Panel: %s\n",SDL_GetError());return 1;}
+    // Place the panel beside the watch when desktop space permits.
+    int wx=0,wy=0;SDL_GetWindowPosition(window,&wx,&wy);
+    SDL_Rect bounds{};
+    if(SDL_GetDisplayUsableBounds(SDL_GetWindowDisplayIndex(window),&bounds)==0 && wx+W+20+panel.width<=bounds.x+bounds.w)
+        SDL_SetWindowPosition(panel.window,wx+W+20,wy);
+    SDL_RaiseWindow(window);
+    if(!smoke&&!self_test&&!skip_boot)sim::start_boot(onboarding);
     SDL_StartTextInput();
     std::size_t screen_count=0;const auto* screens=sim::screens(screen_count);
     unsigned frame=0;bool smoke_ok=true;
@@ -160,7 +149,7 @@ int main(int argc,char** argv) {
             if(down && hit==captured_button)lv_obj_add_state(button,LV_STATE_PRESSED);
             else lv_obj_remove_state(button,LV_STATE_PRESSED);
             if(!down){
-                if(hit==captured_button){if(captured_button==0)sim::power_button_click();else sim::back_button_click();}
+                if(hit==captured_button && !sim::startup_active()){if(captured_button==0)sim::power_button_click();else sim::back_button_click();}
                 captured_button=-1;contact=false;
             }
             return;
@@ -169,7 +158,10 @@ int main(int argc,char** argv) {
         pointer.x=std::clamp(x,0,W-1);pointer.y=std::clamp(y,0,H-1);
         pressed=down;dispatch_pointer();if(!down)contact=false;
     };
+    std::unique_ptr<sim::DesktopTest> scenario;
+    if(self_test)scenario=std::make_unique<sim::DesktopTest>(window,panel);
     while(running) {
+        if(scenario && !scenario->tick()){smoke_ok=scenario->ok;break;}
         if(smoke && frame%5==0){
             const auto index=frame/5;
             sim::show_home();
@@ -181,6 +173,9 @@ int main(int argc,char** argv) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type==SDL_QUIT) running=false;
+            if(e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_q && (e.key.keysym.mod&KMOD_CTRL)){running=false;continue;}
+            if(panel.event(e))continue;
+            if(e.type==SDL_WINDOWEVENT && e.window.windowID==SDL_GetWindowID(window) && e.window.event==SDL_WINDOWEVENT_CLOSE)running=false;
             if(e.type==SDL_MOUSEMOTION && e.motion.which!=SDL_TOUCH_MOUSEID && !touching) {
                 route_pointer(e.motion.x,e.motion.y,contact);
             }
@@ -205,17 +200,19 @@ int main(int argc,char** argv) {
                     if(auto edit=editing_key(key)){sim::edit_key(edit);continue;}
                 }
                 if(e.key.repeat)continue;
+                if(key==SDLK_F6){panel.show();continue;}
+                if(sim::startup_active())continue;
                 const bool editing=sim::text_input_active();
                 if(key==SDLK_F2 || (!editing && key==SDLK_p))sim::power_button_click();
                 if(key==SDLK_F3 || (!editing && (key==SDLK_b || key==SDLK_ESCAPE)))sim::back_button_click();
                 if(key==SDLK_F4)sim::show_home();
                 if(key==SDLK_F5)watch.set_display_on(!watch.display_on());
                 if(key==SDLK_F1) { sim::leave_screen(); lv_screen_load(screen_catalog); }
-                if(!editing && key==SDLK_m) { watch.set_motion(!watch.motion()); refresh(); }
+
             }
         }
-        auto now=SDL_GetTicks(); auto delta=smoke?20u:now-last; last=now;
-        watch.advance(delta); lv_tick_inc(delta); sim::tick();
+        auto now=SDL_GetTicks(); auto delta=(smoke||self_test)?20u:now-last; last=now;
+        watch.advance(delta); lv_tick_inc(delta); sim::tick();sim::tick_boot();
         // Stationary holds still need reads for original long-press callbacks.
         if(pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
             sim::dispatch_pointer(input,pressed);held_read_at=now;
@@ -233,9 +230,9 @@ int main(int argc,char** argv) {
         // Physical buttons stay visible and usable even when the watch is dim/off.
         SDL_SetTextureColorMod(texture,255,255,255);
         SDL_Rect bar{0,H,W,BAR};SDL_RenderCopy(renderer,texture,&bar,&bar);
-        SDL_RenderPresent(renderer); SDL_Delay(10);
+        SDL_RenderPresent(renderer);panel.render(); SDL_Delay(10);
     }
-    SDL_StopTextInput();lv_indev_delete(input);lv_display_delete(controls_display);lv_display_delete(display);lv_deinit();
+    SDL_StopTextInput();panel.close();lv_indev_delete(input);lv_display_delete(controls_display);lv_display_delete(display);lv_deinit();
     SDL_DestroyTexture(texture); SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit();
     return smoke_ok?0:2;
 }

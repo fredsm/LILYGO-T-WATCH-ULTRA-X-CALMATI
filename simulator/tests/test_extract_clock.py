@@ -14,6 +14,8 @@ class ExtractionTests(unittest.TestCase):
             self.assertIn(extract_clock.function(source, name), generated)
         self.assertIn(extract_clock.between(source, '    clock_screen = lv_obj_create(NULL);',
                                            '    gps_screen_create();'), generated)
+        self.assertIn(extract_clock.between(source, '    lv_obj_t *boot_splash = lv_obj_create(NULL);',
+                                           '    lv_refr_now(NULL);                       // paint now;'), generated)
         self.assertEqual(before, path.read_bytes())
         self.assertIn(extract_clock.between(source, '            if (lv_screen_active() == clock_screen)\n',
                                            '\n        }\n    }, POWER_EVENT, NULL);'), generated)

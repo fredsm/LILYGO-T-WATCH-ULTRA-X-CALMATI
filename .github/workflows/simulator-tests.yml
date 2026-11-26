@@ -55,6 +55,8 @@ jobs:
           Copy-Item build/desktop/twatch_desktop.exe build/portable/
           Copy-Item simulator/PORTABLE_README.txt build/portable/README.txt
           Copy-Item simulator/smoke-test.cmd build/portable/
+          Copy-Item simulator/interaction-test.cmd build/portable/
+          Copy-Item simulator/onboarding.cmd build/portable/
       - uses: actions/upload-artifact@v4
         with:
           name: TWatchUltra-simulator-windows-x64

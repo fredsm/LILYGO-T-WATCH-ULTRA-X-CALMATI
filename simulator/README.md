@@ -1,8 +1,8 @@
 # Original firmware UI simulator
 
-## Watch-flow integration: Phases 1, 2 and 3
+## Watch-flow integration: Phases 1-6
 
-The next desktop build starts on the original clock face at 410 x 502 pixels.
+The desktop starts with the original skull splash, then the original clock face at 410 x 502 pixels.
 **F1** opens the debug screen catalog; **F4** and firmware clock-return callbacks
 return to the watch face. The original analog/digital and time-format settings
 now control the face. Weather is a host-only synthetic fixture, populated by
@@ -20,8 +20,18 @@ finger input use the LVGL pointer driver, with the firmware scroll threshold.
 Power and Back buttons below the watch display reuse the firmware button
 routes (including the 250 ms Back debounce). The watch viewport remains
 410 x 502; the 60-pixel control bar is outside it. A separate hardware
-simulation panel and boot/onboarding remain later phases. The debug catalog's existing
-hardware sliders are not yet wired to the clock's hardware fixtures.
+simulation panel opens beside it. Its battery, charging, brightness, display power,
+GPS fix/satellite count and virtual SD-presence controls share state with the
+firmware mocks. Battery changes appear on the clock at its next update (about
+one second); GPS/SD consumers refresh according to their original screen logic.
+The display defaults to full brightness. The panel and physical button bar
+remain bright when the watch is dimmed or off. F6 reopens a closed panel.
+
+The original splash layout/art is reused with a host fade-in and a 1.5-second
+minimum display time. `--skip-boot` goes straight to the clock; `--onboarding`
+shows the original first-use screen after the splash. Onboarding acceptance is
+session-only, and telemetry is disabled in the original source. No email or
+consent is saved to disk. The original UI is compiled directly, not recreated.
 CI validates the integrated phases. Download its successful Windows
 artifact; previously downloaded EXEs do not contain these changes.
 
@@ -67,7 +77,7 @@ ctest --test-dir build/desktop -C Release --output-on-failure
 Multi-config Windows builds place the executable in `build/desktop/Release`.
 The launcher uses the firmware's 410 x 502 portrait geometry. Mouse acts as
 touch; drag to scroll the list. **F2/P** presses Power, **F3/B** presses Back, **F4** returns home,
-**F5** toggles the display, and **M** toggles motion. **Ctrl+Q** exits.
+**F5** toggles the display, and **F6** opens the hardware panel. **Ctrl+Q** exits.
 Printable shortcuts are disabled while editing. UTF-8 typing, Backspace,
 Delete, arrows, Home/End and Ctrl+V edit the active firmware text field.
 Enter invokes the original keyboard Ready action; Escape cancels editing
@@ -87,8 +97,14 @@ remain. Desktop builds also run `twatch_desktop --smoke` with SDL's dummy video
 driver, cycling through all screens using the real SDL render path.
 
 The tests validate host UI integration and sample workflows, not physical-device
-behavior or exhaustive visual equivalence. The original watch face is also tested. Boot
-onboarding and boot overlays are outside the current simulator scope.
+behavior or exhaustive visual equivalence. Startup tests verify the original
+splash, fade timing, optional onboarding, consent and return to the clock.
+`--self-test` injects SDL mouse, native finger and keyboard events through the
+real event loop: four swipe routes and returns, physical Power while the watch
+is off, hardware panel updates and focus isolation, panel close/reopen, catalog,
+text entry, Backspace, Escape and return home. `interaction-test.cmd` runs this
+check in the Windows package and saves its results. Manual touchscreen feel and
+physical hardware behavior still require testing on the respective devices.
 
 PlatformIO shortcuts remain available:
 

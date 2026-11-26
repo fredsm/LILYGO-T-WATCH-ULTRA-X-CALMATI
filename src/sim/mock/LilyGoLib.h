@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cmath>
 #include <ctime>
+#include "hardware.hpp"
 constexpr int DEVICE_MAX_BRIGHTNESS_LEVEL=255;
 // A firmware busy-wait must advance even while the LVGL callback owns the thread.
 // Keep a deterministic sub-tick clock; do not advance LVGL recursively.
@@ -16,11 +17,11 @@ inline uint32_t micros(){
 }
 inline uint32_t millis() { return lv_tick_get(); }
 struct SimGpsValue {
- bool isValid() const {return true;} unsigned long age() const {return 0;}
+ bool isValid() const {return sim::hardware.gps_fix;} unsigned long age() const {return 0;}
  double lat() const {return 35.0;} double lng() const {return -80.0;}
  int year() const {return 2026;} int month() const {return 1;} int day() const {return 1;}
  int hour() const {return 12;} int minute() const {return 0;} int second() const {return 0;}
- unsigned long value() const {return 8;} double meters() const {return 220;} double kmph() const {return 0;} double deg() const {return 0;}
+ unsigned long value() const {return sim::hardware.satellites;} double meters() const {return 220;} double kmph() const {return 0;} double deg() const {return 0;}
 };
 struct SimGps {SimGpsValue location,date,time,satellites,altitude,speed,course;};
 struct SimRtc {
@@ -42,8 +43,8 @@ struct SimRadio {
  int standby(){receiving=false;return 0;}
  float getRSSI(bool=false){return receiving ? -110.0f + std::fmod(frequency*7+lv_tick_get()/100,65.0f) : -127;}
 }; inline SimRadio radio;
-struct SimPmu {int getBatteryPercent()const{return 75;} bool isCharging()const{return false;} bool nfc=false;bool isEnableDLDO1()const{return nfc;}};
-struct SimLilyGo { SimPmu pmu; void initNFC(){}  SimGps gps; SimRtc rtc; void powerControl(int power,bool on){if(power==POWER_NFC)pmu.nfc=on;} void initLoRa(){} void setBrightness(uint8_t){}  void vibrator() {} bool isCardReady() const { return true; } };
+struct SimPmu {int getBatteryPercent()const{return sim::hardware.watch.battery();} bool isCharging()const{return sim::hardware.watch.charging();} bool nfc=false;bool isEnableDLDO1()const{return nfc;}};
+struct SimLilyGo { SimPmu pmu; void initNFC(){}  SimGps gps; SimRtc rtc; void powerControl(int power,bool on){if(power==POWER_NFC)pmu.nfc=on;} void initLoRa(){} void setBrightness(uint8_t v){sim::hardware.watch.set_brightness(v);} void vibrator() {} bool isCardReady() const { return sim::hardware.sd_ready; } };
 inline SimLilyGo instance;
 
 struct SimSerial { void println(const char* s){std::puts(s);} void print(const char* s){std::printf("%s",s);}  template<class... Args> void printf(const char* fmt, Args... args) { std::printf(fmt,args...); } };

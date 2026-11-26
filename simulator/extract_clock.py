@@ -60,6 +60,12 @@ def extract(source):
                    '\n        }\n    }\n\n    // Feed NMEA')
     parts.append('static void original_power_click() {\n' + power + '\n}\n')
     parts.append('static void original_back_click() {\n' + back + '\n}\n')
+    # Reuse the production splash layout and brand; host timing is nonblocking.
+    brand = between(source, '#define FW_NAME', '\nvoid setup()')
+    splash = between(source, '    lv_obj_t *boot_splash = lv_obj_create(NULL);',
+                     '    lv_refr_now(NULL);                       // paint now;')
+    parts.append(brand + '\nlv_obj_t* sim::create_boot_splash() {\n' + splash
+                 + '\nreturn boot_splash;\n}\n')
     return '// Generated from src/main.cpp; do not edit.\n' + '\n'.join(parts)
 
 if __name__ == '__main__':

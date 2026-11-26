@@ -4,6 +4,7 @@
 #include <src/widgets/span/lv_span_private.h>
 #include "mock/LilyGoLib.h"
 #include "../defcon_img.h"
+#include "../boot_skull_img.h"
 #include "../nfc_icon.h"
 #include "../matrix_bg.h"
 #include "../weather.h"

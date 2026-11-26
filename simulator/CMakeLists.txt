@@ -30,7 +30,7 @@ add_test(NAME storage_mock_state COMMAND storage_mock_test)
 option(TWATCH_DESKTOP "Build SDL desktop preview" OFF)
 if(TWATCH_DESKTOP)
     find_package(SDL2 CONFIG REQUIRED)
-    add_executable(twatch_desktop ../src/sim/desktop.cpp)
+    add_executable(twatch_desktop ../src/sim/desktop.cpp ../src/sim/panel.cpp)
     target_link_libraries(twatch_desktop PRIVATE lvgl SDL2::SDL2)
 endif()
 
@@ -58,7 +58,7 @@ foreach(row IN LISTS SCREEN_ROWS)
     list(APPEND SCREEN_NAMES "${screen}")
 endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
-    "${CLOCK_INCLUDE}" ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
+    "${CLOCK_INCLUDE}" ../src/sim/startup.cpp ../src/onboarding.cpp ../src/boot_skull_img.cpp ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
     ../src/task_manager.cpp ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
     ../src/sim/screens.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
@@ -106,3 +106,12 @@ add_executable(keyboard_buttons_test tests/keyboard_buttons_test.cpp)
 target_link_libraries(keyboard_buttons_test PRIVATE simulator_ui)
 add_test(NAME original_keyboard_and_buttons COMMAND keyboard_buttons_test)
 set_tests_properties(original_keyboard_and_buttons PROPERTIES TIMEOUT 30)
+
+add_executable(startup_hardware_test tests/startup_hardware_test.cpp)
+target_link_libraries(startup_hardware_test PRIVATE simulator_ui)
+add_test(NAME original_startup_and_hardware COMMAND startup_hardware_test)
+set_tests_properties(original_startup_and_hardware PROPERTIES TIMEOUT 30)
+if(TWATCH_DESKTOP)
+    add_test(NAME sdl_end_to_end COMMAND twatch_desktop --self-test)
+    set_tests_properties(sdl_end_to_end PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 60)
+endif()
