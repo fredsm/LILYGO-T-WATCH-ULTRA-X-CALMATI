@@ -5,7 +5,9 @@ set(CLOCK_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/original_clock.inc")
 add_custom_command(OUTPUT "${CLOCK_INCLUDE}"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/extract_clock.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp" "${CLOCK_INCLUDE}"
-    DEPENDS extract_clock.py ../src/main.cpp VERBATIM)
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.py"
+            "${CLOCK_INCLUDE}" "${CLOCK_INCLUDE}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.json"
+    DEPENDS extract_clock.py english_ui.py english_ui.json ../src/main.cpp VERBATIM)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)

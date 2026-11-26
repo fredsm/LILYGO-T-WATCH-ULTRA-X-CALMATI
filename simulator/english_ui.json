@@ -246,5 +246,13 @@
   },
   "task_manager.cpp": {
     "  Tutto spento.\\n\\nNessuna radio o scansione attiva:\\nbatteria al sicuro.": "  Everything is off.\\n\\nNo active radios or scans:\\nsaving battery."
+  },
+  "original_clock.inc": {
+    "  %ldg %ldh %ldm": "  %ldd %ldh %ldm",
+    "  meteo...": "  weather...",
+    "  meteo -": "  weather -",
+    "ora": "now",
+    "vecchio": "stale",
+    "  meteo": "  weather"
   }
 }

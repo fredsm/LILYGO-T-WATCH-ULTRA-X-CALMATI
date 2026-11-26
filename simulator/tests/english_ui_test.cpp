@@ -17,6 +17,7 @@ int main(){
     lv_display_set_color_format(d,LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(d,buffer.data(),nullptr,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(d,flush);sim::initialize_screens(sim::create_clock());
+    if(!contains(sim::create_clock(),"weather")||contains(sim::create_clock(),"meteo"))return 2;
     struct Expect {const char* screen;const char* english;const char* italian;};
     const Expect checks[]={
         {"tools","NFC Compare","Credito"},{"tools","Car","Auto"},

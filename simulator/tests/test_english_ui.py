@@ -6,15 +6,18 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'simulator'))
 from english_ui import TOKEN, translate
+from extract_clock import extract
 
 class EnglishUITests(unittest.TestCase):
     def test_catalogue_covers_existing_literals_and_preserves_code(self):
         catalogue = json.loads((ROOT / 'simulator/english_ui.json').read_text(encoding='utf-8'))
         for name, mapping in catalogue.items():
             with self.subTest(source=name):
-                path = ROOT / 'src' / name
+                path = ROOT / 'src' / ('main.cpp' if name == 'original_clock.inc' else name)
                 before = path.read_bytes()
                 source = path.read_text(encoding='utf-8')
+                if name == 'original_clock.inc':
+                    source = extract(source)
                 tokens = {m[0][1:-1] for m in TOKEN.finditer(source) if m[0].startswith('"')}
                 self.assertFalse(mapping.keys() - tokens, 'Stale translation keys')
                 translated = translate(source, mapping)
