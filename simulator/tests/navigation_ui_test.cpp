@@ -10,6 +10,7 @@
 #include "../../src/settings_screen.h"
 #include "../../src/ble_scan_manager.h"
 #include "../../src/sim/mock/esp_bt.h"
+#include "../../src/sim/mock/WiFi.h"
 #include "../../src/pager.h"
 #include "../../src/sim/mock/SD.h"
 #include "../../src/wardriver_screen.h"
@@ -118,6 +119,12 @@ int main(){
    sim::show_quick_controls();pump();}
 
  }
+ // Boot auto-connect and tools may start Wi-Fi without visiting its status page.
+ WiFi.mode(WIFI_STA);pump();
+ auto* wifi=label(lv_screen_active(),"Wi-Fi");
+ if(!check(label(lv_obj_get_parent(wifi),"ON")!=nullptr,"Wi-Fi external enable reflected"))return 38;
+ lv_obj_send_event(lv_obj_get_parent(wifi),LV_EVENT_CLICKED,nullptr);pump();
+ if(!check(WiFi.current==WIFI_MODE_NULL,"Wi-Fi shortcut disables external enable"))return 39;
  ble_stack_acquire();
  auto* bt=label(lv_screen_active(),"Bluetooth");
  lv_obj_send_event(lv_obj_get_parent(bt),LV_EVENT_CLICKED,nullptr);pump();
