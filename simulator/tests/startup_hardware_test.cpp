@@ -3,6 +3,7 @@
 #include "../../src/sim/screens.hpp"
 #include "../../src/sim/mock/LilyGoLib.h"
 #include "../../src/onboarding.h"
+#include "../../src/sim/mock/SD.h"
 #include <array>
 #include <cstring>
 #include <cstdio>
@@ -24,14 +25,16 @@ int main(){
  CHECK(sim::hardware.watch.brightness()==255);
  sim::start_boot(false);auto* splash=lv_screen_active();CHECK(splash!=home&&sim::startup_active());
  CHECK(find(splash,&lv_image_class));CHECK(find(splash,&lv_label_class,"13:37"));
- pump(200);CHECK(lv_obj_get_style_opa(splash,0)>0&&lv_obj_get_style_opa(splash,0)<255);
+ pump(200);CHECK(lv_obj_get_style_opa(splash,LV_PART_MAIN)>0&&lv_obj_get_style_opa(splash,LV_PART_MAIN)<255);
  pump(1200);CHECK(lv_screen_active()==splash);pump(120);CHECK(lv_screen_active()==home&&!sim::startup_active());
  sim::hardware.watch.set_battery(14);sim::hardware.watch.set_charging(true);pump(1200);
  CHECK(instance.pmu.getBatteryPercent()==14&&instance.pmu.isCharging());CHECK(find(home,&lv_label_class,"14%"));
  instance.setBrightness(80);CHECK(sim::hardware.watch.brightness()==80);
  sim::hardware.gps_fix=false;CHECK(!instance.gps.location.isValid());
  sim::hardware.gps_fix=true;sim::hardware.satellites=3;CHECK(instance.gps.satellites.value()==3);
- sim::hardware.sd_ready=false;CHECK(!instance.isCardReady());sim::hardware.reset_inputs();CHECK(instance.isCardReady());
+ auto file=SD.open("/presence-test",FILE_WRITE);CHECK(file&&file.print("test")==4);
+ sim::hardware.sd_ready=false;CHECK(!file&&file.print("blocked")==0&&!SD.open("/presence-test"));
+ CHECK(!instance.isCardReady());sim::hardware.reset_inputs();CHECK(instance.isCardReady());CHECK(SD.open("/presence-test").size()==4);
  CHECK(sim::hardware.watch.brightness()==255&&instance.pmu.getBatteryPercent()==75&&!instance.pmu.isCharging());
  sim::start_boot(true);pump(1520);auto* onboarding=lv_screen_active();CHECK(onboarding!=home&&sim::startup_active());
  auto* accept=find(onboarding,&lv_label_class,"ACCETTO / ACCEPT");auto* checkbox=find(onboarding,&lv_checkbox_class);CHECK(accept&&checkbox);

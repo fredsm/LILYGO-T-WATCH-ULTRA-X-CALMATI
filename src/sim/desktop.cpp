@@ -129,7 +129,7 @@ int main(int argc,char** argv) {
     if(SDL_GetDisplayUsableBounds(SDL_GetWindowDisplayIndex(window),&bounds)==0 && wx+W+20+panel.width<=bounds.x+bounds.w)
         SDL_SetWindowPosition(panel.window,wx+W+20,wy);
     SDL_RaiseWindow(window);
-    if(!smoke&&!self_test&&!skip_boot)sim::start_boot(onboarding);
+    if(!smoke&&!skip_boot)sim::start_boot(onboarding&&!self_test);
     SDL_StartTextInput();
     std::size_t screen_count=0;const auto* screens=sim::screens(screen_count);
     unsigned frame=0;bool smoke_ok=true;
@@ -161,7 +161,7 @@ int main(int argc,char** argv) {
     std::unique_ptr<sim::DesktopTest> scenario;
     if(self_test)scenario=std::make_unique<sim::DesktopTest>(window,panel);
     while(running) {
-        if(scenario && !scenario->tick()){smoke_ok=scenario->ok;break;}
+        if(scenario && !sim::startup_active() && !scenario->tick()){smoke_ok=scenario->ok;break;}
         if(smoke && frame%5==0){
             const auto index=frame/5;
             sim::show_home();
@@ -232,6 +232,7 @@ int main(int argc,char** argv) {
         SDL_Rect bar{0,H,W,BAR};SDL_RenderCopy(renderer,texture,&bar,&bar);
         SDL_RenderPresent(renderer);panel.render(); SDL_Delay(10);
     }
+    if(scenario&&!scenario->complete())smoke_ok=false;
     SDL_StopTextInput();panel.close();lv_indev_delete(input);lv_display_delete(controls_display);lv_display_delete(display);lv_deinit();
     SDL_DestroyTexture(texture); SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit();
     return smoke_ok?0:2;

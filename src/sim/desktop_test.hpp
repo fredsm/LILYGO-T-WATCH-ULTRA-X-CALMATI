@@ -43,6 +43,11 @@ public:
         swipe(80,250,240,0);check(meshtastic_screen_is_active,"right opens mesh");swipe(350,12,-300,0);check(home,"mesh returns home");
         swipe(205,330,0,-240);check(time_screen_is_active,"up opens time");swipe(5,80,0,300);check(home,"time returns home");
         swipe(205,100,0,240);check(tools_screen_is_active,"down opens tools");swipe(5,80,0,300);check(home,"tools edge returns home");
+        tap_panel(panel.battery);wait(60);
+        check([]{char text[16];std::snprintf(text,sizeof(text),"%d%%",instance.pmu.getBatteryPercent());return instance.pmu.getBatteryPercent()<10&&find(create_clock(),&lv_label_class,text);},"panel battery updates original clock");
+        tap_panel(panel.brightness);check([]{return hardware.watch.brightness()<20;},"panel brightness reaches renderer state");
+        steps.push_back([]{instance.setBrightness(255);});wait();
+        check([this]{return lv_slider_get_value(panel.brightness)==255;},"firmware brightness synchronizes panel");
         tap_panel(panel.charging);check([]{return instance.pmu.isCharging();},"panel charging reaches PMU");
         tap_panel(panel.gps);check([]{return !instance.gps.location.isValid();},"panel GPS loss reaches firmware");
         tap_panel(panel.sd);check([]{return !instance.isCardReady();},"panel SD removal reaches firmware");
@@ -68,5 +73,6 @@ public:
         key(SDLK_F4,watch_id);check(home,"final return to clock");
     }
     bool tick(){if(position==steps.size()||!ok)return false;steps[position++]();return true;}
+    bool complete()const{return ok&&position==steps.size();}
 };
 }
