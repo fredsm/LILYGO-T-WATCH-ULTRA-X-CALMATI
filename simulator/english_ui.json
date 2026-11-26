@@ -254,5 +254,15 @@
     "ora": "now",
     "vecchio": "stale",
     "  meteo": "  weather"
+  },
+  "skimmer_probe.cpp": {
+    "prodotto commerciale (benigno)": "commercial product (benign)",
+    "modulo seriale grezzo - contestualizza": "raw serial module - review context",
+    "device BLE generico": "generic BLE device",
+    "Marca: %s\\nModello: %s\\nFW: %s\\nSeriale: %s\\nServizio seriale: %s\\nServizi: %d\\nVerdetto: %s": "Brand: %s\\nModel: %s\\nFW: %s\\nSerial: %s\\nSerial service: %s\\nServices: %d\\nVerdict: %s",
+    "FFE0/FFF0 SI": "FFE0/FFF0 YES",
+    "connessione fallita\\n(avvicina il device / non connettibile)": "Connection failed\\n(move closer / device not connectable)",
+    "GATT client non pronto": "GATT client not ready",
+    "apertura fallita": "Failed to open connection"
   }
 }

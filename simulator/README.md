@@ -131,7 +131,7 @@ See [acceptance checks](TESTING.md) for the automated scripts and a touchscreen 
 
 ## English firmware and simulator UI
 
-The 210 approved UI translations now live directly in the original firmware
+The 218 approved UI translations now live directly in the original firmware
 sources, including clock weather/countdown text and onboarding. The simulator
 compiles those exact sources without a translation step, so rendering tests
 also verify the wording shipped to the watch. The file-scoped catalogue remains

@@ -32,19 +32,19 @@ static void build_result()
     const char *verdict;
     // Recognisable vendor string in DIS → a real commercial product (benign).
     if (s_manuf[0])
-        verdict = "prodotto commerciale (benigno)";
+        verdict = "commercial product (benign)";
     else if (s_has_serial_svc)
-        verdict = "modulo seriale grezzo - contestualizza";
+        verdict = "raw serial module - review context";
     else
-        verdict = "device BLE generico";
+        verdict = "generic BLE device";
 
     snprintf(s_result, sizeof(s_result),
-        "Marca: %s\nModello: %s\nFW: %s\nSeriale: %s\nServizio seriale: %s\nServizi: %d\nVerdetto: %s",
+        "Brand: %s\nModel: %s\nFW: %s\nSerial: %s\nSerial service: %s\nServices: %d\nVerdict: %s",
         s_manuf[0]  ? s_manuf  : "-",
         s_model[0]  ? s_model  : "-",
         s_fw[0]     ? s_fw     : "-",
         s_serial[0] ? s_serial : "-",
-        s_has_serial_svc ? "FFE0/FFF0 SI" : "no",
+        s_has_serial_svc ? "FFE0/FFF0 YES" : "no",
         s_svc_count, verdict);
     s_done = true; s_busy = false;
 }
@@ -96,7 +96,7 @@ static void cb(esp_gattc_cb_event_t ev, esp_gatt_if_t gi, esp_ble_gattc_cb_param
         if (p->reg.status == ESP_GATT_OK) { s_if = gi; s_reg = true; }
         break;
     case ESP_GATTC_OPEN_EVT:
-        if (p->open.status != ESP_GATT_OK) { snprintf(s_result, sizeof(s_result), "connessione fallita\n(avvicina il device / non connettibile)"); s_done = true; s_busy = false; break; }
+        if (p->open.status != ESP_GATT_OK) { snprintf(s_result, sizeof(s_result), "Connection failed\n(move closer / device not connectable)"); s_done = true; s_busy = false; break; }
         s_conn = p->open.conn_id;
         s_dis_s = s_dis_e = 0; s_has_serial_svc = false; s_svc_count = 0;
         s_manuf[0]=s_model[0]=s_fw[0]=s_serial[0]='\0';
@@ -152,13 +152,13 @@ void skimmer_probe_start(const uint8_t bda[6], esp_ble_addr_type_t addr_type)
 {
     if (s_busy) return;
     ensure_reg();
-    if (!s_reg) { snprintf(s_result, sizeof(s_result), "GATT client non pronto"); s_done = true; return; }
+    if (!s_reg) { snprintf(s_result, sizeof(s_result), "GATT client not ready"); s_done = true; return; }
     s_busy = true; s_done = false;
     esp_ble_gap_stop_scanning();
     delay(60);
     esp_bd_addr_t a; memcpy(a, bda, 6);
     if (esp_ble_gattc_open(s_if, a, addr_type, true) != ESP_OK) {
-        snprintf(s_result, sizeof(s_result), "apertura fallita");
+        snprintf(s_result, sizeof(s_result), "Failed to open connection");
         s_done = true; s_busy = false;
     }
 }
