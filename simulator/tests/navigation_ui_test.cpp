@@ -1,6 +1,12 @@
 #include "../../src/sim/clock.hpp"
 #include "../../src/sim/screens.hpp"
 #include "../../src/sim/pointer.hpp"
+#include "../../src/sim/navigation.hpp"
+#include "../../src/sim/mock/LilyGoLib.h"
+#include "../../src/gps_screen.h"
+#include "../../src/lora_screen.h"
+#include "../../src/wifi_radio_screen.h"
+#include "../../src/bluetooth_screen.h"
 #include "../../src/wardriver_screen.h"
 #include "../../src/meshtastic_screen.h"
 #include "../../src/tools_screen.h"
@@ -46,22 +52,42 @@ int main(){
   swipe(25,12,300,0);if(!check(lv_screen_active()==home,"wardriver right -> clock"))return 2;
   swipe(80,250,240,0);if(!check(meshtastic_screen_is_active(),"clock right -> mesh"))return 3;
   swipe(350,12,-300,0);if(!check(lv_screen_active()==home,"mesh left -> clock"))return 4;
-  swipe(205,330,0,-240);if(!check(time_screen_is_active(),"clock up -> time"))return 5;
-  swipe(5,80,0,300);if(!check(lv_screen_active()==home,"time down -> clock"))return 6;
-  swipe(205,100,0,240);if(!check(tools_screen_is_active(),"clock down -> tools"))return 7;
+  swipe(205,100,0,240);if(!check(sim::quick_controls_active(),"clock down -> quick controls"))return 5;
+  swipe(5,400,0,-300);if(!check(lv_screen_active()==home,"quick controls up -> clock"))return 6;
+  swipe(205,330,0,-240);if(!check(tools_screen_is_active(),"clock up -> tools"))return 7;
   swipe(5,80,0,300);if(!check(lv_screen_active()==home,"tools edge down -> clock"))return 8;
  }
- swipe(205,100,0,240);
+ swipe(205,330,0,-240);
  auto* grid=lv_obj_get_child(lv_screen_active(),1);
  swipe(205,400,0,-240);
  if(!check(tools_screen_is_active() && lv_obj_get_scroll_top(grid)>0,"tools inward swipe scrolls tiles"))return 12;
  sim::show_home();pump();
  swipe(205,330,0,-240);
+ auto* time=label(lv_screen_active(),"Time");if(!check(time!=nullptr,"Time tile exists"))return 20;
+ auto* tile=lv_obj_get_parent(time);if(!check(lv_obj_get_index(tile)==0,"Time is first tile"))return 21;
+ lv_obj_scroll_to_view(tile,LV_ANIM_OFF);pump();lv_area_t t;lv_obj_get_coords(tile,&t);
+ sample((t.x1+t.x2)/2,(t.y1+t.y2)/2,true);sample((t.x1+t.x2)/2,(t.y1+t.y2)/2,false);pump();
+ if(!check(time_screen_is_active(),"tap Time tile"))return 22;
+ swipe(5,80,0,300);if(!check(tools_screen_is_active(),"Time down returns to Tools"))return 23;
+ time=label(lv_screen_active(),"Time");lv_obj_send_event(lv_obj_get_parent(time),LV_EVENT_CLICKED,nullptr);pump();
  auto* text=label(lv_screen_active(),"Stopwatch");if(!check(text!=nullptr,"original time tile exists"))return 9;
  lv_obj_scroll_to_view(text,LV_ANIM_OFF);pump();lv_area_t area;lv_obj_get_coords(text,&area);
  int x=(area.x1+area.x2)/2,y=(area.y1+area.y2)/2;
  sample(x,y,true);sample(x,y,false);pump();
  if(!check(stopwatch_screen_is_active(),"tap original stopwatch tile"))return 10;
  sim::show_home();pump();if(!check(lv_screen_active()==home,"home after nested screen"))return 11;
+ sim::show_quick_controls();pump();
+ struct Toggle {const char* name;bool (*on)();};
+ const Toggle toggles[]={{"Wi-Fi",wifi_radio_screen_is_powered},{"Bluetooth",bluetooth_screen_is_powered},
+     {"GPS",gps_screen_is_powered},{"LoRa",lora_screen_is_powered},{"NFC",[](){return instance.pmu.isEnableDLDO1();}}};
+ for(const auto& toggle:toggles){
+  auto* name=label(lv_screen_active(),toggle.name);if(!name)return 24;
+  auto* button=lv_obj_get_parent(name);lv_area_t a;lv_obj_get_coords(button,&a);int x=(a.x1+a.x2)/2,y=(a.y1+a.y2)/2;
+  for(int i=0;i<2;++i){bool before=toggle.on();sample(x,y,true);sample(x,y,false);pump();
+   if(!check(toggle.on()!=before,toggle.name)||!sim::quick_controls_active())return 25;}
+ }
+ auto* brightness=label(lv_screen_active(),"Brightness");if(!brightness)return 26;
+ for(int expected:{85,170,255}){lv_obj_send_event(lv_obj_get_parent(brightness),LV_EVENT_CLICKED,nullptr);pump();if(sim::hardware.watch.brightness()!=expected)return 27;}
+ sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Back closes shortcuts"))return 28;
  lv_indev_delete(input);lv_deinit();return 0;
 }

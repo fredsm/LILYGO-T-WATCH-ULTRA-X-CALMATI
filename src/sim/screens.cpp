@@ -20,6 +20,7 @@
 #include "../scan_screen.h"
 #include "screens.hpp"
 #include "clock.hpp"
+#include "navigation.hpp"
 #include "../tools_screen.h"
 #include "../task_manager.h"
 #include <ctime>
@@ -79,14 +80,15 @@ const sim::Screen registry[]={
 #include "screens.inc"
 #undef SIM_SCREEN
  {"task_manager",nullptr,show_task,task_active,nullptr},
+ {"quick_controls",nullptr,sim::show_quick_controls,sim::quick_controls_active,nullptr},
 };
 }
 namespace sim {
 void initialize_filesystem();
 const Screen* screens(std::size_t& count){count=sizeof(registry)/sizeof(registry[0]);return registry;}
-void initialize_screens(lv_obj_t* home){create_clock();home_screen=home;initialize_filesystem();for(const auto& s:registry)if(s.create)s.create();lv_screen_load(home);}
-void tick(){refresh_clock();nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();}
+void initialize_screens(lv_obj_t* home){create_clock();home_screen=home;initialize_filesystem();for(const auto& s:registry)if(s.create)s.create();initialize_navigation();lv_screen_load(home);}
+void tick(){refresh_clock();if(quick_controls_active())refresh_quick_controls();nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();}
 void leave_screen(){for(const auto& s:registry)if(s.active()&&s.stop)s.stop();}
 void show_home(){leave_screen();lv_screen_load(home_screen);}
 }
-void clock_screen_show(){sim::show_home();}
+void clock_screen_show(){if(time_screen_is_active())tools_screen_show();else sim::show_home();}

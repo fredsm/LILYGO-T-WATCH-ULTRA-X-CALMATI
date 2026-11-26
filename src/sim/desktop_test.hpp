@@ -1,6 +1,7 @@
 #pragma once
 #include "panel.hpp"
 #include "clock.hpp"
+#include "navigation.hpp"
 #include "../gps_screen.h"
 #include "../wardriver_screen.h"
 #include "../meshtastic_screen.h"
@@ -41,8 +42,11 @@ public:
         key(SDLK_F2,watch_id);check(gps_screen_is_active,"F2 opens GPS");key(SDLK_F4,watch_id);check(home,"F4 returns home");
         swipe(330,250,-240,0);check(wardriver_screen_is_active,"left opens wardriver");swipe(25,12,300,0);check(home,"wardriver returns home");
         swipe(80,250,240,0);check(meshtastic_screen_is_active,"right opens mesh");swipe(350,12,-300,0);check(home,"mesh returns home");
-        swipe(205,330,0,-240);check(time_screen_is_active,"up opens time");swipe(5,80,0,300);check(home,"time returns home");
-        swipe(205,100,0,240);check(tools_screen_is_active,"down opens tools");swipe(5,80,0,300);check(home,"tools edge returns home");
+        swipe(205,100,0,240);check(quick_controls_active,"down opens quick controls");swipe(5,400,0,-300);check(home,"quick controls returns home");
+        swipe(205,330,0,-240);check(tools_screen_is_active,"up opens tools");
+        steps.push_back([this]{auto* label=find(lv_screen_active(),&lv_label_class,"Time");if(!label){ok=false;return;}auto* tile=lv_obj_get_parent(label);if(lv_obj_get_index(tile)!=0){ok=false;return;}lv_obj_send_event(tile,LV_EVENT_CLICKED,nullptr);});wait();
+        check(time_screen_is_active,"first Tools tile opens Time");swipe(5,80,0,300);check(tools_screen_is_active,"Time returns to Tools");
+        swipe(5,80,0,300);check(home,"tools edge returns home");
         tap_panel(panel.battery);wait(60);
         check([]{char text[16];std::snprintf(text,sizeof(text),"%d%%",instance.pmu.getBatteryPercent());return instance.pmu.getBatteryPercent()<10&&find(create_clock(),&lv_label_class,text);},"panel battery updates original clock");
         tap_panel(panel.brightness);check([]{return hardware.watch.brightness()<20;},"panel brightness reaches renderer state");

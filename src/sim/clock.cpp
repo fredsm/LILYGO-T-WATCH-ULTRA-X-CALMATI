@@ -1,4 +1,6 @@
 #include "clock.hpp"
+#include "navigation.hpp"
+#include "screens.hpp"
 // Original firmware accesses the colon span's style directly. LVGL 9 keeps
 // that struct definition in this header; the simulator pins the same version.
 #include <src/widgets/span/lv_span_private.h>
@@ -32,17 +34,28 @@ void clock_screen_show();
 void clock_screen_get_local_time(struct tm* out){instance.rtc.getDateTime(out);}
 
 namespace sim {
-void power_button_click(){original_power_click();}
+void home_gesture(lv_event_t* e){
+    if(stealth_active())return;
+    auto* input=lv_event_get_indev(e);if(!input)return;
+    auto dir=lv_indev_get_gesture_dir(input);
+    if(dir==LV_DIR_TOP)tools_screen_show();
+    else if(dir==LV_DIR_BOTTOM)show_quick_controls();
+    else on_clock_gesture(e);
+}
+void power_button_click(){if(quick_controls_active())show_home();else original_power_click();}
 void back_button_click(){
     static bool seen=false;static uint32_t last=0;
     const auto now=lv_tick_get();
     if(seen && now-last<250)return;
-    seen=true;last=now;original_back_click();
+    seen=true;last=now;
+    if(quick_controls_active())show_home();
+    else if(time_screen_is_active())tools_screen_show();
+    else original_back_click();
 }
 lv_obj_t* create_clock(){
     if(!clock_screen){
         create_original_clock();
-        lv_obj_add_event_cb(clock_screen,on_clock_gesture,LV_EVENT_GESTURE,nullptr);
+        lv_obj_add_event_cb(clock_screen,home_gesture,LV_EVENT_GESTURE,nullptr);
         lv_obj_update_layout(clock_screen);
         realign_status_icons();
         update_clock();

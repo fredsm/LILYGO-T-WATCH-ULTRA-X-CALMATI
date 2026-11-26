@@ -78,7 +78,7 @@ endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
     "${CLOCK_INCLUDE}" ../src/sim/startup.cpp "${ENGLISH_ONBOARDING}" ../src/boot_skull_img.cpp ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
     "${ENGLISH_TASK_MANAGER}" ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
-    ../src/sim/screens.cpp
+    ../src/sim/screens.cpp ../src/sim/navigation.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
@@ -102,6 +102,7 @@ if(TWATCH_DESKTOP)
 endif()
 
 add_test(NAME ui_task_manager COMMAND screen_ui_test task_manager)
+add_test(NAME ui_quick_controls COMMAND screen_ui_test quick_controls)
 
 add_executable(screen_interaction_test tests/screen_interaction_test.cpp)
 target_link_libraries(screen_interaction_test PRIVATE simulator_ui)

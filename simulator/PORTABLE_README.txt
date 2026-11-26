@@ -5,7 +5,8 @@ No compiler, SDL installation, watch or other hardware is required.
 
 All 61 original dedicated firmware screens plus task manager are available.
 Startup shows the original skull splash, then the watch face at 410 x 502 pixels.
-Swipe left: Wardriver; right: Meshtastic; down: Tools; up: Time.
+Swipe left: Wardriver; right: Meshtastic; up: Tools; down: Quick Controls.
+Time is the first Tools tile. Swipe down/Back from Time returns to Tools.
 Use the touchscreen or hold the left mouse button and drag.
 F1 opens the debug screen catalog; click a screen button to inspect it.
 Mouse clicks act as touch. F4 returns directly to the watch face.
@@ -32,7 +33,7 @@ Double-click onboarding.cmd to include the original optional onboarding screen.
 Acceptance is session-only; no email, consent or telemetry is saved/sent.
 Run twatch_desktop.exe --skip-boot to skip the 1.5-second splash.
 
-To automatically cycle all 62 entries through the SDL renderer, double-click
+To automatically cycle all 63 entries through the SDL renderer, double-click
 smoke-test.cmd. It saves smoke-test.log and reports PASS or FAIL. The test uses
 an invisible dummy video driver; run twatch_desktop.exe for interactive viewing.
 
@@ -44,3 +45,7 @@ and hardware-panel regression checks. Results are saved in interaction-test.log.
 
 The simulator UI is English, including onboarding and status messages.
 Auto is now Car; Credito is NFC Compare. Physical firmware text is unchanged.
+
+Quick Controls toggles Wi-Fi, Bluetooth, GPS, LoRa and NFC. Brightness cycles
+33%, 66%, 100%. Swipe up, Back or Power closes it. These are simulator-only
+layout changes; the physical watch firmware is unchanged.

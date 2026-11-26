@@ -14,7 +14,7 @@ ambiguous source boundaries fail the build. The production file is unchanged.
 The original DEF CON image, clock font and Matrix background are compiled too.
 
 Clock swipes reuse the original handler: left to Wardriver, right to Meshtastic,
-down to Tools, up to Time. Original destination-screen gestures and tile
+up to Tools, down to Quick Controls. Time is the first Tools tile. Original destination-screen gestures and tile
 callbacks handle subsequent navigation. Mouse dragging and native touchscreen
 finger input use the LVGL pointer driver, with the firmware scroll threshold.
 Power and Back buttons below the watch display reuse the firmware button
@@ -52,7 +52,7 @@ For Windows x64, download the **TWatchUltra-simulator-windows-x64** artifact
 from a successful **Simulator tests** GitHub Actions run. Extract the ZIP and
 double-click `twatch_desktop.exe`. This portable package includes statically
 linked SDL2 and C runtime; no development tools are needed. `smoke-test.cmd`
-automatically cycles all 62 entries and saves a log. CI runs all desktop
+automatically cycles all 63 entries and saves a log. CI runs all desktop
 tests on Windows before publishing the artifact.
 
 Requires Git, CMake 3.16+, a C/C++17 compiler, and network access on the first
@@ -142,3 +142,19 @@ Onboarding keeps the existing English disclaimer once. `Auto` becomes `Car`,
 and `Credito` becomes `NFC Compare`. Dynamic status/error messages and NFC
 comparison output are translated too. Add future UI translations to the
 catalogue; stale keys and changed printf arguments fail the catalogue tests.
+
+## Simulator navigation customization
+
+From the clock, swipe up to open Tools. Time is the first tile and opens the
+original Alarm/Stopwatch/Timer/Calendar menu. Swipe down or press Back from Time
+to return to Tools. A downward swipe at the top of Tools returns to the clock.
+
+Swipe down from the clock for Quick Controls: Wi-Fi, Bluetooth, GPS, LoRa, NFC
+and brightness. Radio tiles show ON/OFF with distinct colors and invoke the
+original radio-screen switch callbacks through the host mocks. Brightness
+cycles through 33%, 66% and 100%, sharing the desktop panel's brightness state.
+Swipe up, press Back or press Power to close Quick Controls. F4 returns home.
+A shared radio can remain on if another tool is using it; the panel reports this.
+
+These navigation and tile changes live in `src/sim/navigation.cpp` and host
+clock routing only. Physical firmware navigation and screens are unchanged.
