@@ -93,7 +93,7 @@ int main(){
  sim::show_home();pump();
  swipe(205,330,0,-240);
  auto* wardriver=label(lv_screen_active(),"Wardriver");if(!check(wardriver!=nullptr,"Wardriver tile exists"))return 40;
- auto* wd_tile=lv_obj_get_parent(wardriver);lv_area_t wd;lv_obj_get_coords(wd_tile,&wd);
+ auto* wd_tile=lv_obj_get_parent(wardriver);lv_obj_scroll_to_view(wd_tile,LV_ANIM_OFF);pump();lv_area_t wd;lv_obj_get_coords(wd_tile,&wd);
  sample((wd.x1+wd.x2)/2,(wd.y1+wd.y2)/2,true);sample((wd.x1+wd.x2)/2,(wd.y1+wd.y2)/2,false);pump();
  if(!check(wardriver_screen_is_active(),"Wardriver tile touch opens original screen"))return 41;
  swipe(25,12,300,0);if(!check(tools_screen_is_active(),"Wardriver swipe returns Tools"))return 42;
