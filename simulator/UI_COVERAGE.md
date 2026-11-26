@@ -1,12 +1,13 @@
 # Original UI coverage
 
-Inventory: **61** dedicated screen translation units; **61 integrated**, none pending. The earlier estimate of 60 omitted one unit.
+Inventory: **62** dedicated screen translation units; **62 integrated**, none pending. This includes the 61 original screens and the shared Quick Controls screen.
 
-Verified at commit `4f644d3585d46eb142456e3368f610eae61c2065`:
-[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45865569030).
+Verified at commit `270d9f18119637d09249be68659b91b33ef42821`:
+[Simulator CI run](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45901764272).
 Linux and Windows native builds each pass **77/77** tests; Linux and Windows
 SDL desktop builds each pass **79/79**, including the real SDL render-path
-smoke test. The production firmware validation build also passes.
+smoke test. The [ESP32 firmware validation build](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45901764256) also passes.
+[Download the firmware package](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45901764256/artifacts/15155653349).
 
 Every dedicated screen links the original firmware translation unit, opens,
 renders, returns to the launcher and reopens. The complete navigation cycle also
@@ -16,7 +17,7 @@ ownership, simulated USB execution, NFC write/read and before/after captures,
 GATT enumeration, PNG tile decoding and voice response.
 
 These are automated host checks, not a claim of exhaustive manual visual review
-or hardware validation. Production hardware behavior remains unchanged.
+or hardware validation. Navigation and Quick Controls now run in both firmware and simulator; real radio behavior still requires on-device acceptance testing.
 
 | Source | Native status |
 |---|---|
@@ -55,6 +56,7 @@ or hardware validation. Production hardware behavior remains unchanged.
 | src/nfc_screen.cpp | Headless + SDL smoke verified |
 | src/nfc_write_screen.cpp | Headless + SDL smoke verified |
 | src/nodes_screen.cpp | Headless + SDL smoke verified |
+| src/quick_controls_screen.cpp | Headless + SDL smoke verified |
 | src/pager_screen.cpp | Headless + SDL smoke verified |
 | src/pet_screen.cpp | Headless + SDL smoke verified |
 | src/phantom_flood_screen.cpp | Headless + SDL smoke verified |
@@ -83,7 +85,7 @@ or hardware validation. Production hardware behavior remains unchanged.
 | src/wpa3_sae_screen.cpp | Headless + SDL smoke verified |
 
 Additional coverage: original task manager and the original watch face from
-main.cpp are verified outside the 61 dedicated screen inventory. Tests cover
+main.cpp are verified outside the dedicated screen inventory. Tests cover
 clock face switching, repeated four-direction swipe round trips, Tools tile
 scrolling and edge returns, opening the original Stopwatch tile, firmware
 Power/Back routes and debounce, UTF-8 compose editing, confirmation, cancellation
@@ -108,22 +110,39 @@ Exhaustive manual touchscreen/visual verification and real hardware behavior
 remain outside automated host coverage. See [acceptance checks](TESTING.md)
 for the included scripts and hands-on touchscreen checklist.
 
-[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45865569030/artifacts/15139528971).
+[Windows package for this verified commit](https://github.com/fredsm/LILYGO-T-WATCH-ULTRA-X-CALMATI/actions/runs/45901764272/artifacts/15155813609).
 
 ## Simulator customization on dev
 
-The English-only host build has 210 file-scoped translation entries, including
-clock weather/countdown wording. Original firmware source files are unchanged.
-The catalog now has 63 entries: 61 dedicated original screens, Task Manager and
-the new host-only Quick Controls screen.
+The 218 approved translations now live in firmware sources, including clock
+weather/countdown wording. Host builds compile the same English UI directly.
+The catalog has 63 entries: 62 dedicated screens (including shared Quick Controls)
+and Task Manager.
 
 Clock swipe up opens Tools; its first tile is Time. Time opens the original
 utility menu and returns to Tools on swipe down or Back. Clock swipe down opens
 Quick Controls with Wi-Fi, Bluetooth, GPS, LoRa, NFC, brightness and Settings.
-Radio controls reuse the original switch callbacks through host adapters.
+Radio controls reuse the firmware handlers through host adapters. The real
+watch uses these same handlers against its hardware.
 Brightness cycles 33/66/100%. Settings also remains accessible via Back at home.
 
 Tests cover repeated swipe round trips, Time's first-tile position and touch
 activation, the nested Stopwatch path, every quick radio toggled on/off, all
 brightness presets, Settings touch activation and Back navigation. The SDL
 end-to-end test covers the new routes and Settings shortcut as well.
+
+## Firmware promotion
+
+Clock swipe up now opens Tools with Time first; swipe down opens the shared
+Quick Controls screen. Power/Back home shortcuts and left/right gestures are
+preserved. Time returns to Tools. Simulator-only routing and tile injection
+have been removed so host tests exercise the production routes directly.
+
+Radio tiles read actual Wi-Fi/Bluetooth state, GPS power, shared LoRa usage and
+NFC power. Tests cover externally enabled Wi-Fi and ownership retained by BLE
+and pager consumers. Brightness presets update Settings and save to writable
+SD; dim/wake restores the selected level. Firmware CI compiles the ESP32 target;
+physical touch, radio operation and dim/wake still need on-watch testing.
+
+English conversion covers 24 source files. Regression checks verify all 218
+translated literals in the firmware, with unchanged non-string C++ code.
