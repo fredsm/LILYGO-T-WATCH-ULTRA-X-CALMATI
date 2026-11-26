@@ -8,13 +8,18 @@
 #include "../wifi_radio_screen.h"
 #include "../bluetooth_screen.h"
 #include "../nfc_screen.h"
-#include "../tile_icons.h"
 #include <cstdint>
 namespace {
 lv_obj_t* quick=nullptr;
 lv_obj_t* notice=nullptr;
 lv_obj_t* brightness_value=nullptr;
 lv_obj_t* time_tile=nullptr;
+void tile_icons_passthrough(lv_obj_t* obj){
+    for(unsigned i=0;i<lv_obj_get_child_count(obj);++i){
+        auto* child=lv_obj_get_child(obj,i);lv_obj_clear_flag(child,LV_OBJ_FLAG_CLICKABLE);
+        tile_icons_passthrough(child);
+    }
+}
 bool nfc_on(){return instance.pmu.isEnableDLDO1();}
 struct Control {
     const char* name;const char* icon;void (*show)();bool (*on)();
