@@ -37,7 +37,7 @@ int main(){
  CHECK(!instance.isCardReady());sim::hardware.reset_inputs();CHECK(instance.isCardReady());CHECK(SD.open("/presence-test").size()==4);
  CHECK(sim::hardware.watch.brightness()==255&&instance.pmu.getBatteryPercent()==75&&!instance.pmu.isCharging());
  sim::start_boot(true);pump(1520);auto* onboarding=lv_screen_active();CHECK(onboarding!=home&&sim::startup_active());
- auto* accept=find(onboarding,&lv_label_class,"ACCETTO / ACCEPT");auto* checkbox=find(onboarding,&lv_checkbox_class);CHECK(accept&&checkbox);
+ auto* accept=find(onboarding,&lv_label_class,"ACCEPT");auto* checkbox=find(onboarding,&lv_checkbox_class);CHECK(accept&&checkbox);
  lv_obj_send_event(lv_obj_get_parent(accept),LV_EVENT_CLICKED,nullptr);CHECK(lv_screen_active()==onboarding&&onboarding_needed());
  lv_obj_add_state(checkbox,LV_STATE_CHECKED);lv_obj_send_event(lv_obj_get_parent(accept),LV_EVENT_CLICKED,nullptr);
  CHECK(lv_screen_active()==home&&!onboarding_needed()&&!sim::startup_active());

@@ -41,3 +41,6 @@ screen reopening, navigation and sample NFC, BLE, portscan and voice workflows.
 
 Double-click interaction-test.cmd for the SDL navigation, keyboard, touch-button
 and hardware-panel regression checks. Results are saved in interaction-test.log.
+
+The simulator UI is English, including onboarding and status messages.
+Auto is now Car; Credito is NFC Compare. Physical firmware text is unchanged.

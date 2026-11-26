@@ -50,16 +50,32 @@ add_test(NAME original_calendar_ui COMMAND calendar_ui_test)
 
 
 # screens.inc is the single source of truth for native source selection and UI tests.
+# Compile localized copies only in this host project. Firmware files stay intact.
+function(english_source original result)
+    get_filename_component(source "${original}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    get_filename_component(name "${source}" NAME)
+    get_filename_component(source_dir "${source}" DIRECTORY)
+    set(output "${CMAKE_CURRENT_BINARY_DIR}/english/${name}")
+    add_custom_command(OUTPUT "${output}"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.py"
+                "${source}" "${output}" "${CMAKE_CURRENT_SOURCE_DIR}/english_ui.json"
+        DEPENDS "${source}" english_ui.py english_ui.json VERBATIM)
+    set_source_files_properties("${output}" PROPERTIES INCLUDE_DIRECTORIES "${source_dir}")
+    set(${result} "${output}" PARENT_SCOPE)
+endfunction()
+english_source("../src/onboarding.cpp" ENGLISH_ONBOARDING)
+english_source("../src/task_manager.cpp" ENGLISH_TASK_MANAGER)
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../src/sim/screens.inc" SCREEN_ROWS REGEX "^SIM_SCREEN")
 set(SCREEN_SOURCES)
 foreach(row IN LISTS SCREEN_ROWS)
     string(REGEX REPLACE "^SIM_SCREEN\\(([a-z0-9_]+),.*" "\\1" screen "${row}")
-    list(APPEND SCREEN_SOURCES "../src/${screen}_screen.cpp")
+    english_source("../src/${screen}_screen.cpp" translated_source)
+    list(APPEND SCREEN_SOURCES "${translated_source}")
     list(APPEND SCREEN_NAMES "${screen}")
 endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
-    "${CLOCK_INCLUDE}" ../src/sim/startup.cpp ../src/onboarding.cpp ../src/boot_skull_img.cpp ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
-    ../src/task_manager.cpp ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
+    "${CLOCK_INCLUDE}" ../src/sim/startup.cpp "${ENGLISH_ONBOARDING}" ../src/boot_skull_img.cpp ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
+    "${ENGLISH_TASK_MANAGER}" ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
     ../src/sim/screens.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
@@ -110,6 +126,10 @@ set_tests_properties(original_keyboard_and_buttons PROPERTIES TIMEOUT 30)
 add_executable(startup_hardware_test tests/startup_hardware_test.cpp)
 target_link_libraries(startup_hardware_test PRIVATE simulator_ui)
 add_test(NAME original_startup_and_hardware COMMAND startup_hardware_test)
+add_test(NAME simulator_english_catalogue COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_english_ui.py")
+add_executable(english_ui_test tests/english_ui_test.cpp)
+target_link_libraries(english_ui_test PRIVATE simulator_ui)
+add_test(NAME simulator_english_screens COMMAND english_ui_test)
 set_tests_properties(original_startup_and_hardware PROPERTIES TIMEOUT 30)
 if(TWATCH_DESKTOP)
     add_test(NAME sdl_end_to_end COMMAND twatch_desktop --self-test)

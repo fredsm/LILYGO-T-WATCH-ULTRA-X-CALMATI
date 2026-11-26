@@ -1,7 +1,7 @@
 name: Development validation
 on:
   push:
-    branches: [development/simulator]
+    branches: [development/simulator, dev]
   pull_request:
     branches: [main]
   workflow_dispatch:

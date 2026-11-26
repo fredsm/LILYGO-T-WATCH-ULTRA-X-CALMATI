@@ -47,9 +47,9 @@ int main(){
  nfc_write_screen_show();lv_obj_t* value=nullptr;for(unsigned i=0;i<lv_obj_get_child_count(lv_screen_active());++i){auto* o=lv_obj_get_child(lv_screen_active(),i);if(lv_obj_check_type(o,&lv_textarea_class))value=o;}
  CHECK(value);lv_textarea_set_text(value,"SIM round trip");CHECK(click("Write"));pump();CHECK(label(lv_screen_active(),"Written successfully"));
  nfc_screen_show();CHECK(click("Read"));pump();CHECK(label(lv_screen_active(),"SIM round trip"));
- CHECK(open("nfc_credit"));CHECK(click("PRIMA"));pump();CHECK(click("DOPO"));pump();CHECK(SD.exists("/frantic/verify_log.txt"));
- CHECK(open("gatt_explorer"));CHECK(click("senza nome"));pump();CHECK(label(lv_screen_active(),"SVC 0x180F"));
+ CHECK(open("nfc_credit"));CHECK(click("BEFORE"));pump();CHECK(click("AFTER"));pump();CHECK(SD.exists("/frantic/verify_log.txt"));
+ CHECK(open("gatt_explorer"));CHECK(click("no name"));pump();CHECK(label(lv_screen_active(),"SVC 0x180F"));
  CHECK(open("map"));lv_image_header_t header{};CHECK(lv_image_decoder_get_info("A:/map/1/0/0.png",&header)==LV_RESULT_OK);CHECK(header.w==256&&header.h==256);
- CHECK(open("voice"));CHECK(click("PARLA"));CHECK(mic_rec_is_recording());pump(11000);CHECK(label(lv_screen_active(),"Simulated assistant response."));
+ CHECK(open("voice"));CHECK(click("SPEAK"));CHECK(mic_rec_is_recording());pump(11000);CHECK(label(lv_screen_active(),"Simulated assistant response."));
  sim::show_home();lv_deinit();std::puts("Original UI interaction flows passed");return 0;
 }

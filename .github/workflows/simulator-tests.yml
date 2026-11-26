@@ -2,7 +2,7 @@ name: Simulator tests
 on:
   workflow_dispatch:
   push:
-    branches: [development/simulator]
+    branches: [development/simulator, dev]
   pull_request:
     branches: [main]
 permissions:
