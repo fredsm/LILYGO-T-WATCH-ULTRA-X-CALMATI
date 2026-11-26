@@ -10,14 +10,16 @@
 void clock_screen_show();
 
 static lv_obj_t *time_screen;
+static bool entered_from_clock = false;
 
-// Swipe DOWN returns to Tools, which owns the Time tile.
+// Reverse the home swipe, or return to the menu that opened Time.
 static void on_gesture(lv_event_t *e)
 {
     lv_indev_t *indev = lv_event_get_indev(e);
+    if (!indev) return;
     lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-    if (dir == LV_DIR_BOTTOM)
-        tools_screen_show();
+    if (dir == LV_DIR_BOTTOM || dir == LV_DIR_RIGHT)
+        time_screen_back();
 }
 
 // ---- Tile helper -----------------------------------------------------------
@@ -424,3 +426,7 @@ void time_screen_create()
 
 void time_screen_show()       { lv_scr_load(time_screen); }
 bool time_screen_is_active()  { return lv_screen_active() == time_screen; }
+
+void time_screen_show_from_clock(){entered_from_clock=true;time_screen_show();}
+void time_screen_show_from_tools(){entered_from_clock=false;time_screen_show();}
+void time_screen_back(){if(entered_from_clock)clock_screen_show();else tools_screen_show();}

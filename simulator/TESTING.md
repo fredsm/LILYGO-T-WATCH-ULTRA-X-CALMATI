@@ -19,7 +19,7 @@ Extract the entire ZIP before running it. These checks use synthetic data only.
 | Action | Expected result |
 | --- | --- |
 | Run `twatch_desktop.exe` | Original skull fades in, then clock appears after about 1.5 seconds. Watch area is 410 x 502; brightness starts at 100%. |
-| Swipe left/right/up/down from the clock | Wardriver / Meshtastic / Tools / Quick Controls, respectively. F4 always returns to the clock after startup. |
+| Swipe left/right/up/down from the clock | Time / Meshtastic / Tools / Quick Controls, respectively. F4 always returns to the clock after startup. |
 | Swipe up inside Tools | Tiles scroll. A downward swipe at the top edge returns to the clock. |
 | Open Tools, tap its first tile (Time), then Stopwatch, then start/stop/reset | Original stopwatch controls respond. F4 returns home. |
 | Tap Power and Back below the watch | Original firmware button routes execute. F2 and F3 do the same. |
@@ -51,3 +51,7 @@ icon. Verify Time is first in Tools, Time returns to Tools, Settings opens from
 Quick Controls, and brightness survives dim/wake (and reboot with writable SD).
 Repeat the Power/Back radio-screen cycle and left/right home swipes. These
 on-device checks are still required; host tests cannot verify radio hardware.
+
+Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens
+Time. Back or a rightward/downward swipe from Time returns to the screen that
+opened it (home or Tools). Wardriver Back/right swipe returns to Tools.

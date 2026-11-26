@@ -686,7 +686,7 @@ static void on_clock_gesture(lv_event_t *e)
     lv_indev_t *indev = lv_event_get_indev(e);
     lv_dir_t dir = lv_indev_get_gesture_dir(indev);
     if (dir == LV_DIR_LEFT)
-        wardriver_screen_show();
+        time_screen_show_from_clock();
     else if (dir == LV_DIR_RIGHT) {
         meshtastic_mark_read();
         meshtastic_screen_show();
@@ -1906,6 +1906,8 @@ void loop()
             if (settings_screen_is_active()) {
                 clock_screen_show();
             } else if (time_screen_is_active()) {
+                time_screen_back();
+            } else if (wardriver_screen_is_active()) {
                 tools_screen_show();
             } else if (nfc_write_screen_is_active()) {
                 nfc_screen_show();

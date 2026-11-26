@@ -16,7 +16,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "evil_twin.h"
 #include "counter_tail.h"
 
-void clock_screen_show();
+#include "tools_screen.h"
 
 // ─── Configuration ─────────────────────────────────────────────
 // Per-session cap on unique devices held in the hash table. When this is
@@ -462,7 +462,7 @@ static void on_gesture(lv_event_t *e) {
     lv_indev_t *indev = lv_event_get_indev(e);
     lv_dir_t dir = lv_indev_get_gesture_dir(indev);
     if (dir == LV_DIR_RIGHT)
-        clock_screen_show();
+        tools_screen_show();
 }
 
 // ─── UI helpers ────────────────────────────────────────────────

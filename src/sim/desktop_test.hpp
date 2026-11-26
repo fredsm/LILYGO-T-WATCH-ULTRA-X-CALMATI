@@ -41,13 +41,15 @@ public:
         auto home=[](){return lv_screen_active()==create_clock();};
         check(home,"starts on original clock");check([]{return hardware.watch.brightness()==255;},"full brightness default");
         key(SDLK_F2,watch_id);check(gps_screen_is_active,"F2 opens GPS");key(SDLK_F4,watch_id);check(home,"F4 returns home");
-        swipe(330,250,-240,0);check(wardriver_screen_is_active,"left opens wardriver");swipe(25,12,300,0);check(home,"wardriver returns home");
+        swipe(330,250,-240,0);check(time_screen_is_active,"left opens Time");swipe(25,12,300,0);check(home,"Time returns home");
         swipe(80,250,240,0);check(meshtastic_screen_is_active,"right opens mesh");swipe(350,12,-300,0);check(home,"mesh returns home");
         swipe(205,100,0,240);check(quick_controls_active,"down opens quick controls");
         sample(watch_id,205,425,SDL_MOUSEBUTTONDOWN);sample(watch_id,205,425,SDL_MOUSEBUTTONUP);wait();
         check(settings_screen_is_active,"quick Settings shortcut opens settings");key(SDLK_F4,watch_id);
         swipe(205,100,0,240);swipe(5,400,0,-300);check(home,"quick controls returns home");
         swipe(205,330,0,-240);check(tools_screen_is_active,"up opens tools");
+        steps.push_back([this]{auto* label=find(lv_screen_active(),&lv_label_class,"Wardriver");if(!label){ok=false;return;}lv_obj_send_event(lv_obj_get_parent(label),LV_EVENT_CLICKED,nullptr);});wait();
+        check(wardriver_screen_is_active,"Tools opens Wardriver");swipe(25,12,300,0);check(tools_screen_is_active,"Wardriver returns to Tools");
         steps.push_back([this]{auto* label=find(lv_screen_active(),&lv_label_class,"Time");if(!label){ok=false;return;}auto* tile=lv_obj_get_parent(label);if(lv_obj_get_index(tile)!=0){ok=false;return;}lv_obj_send_event(tile,LV_EVENT_CLICKED,nullptr);});wait();
         check(time_screen_is_active,"first Tools tile opens Time");swipe(5,80,0,300);check(tools_screen_is_active,"Time returns to Tools");
         swipe(5,80,0,300);check(home,"tools edge returns home");

@@ -1,10 +1,11 @@
 #pragma once
 #include <lvgl.h>
 
-// "TIME" grid screen reached by swiping UP from the clock face. Holds the
-// timepiece-flavoured tools that used to live at the bottom of the TOOLS
-// grid: Alarm, Stopwatch, Timer, Calendar.
-
+// Time utilities are reached from a right-to-left home swipe or the Tools tile.
 void time_screen_create();
 void time_screen_show();
 bool time_screen_is_active();
+
+void time_screen_show_from_clock();
+void time_screen_show_from_tools();
+void time_screen_back();

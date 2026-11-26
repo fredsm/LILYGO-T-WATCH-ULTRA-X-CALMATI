@@ -77,8 +77,8 @@ int main(){
  lv_indev_set_mode(input,LV_INDEV_MODE_EVENT);
  auto* home=sim::create_clock();sim::initialize_screens(home);pump();
  for(int pass=0;pass<2;++pass){
-  swipe(330,250,-240,0);if(!check(wardriver_screen_is_active(),"clock left -> wardriver"))return 1;
-  swipe(25,12,300,0);if(!check(lv_screen_active()==home,"wardriver right -> clock"))return 2;
+  swipe(330,250,-240,0);if(!check(time_screen_is_active(),"clock left -> Time"))return 1;
+  swipe(25,12,300,0);if(!check(lv_screen_active()==home,"Time right -> clock"))return 2;
   swipe(80,250,240,0);if(!check(meshtastic_screen_is_active(),"clock right -> mesh"))return 3;
   swipe(350,12,-300,0);if(!check(lv_screen_active()==home,"mesh left -> clock"))return 4;
   swipe(205,100,0,240);if(!check(sim::quick_controls_active(),"clock down -> quick controls"))return 5;
@@ -92,6 +92,13 @@ int main(){
  if(!check(tools_screen_is_active() && lv_obj_get_scroll_top(grid)>0,"tools inward swipe scrolls tiles"))return 12;
  sim::show_home();pump();
  swipe(205,330,0,-240);
+ auto* wardriver=label(lv_screen_active(),"Wardriver");if(!check(wardriver!=nullptr,"Wardriver tile exists"))return 40;
+ auto* wd_tile=lv_obj_get_parent(wardriver);lv_area_t wd;lv_obj_get_coords(wd_tile,&wd);
+ sample((wd.x1+wd.x2)/2,(wd.y1+wd.y2)/2,true);sample((wd.x1+wd.x2)/2,(wd.y1+wd.y2)/2,false);pump();
+ if(!check(wardriver_screen_is_active(),"Wardriver tile touch opens original screen"))return 41;
+ swipe(25,12,300,0);if(!check(tools_screen_is_active(),"Wardriver swipe returns Tools"))return 42;
+ lv_obj_send_event(wd_tile,LV_EVENT_CLICKED,nullptr);pump();sim::back_button_click();pump();
+ if(!check(tools_screen_is_active(),"Wardriver Back returns Tools"))return 43;
  auto* time=label(lv_screen_active(),"Time");if(!check(time!=nullptr,"Time tile exists"))return 20;
  auto* tile=lv_obj_get_parent(time);if(!check(lv_obj_get_index(tile)==0,"Time is first tile"))return 21;
  lv_obj_scroll_to_view(tile,LV_ANIM_OFF);pump();lv_area_t t;lv_obj_get_coords(tile,&t);
@@ -109,6 +116,9 @@ int main(){
  struct Toggle {const char* name;bool (*on)();};
  const Toggle toggles[]={{"Wi-Fi",wifi_radio_screen_is_powered},{"Bluetooth",bluetooth_screen_is_powered},
      {"GPS",gps_screen_is_powered},{"LoRa",lora_screen_is_powered},{"NFC",[](){return instance.pmu.isEnableDLDO1();}}};
+ sim::show_home();pump();swipe(330,250,-240,0);sim::back_button_click();pump();
+ if(!check(lv_screen_active()==home,"Time from home Back returns home"))return 44;
+ sim::show_quick_controls();pump();
  for(const auto& toggle:toggles){
   auto* name=label(lv_screen_active(),toggle.name);if(!name)return 24;
   auto* button=lv_obj_get_parent(name);lv_area_t a;lv_obj_get_coords(button,&a);int x=(a.x1+a.x2)/2,y=(a.y1+a.y2)/2;

@@ -13,7 +13,7 @@ functions verbatim from `src/main.cpp` during the host build. Missing or
 ambiguous source boundaries fail the build. The production file is unchanged.
 The original DEF CON image, clock font and Matrix background are compiled too.
 
-Clock swipes reuse the original handler: left to Wardriver, right to Meshtastic,
+Clock swipes reuse the original handler: left to Time, right to Meshtastic,
 up to Tools, down to Quick Controls. Time is the first Tools tile. Original destination-screen gestures and tile
 callbacks handle subsequent navigation. Mouse dragging and native touchscreen
 finger input use the LVGL pointer driver, with the firmware scroll threshold.
@@ -164,3 +164,7 @@ when the radio cannot be switched off.
 
 Quick Controls also includes a Settings shortcut beneath the radio tiles.
 The existing Back-from-home Settings shortcut remains available.
+
+Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens
+Time. Back or a rightward/downward swipe from Time returns to the screen that
+opened it (home or Tools). Wardriver Back/right swipe returns to Tools.

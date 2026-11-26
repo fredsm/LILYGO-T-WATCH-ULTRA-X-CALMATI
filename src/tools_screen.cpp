@@ -1,5 +1,6 @@
 #include "tools_screen.h"
 #include "time_screen.h"
+#include "wardriver_screen.h"
 #include "esp32-hal-tinyusb.h"    // usb_persist_restart(RESTART_BOOTLOADER) — tile Download
 #include "gps_screen.h"           // gps_screen_power_on() per la tile UDDA
 #include "meshtastic.h"           // meshtastic_set_active/announce/short_name
@@ -1590,7 +1591,7 @@ static void add_time_tile(lv_obj_t* grid){
     auto* hand=lv_line_create(face);lv_line_set_points(hand,hands,3);lv_obj_set_style_line_color(hand,lv_color_white(),0);
     lv_obj_set_style_line_width(hand,4,0);lv_obj_set_style_line_rounded(hand,true,0);
     tile_icons_passthrough(time_tile);
-    lv_obj_add_event_cb(time_tile,[](lv_event_t*){time_screen_show();},LV_EVENT_CLICKED,nullptr);
+    lv_obj_add_event_cb(time_tile,[](lv_event_t*){time_screen_show_from_tools();},LV_EVENT_CLICKED,nullptr);
     lv_obj_move_to_index(time_tile,0);
 }
 
@@ -1639,6 +1640,13 @@ void tools_screen_create()
     // The timepiece tiles (Alarm / Stopwatch / Timer / Calendar) used to live
     // at the bottom of this grid; the first Time tile now opens their menu.
     add_time_tile(grid);
+    lv_obj_t *t_wardriver = make_tile(grid, "Wardriver");
+    auto* wardriver_icon = lv_label_create(t_wardriver);
+    lv_label_set_text(wardriver_icon, LV_SYMBOL_EYE_OPEN);
+    lv_obj_set_style_text_font(wardriver_icon, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_color(wardriver_icon, lv_color_hex(0x65caff), 0);
+    lv_obj_align(wardriver_icon, LV_ALIGN_TOP_MID, 0, 36);
+    lv_obj_add_event_cb(t_wardriver, [](lv_event_t*){wardriver_screen_show();}, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *t_scanner = make_tile(grid, "Scanner");
     t_duress            = make_tile(grid, "Duress");
     lv_obj_t *t_wifi    = make_tile(grid, "WiFi");

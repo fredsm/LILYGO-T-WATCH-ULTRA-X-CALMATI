@@ -5,7 +5,7 @@ No compiler, SDL installation, watch or other hardware is required.
 
 All 61 original dedicated firmware screens plus task manager are available.
 Startup shows the original skull splash, then the watch face at 410 x 502 pixels.
-Swipe left: Wardriver; right: Meshtastic; up: Tools; down: Quick Controls.
+Swipe left: Time; right: Meshtastic; up: Tools; down: Quick Controls.
 Time is the first Tools tile. Swipe down/Back from Time returns to Tools.
 Use the touchscreen or hold the left mouse button and drag.
 F1 opens the debug screen catalog; click a screen button to inspect it.
@@ -53,3 +53,7 @@ Bluetooth/LoRa stay on while another tool owns them; the UI explains why.
 
 Quick Controls also includes a Settings shortcut beneath the radio tiles.
 The existing Back-from-home Settings shortcut remains available.
+
+Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens
+Time. Back or a rightward/downward swipe from Time returns to the screen that
+opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
