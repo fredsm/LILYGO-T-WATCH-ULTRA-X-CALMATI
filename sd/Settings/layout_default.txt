@@ -1,5 +1,5 @@
-# T-Watch Ultra built-in navigation layout. Copy to /Settings/layout.txt on SD.
-# Boot-loaded; missing keys use defaults. Swipe directions refer to finger motion.
+# T-Watch Ultra built-in navigation layout. Copy to /Settings/layout_default.txt on SD.
+# Boot-loaded; copy this file to layout.txt to customize. Swipe directions refer to finger motion.
 # Targets: none, time, meshtastic, tools, quick_controls, settings, gps, lora,
 # wifi_radio, bluetooth, nfc, calendar, stopwatch, timer, alarm, diagnostics,
 # task_manager. Keep at least one Home path to Settings.
@@ -12,7 +12,7 @@ home.power = gps
 
 # Exact existing Tools tile names, comma-separated. Listed tiles move to the
 # front, remaining tiles retain factory order. Hide only changes presentation.
-tools.order = Time, Wardriver, Scanner
+tools.order = Time, Wardriver, Scanner, Duress, WiFi, Analyze, Mouse, USB SD, Pager, TPMS, LoRa APRS, Tesla CP, AirTag, Skimmers, Evil Twin, Flock, Radar, Meta, Task Mgr, Pet, Pwn, Cameras, Deauth, ARP MitM, BLE Audit, Drone ID, GATT, Phantom, RID Spoof, Sentinel, Printer, Calmati, Download, Mifare, Waterfall, ESP-NOW, Car, UDDA, ADS-B, Mic Rec, Assist, Panel, NFC Compare, WPA3 SAE
 tools.hide =
 
 # Exact order of visible controls and bottom action buttons.

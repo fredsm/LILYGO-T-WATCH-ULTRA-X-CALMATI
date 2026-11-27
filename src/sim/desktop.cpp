@@ -96,24 +96,31 @@ uint32_t editing_key(SDL_Keycode key){
 int main(int argc,char** argv) {
     bool smoke=false,self_test=false,skip_boot=false,onboarding=false;
     const char* layout_path=nullptr;
+    const char* default_layout_path=nullptr;
     for(int i=1;i<argc;++i){
         if(!std::strcmp(argv[i],"--smoke"))smoke=true;
         else if(!std::strcmp(argv[i],"--self-test"))self_test=true;
         else if(!std::strcmp(argv[i],"--skip-boot"))skip_boot=true;
         else if(!std::strcmp(argv[i],"--onboarding"))onboarding=true;
         else if(!std::strcmp(argv[i],"--layout")&&i+1<argc)layout_path=argv[++i];
+        else if(!std::strcmp(argv[i],"--layout-default")&&i+1<argc)default_layout_path=argv[++i];
         else {std::fprintf(stderr,"Unknown option: %s\n",argv[i]);return 1;}
     }
-    if(layout_path){
-        // Read only the explicitly supplied file into the virtual SD.
-        std::ifstream f(layout_path,std::ios::binary);
-        if(!f){std::fprintf(stderr,"Cannot open layout: %s\n",layout_path);return 1;}
+    auto import_layout=[](const char* host_path,const char* sd_path){
+        if(!host_path)return true;
+        // Only explicitly supplied host files are imported into the virtual SD.
+        std::ifstream f(host_path,std::ios::binary);
+        if(!f){std::fprintf(stderr,"Cannot open layout: %s\n",host_path);return false;}
         char bytes[LAYOUT_MAX_BYTES+1];
         f.read(bytes,sizeof(bytes));
-        auto out=SD.open(LAYOUT_PATH,FILE_WRITE);
-        out.write(reinterpret_cast<const uint8_t*>(bytes),size_t(f.gcount()));
-        out.close();
-    }
+        if(f.bad()){std::fprintf(stderr,"Cannot read layout: %s\n",host_path);return false;}
+        auto out=SD.open(sd_path,FILE_WRITE);
+        const auto n=size_t(f.gcount());
+        const bool ok=out&&out.write(reinterpret_cast<const uint8_t*>(bytes),n)==n;
+        out.close();return ok;
+    };
+    if(!import_layout(default_layout_path,LAYOUT_DEFAULT_PATH)||
+       !import_layout(layout_path,LAYOUT_PATH))return 1;
     SDL_SetMainReady();
     // Native touch is handled below; disable duplicate synthesized mouse events.
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,"0");

@@ -54,7 +54,7 @@ jobs:
           New-Item -ItemType Directory -Force build/portable | Out-Null
           Copy-Item build/desktop/twatch_desktop.exe build/portable/
           Copy-Item simulator/PORTABLE_README.txt build/portable/README.txt
-          Copy-Item sd/Settings/layout.txt build/portable/layout.txt
+          Copy-Item sd/Settings/layout_default.txt build/portable/layout_default.txt
           Copy-Item simulator/smoke-test.cmd build/portable/
           Copy-Item simulator/interaction-test.cmd build/portable/
           Copy-Item simulator/onboarding.cmd build/portable/

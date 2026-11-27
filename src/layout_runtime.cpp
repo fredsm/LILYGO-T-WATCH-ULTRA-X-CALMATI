@@ -25,26 +25,35 @@
 
 namespace {
 LayoutConfig current=layout_defaults();
-LayoutSource source=LayoutSource::Defaults;
-}
-const LayoutConfig& layout_config(){return current;}
-LayoutSource layout_source(){return source;}
-void layout_load(){
-    current=layout_defaults();source=LayoutSource::Defaults;
-    StorageAccess access;
-    if(!access||!SD.exists(LAYOUT_PATH))return;
-    source=LayoutSource::Invalid;
-    auto f=SD.open(LAYOUT_PATH,FILE_READ);
-    if(!f)return;
+LayoutStatus status{LayoutSource::Embedded,false,false};
+enum class ReadResult { Missing, Invalid, Loaded };
+ReadResult read_layout(const char* path,LayoutConfig& base){
+    if(!SD.exists(path))return ReadResult::Missing;
+    auto f=SD.open(path,FILE_READ);
+    if(!f)return ReadResult::Invalid;
     const size_t n=f.size();
-    if(n>LAYOUT_MAX_BYTES){f.close();return;}
-    // Temporary bounded allocation: retain only parsed IDs in RAM.
+    if(n>LAYOUT_MAX_BYTES){f.close();return ReadResult::Invalid;}
     auto* buffer=static_cast<char*>(storage_allocate(n+1));
-    if(!buffer){f.close();return;}
+    if(!buffer){f.close();return ReadResult::Invalid;}
     const auto got=f.read(reinterpret_cast<uint8_t*>(buffer),n);
     f.close();
-    if(got==n&&layout_parse(buffer,n,current))source=LayoutSource::File;
+    const bool ok=got==n&&layout_parse_overlay(buffer,n,base,base);
     free(buffer);
+    return ok?ReadResult::Loaded:ReadResult::Invalid;
+}
+}
+const LayoutConfig& layout_config(){return current;}
+LayoutStatus layout_status(){return status;}
+void layout_load(){
+    current=layout_defaults();status={LayoutSource::Embedded,false,false};
+    StorageAccess access;
+    if(!access)return;
+    const auto defaults=read_layout(LAYOUT_DEFAULT_PATH,current);
+    if(defaults==ReadResult::Loaded)status.source=LayoutSource::DefaultFile;
+    status.invalid_default=defaults==ReadResult::Invalid;
+    const auto custom=read_layout(LAYOUT_PATH,current);
+    if(custom==ReadResult::Loaded)status.source=LayoutSource::CustomFile;
+    status.invalid_custom=custom==ReadResult::Invalid;
 }
 void layout_open_home(HomeInput input){
     if(power_screen_off()||power_shutting_down()||pin_lock_active()||stealth_active())return;

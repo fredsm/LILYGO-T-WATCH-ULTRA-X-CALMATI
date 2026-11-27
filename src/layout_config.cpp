@@ -1,4 +1,5 @@
 #include "layout_config.h"
+#include "layout_default_embedded.h"
 #include <string.h>
 
 namespace {
@@ -41,26 +42,21 @@ template<size_t N> bool list(char* s,const char* const(&names)[N],uint8_t* out,u
     }
 }
 }
-LayoutConfig layout_defaults(){
+// Registry order is only the append order for tools absent from configuration.
+// The complete standard layout is parsed from the embedded canonical file.
+static LayoutConfig inventory(){
     LayoutConfig c{};
-    c.home[0]=HomeTarget::Time;c.home[1]=HomeTarget::Meshtastic;
-    c.home[2]=HomeTarget::Tools;c.home[3]=HomeTarget::QuickControls;
-    c.home[4]=HomeTarget::Settings;c.home[5]=HomeTarget::Gps;
     for(unsigned i=0;i<LAYOUT_TOOL_COUNT;++i)c.tools[i]=i;
     c.tool_count=LAYOUT_TOOL_COUNT;
-    for(unsigned i=0;i<LAYOUT_CONTROL_COUNT;++i)c.controls[i]=i;
-    c.control_count=LAYOUT_CONTROL_COUNT;
-    for(unsigned i=0;i<LAYOUT_ACTION_COUNT;++i)c.actions[i]=i;
-    c.action_count=LAYOUT_ACTION_COUNT;
     return c;
 }
 const char* layout_tool_name(unsigned id){return id<LAYOUT_TOOL_COUNT?tools[id]:nullptr;}
-bool layout_parse(char* text,size_t length,LayoutConfig& output){
+static bool parse(char* text,size_t length,const LayoutConfig& base,LayoutConfig& output,bool complete){
     if(!text||length>LAYOUT_MAX_BYTES||memchr(text,0,length))return false;
     // Caller supplies capacity length+1.
     text[length]=0;
     if(length>=3&&uint8_t(text[0])==0xef&&uint8_t(text[1])==0xbb&&uint8_t(text[2])==0xbf)text+=3;
-    LayoutConfig c=layout_defaults();uint16_t seen=0;
+    LayoutConfig c=base;uint16_t seen=0;
     for(char* line=text;line;){
         char* next=strchr(line,'\n');if(next)*next++=0;
         char* hash=strchr(line,'#');if(hash)*hash=0;
@@ -78,10 +74,11 @@ bool layout_parse(char* text,size_t length,LayoutConfig& output){
                 if(!list(value,tools,order,count))return false;
                 bool used[LAYOUT_TOOL_COUNT]={};
                 for(unsigned i=0;i<count;++i){c.tools[i]=order[i];used[order[i]]=true;}
-                for(unsigned i=0;i<LAYOUT_TOOL_COUNT;++i)if(!used[i])c.tools[count++]=i;
+                for(unsigned i=0;i<base.tool_count;++i)if(!used[base.tools[i]])c.tools[count++]=base.tools[i];
             }else if(key==7){
                 uint8_t ids[LAYOUT_TOOL_COUNT],count;
                 if(!list(value,tools,ids,count))return false;
+                memset(c.hidden,0,sizeof(c.hidden));
                 for(unsigned i=0;i<count;++i)c.hidden[ids[i]]=true;
             }else if(key==8){
                 if(!list(value,controls,c.controls,c.control_count))return false;
@@ -91,10 +88,43 @@ bool layout_parse(char* text,size_t length,LayoutConfig& output){
         }
         line=next;
     }
+    if(complete && seen!=((1u<<10)-1))return false;
     // Never strand the user without access to Settings.
     bool quick_settings=false, reachable=false;
     for(unsigned i=0;i<c.action_count;++i)if(c.actions[i]==0)quick_settings=true;
     for(auto t:c.home)if(t==HomeTarget::Settings||(t==HomeTarget::QuickControls&&quick_settings))reachable=true;
     if(!reachable)return false;
     output=c;return true;
+}
+
+
+// Parse once, including before hardware setup. The only emergency mapping below
+// is a minimal Settings/Tools escape hatch if a malformed canonical file was
+// compiled; CI explicitly rejects that condition.
+namespace {
+struct EmbeddedLayout {
+    LayoutConfig config=inventory();
+    bool valid=false;
+    EmbeddedLayout(){
+        char text[sizeof(layout_embedded_text)];
+        memcpy(text,layout_embedded_text,sizeof(text));
+        valid=parse(text,sizeof(text)-1,config,config,true);
+        if(!valid){
+            config.home[static_cast<unsigned>(HomeInput::Back)]=HomeTarget::Settings;
+            config.home[static_cast<unsigned>(HomeInput::SwipeUp)]=HomeTarget::Tools;
+        }
+    }
+};
+const EmbeddedLayout& embedded(){
+    static const EmbeddedLayout result;
+    return result;
+}
+}
+bool layout_embedded_valid(){return embedded().valid;}
+LayoutConfig layout_defaults(){return embedded().config;}
+bool layout_parse_overlay(char* text,size_t length,const LayoutConfig& base,LayoutConfig& output){
+    return parse(text,length,base,output,false);
+}
+bool layout_parse(char* text,size_t length,LayoutConfig& output){
+    return layout_parse_overlay(text,length,layout_defaults(),output);
 }

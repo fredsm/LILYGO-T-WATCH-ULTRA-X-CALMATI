@@ -33,7 +33,7 @@ lv_obj_t* label(lv_obj_t* root,const char* value){
         if(auto* o=label(lv_obj_get_child(root,i),value))return o;
     return nullptr;
 }
-void save(const char* text){auto f=SD.open(LAYOUT_PATH,FILE_WRITE);f.print(text);f.close();}
+void save(const char* text,const char* path=LAYOUT_PATH){auto f=SD.open(path,FILE_WRITE);f.print(text);f.close();}
 constexpr const char* custom=
     "# user config\r\n"
     "home.swipe_left=tools\r\n"
@@ -48,11 +48,16 @@ constexpr const char* custom=
     "quick.actions=lock,settings\n";
 }
 int main(){
+    CHECK(layout_embedded_valid());
     auto c=layout_defaults();
     CHECK(c.home[0]==HomeTarget::Time&&c.home[5]==HomeTarget::Gps);
+    CHECK(c.tool_count==LAYOUT_TOOL_COUNT&&c.control_count==6&&c.action_count==2);
     CHECK(parse(custom,c));
     CHECK(c.home[0]==HomeTarget::Tools&&c.home[5]==HomeTarget::Settings);
     CHECK(!strcmp(layout_tool_name(c.tools[0]),"Task Mgr"));
+    CHECK(!strcmp(layout_tool_name(c.tools[1]),"Time"));
+    CHECK(!strcmp(layout_tool_name(c.tools[2]),"Wardriver")); // unlisted tools follow ordered entries
+    CHECK(!strcmp(layout_tool_name(c.tools[c.tool_count-1]),"WPA3 SAE"));
     CHECK(c.controls[0]==5&&c.control_count==3&&c.actions[0]==1);
     // Reject whole files without changing the caller's last good configuration.
     for(auto* bad:{"home.power=not_a_screen","home.power=time\nhome.power=gps",
@@ -73,9 +78,10 @@ int main(){
     input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,[](lv_indev_t*,lv_indev_data_t* data){data->point=point;data->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;});
     lv_indev_set_mode(input,LV_INDEV_MODE_EVENT);lv_indev_set_scroll_limit(input,35);
+    save("home.power=timer\n",LAYOUT_DEFAULT_PATH);
     save(custom);
     auto* home=sim::create_clock();sim::initialize_screens(home);power_init();pump();
-    CHECK(layout_source()==LayoutSource::File);
+    CHECK(layout_status().source==LayoutSource::CustomFile);
     swipe(330,250,-240,0);CHECK(tools_screen_is_active());
     auto* first=label(lv_screen_active(),"Task Mgr");CHECK(first&&lv_obj_get_index(lv_obj_get_parent(first))==0);
     auto* time=label(lv_screen_active(),"Time");CHECK(time&&lv_obj_get_index(lv_obj_get_parent(time))==1);
@@ -92,17 +98,42 @@ int main(){
     sim::show_home();pump();sim::back_button_click();CHECK(calendar_screen_is_active());
     sim::show_home();pump();sim::power_button_click();CHECK(settings_screen_is_active());
     // Edits are boot-only; changing the SD file does not move live controls.
-    save("home.power=bad");CHECK(layout_source()==LayoutSource::File);
+    save("home.power=bad");CHECK(layout_status().source==LayoutSource::CustomFile);
     sim::show_home();pump();sim::power_button_click();CHECK(settings_screen_is_active());
     sim::show_home();pin_lock_activate();layout_open_home(HomeInput::Power);
     CHECK(lv_screen_active()==home);
-    // Deep reboot restores defaults for a malformed file, including hidden tiles.
+    // Deep reboot restores the SD default for a malformed custom file.
     deepsleep();CHECK(power_is_asleep());power_button_down(10000);
     power_tick(15000);power_button_up(15100);
-    CHECK(layout_source()==LayoutSource::Invalid&&layout_config().home[5]==HomeTarget::Gps);
+    CHECK(layout_status().source==LayoutSource::DefaultFile&&layout_status().invalid_custom);
+    CHECK(layout_config().home[5]==HomeTarget::Timer);
     CHECK(!lv_obj_has_flag(lv_obj_get_parent(mouse),LV_OBJ_FLAG_HIDDEN));
     CHECK(lv_obj_get_index(lv_obj_get_parent(time))==0);
     CHECK(!lv_obj_has_flag(lv_obj_get_parent(bluetooth),LV_OBJ_FLAG_HIDDEN));
-    sim::hardware.sd_ready=false;layout_load();CHECK(layout_source()==LayoutSource::Defaults);
+    // Valid partial custom config inherits SD default fields and ordering.
+    save("home.back=diagnostics\ntools.order=Task Mgr\ntools.hide=Mouse",LAYOUT_DEFAULT_PATH);
+    save("home.power=settings\ntools.order=Calendar",LAYOUT_PATH);
+    layout_load();CHECK(layout_status().source==LayoutSource::DefaultFile&&layout_status().invalid_custom);
+    save("home.power=settings\ntools.order=Time\ntools.hide=",LAYOUT_PATH);
+    layout_load();CHECK(layout_status().source==LayoutSource::CustomFile&&!layout_status().invalid_custom);
+    CHECK(layout_config().home[4]==HomeTarget::Diagnostics&&layout_config().home[5]==HomeTarget::Settings);
+    CHECK(!strcmp(layout_tool_name(layout_config().tools[0]),"Time"));
+    CHECK(!strcmp(layout_tool_name(layout_config().tools[1]),"Task Mgr"));
+    for(unsigned i=0;i<LAYOUT_TOOL_COUNT;++i)CHECK(!layout_config().hidden[i]);
+    sim_sd_files.erase(LAYOUT_PATH);layout_load();
+    CHECK(layout_status().source==LayoutSource::DefaultFile&&!layout_status().invalid_custom);
+    CHECK(layout_config().home[4]==HomeTarget::Diagnostics);
+    save("home.power=settings",LAYOUT_PATH);
+    sim_sd_files.erase(LAYOUT_DEFAULT_PATH);layout_load();
+    CHECK(layout_status().source==LayoutSource::CustomFile&&!layout_status().invalid_default);
+    CHECK(layout_config().home[4]==HomeTarget::Settings);
+    save("home.power=bad",LAYOUT_DEFAULT_PATH);
+    layout_load();CHECK(layout_status().source==LayoutSource::CustomFile&&layout_status().invalid_default);
+    CHECK(layout_config().home[4]==HomeTarget::Settings);
+    save("home.power=bad",LAYOUT_PATH);
+    layout_load();CHECK(layout_status().source==LayoutSource::Embedded&&layout_status().invalid_default&&layout_status().invalid_custom);
+    CHECK(layout_config().home[5]==HomeTarget::Gps);
+    sim::hardware.sd_ready=false;layout_load();CHECK(layout_status().source==LayoutSource::Embedded);
+    CHECK(!layout_status().invalid_default&&!layout_status().invalid_custom);
     return 0;
 }

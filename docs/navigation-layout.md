@@ -6,10 +6,28 @@ start services at boot, or change the existing behavior of any tool.
 
 ## Configuration file
 
-Copy [sd/Settings/layout.txt](../sd/Settings/layout.txt) onto the SD card at
-`/Settings/layout.txt`. It is optional. The firmware reads it once after storage
-initialization, before constructing the menus. Edit it on a PC and restart the
-watch using the normal power-off/wake mechanism. No firmware rebuild is required.
+Copy [sd/Settings/layout_default.txt](../sd/Settings/layout_default.txt) to
+`/Settings/layout_default.txt` on the SD card. Copy it to `/Settings/layout.txt`
+if you want to customize your watch. Both are optional.
+
+Boot loads the tiers in this order (each valid file overrides the preceding
+tier):
+
+1. Embedded copy of the canonical `layout_default.txt`, generated at build time.
+2. SD `/Settings/layout_default.txt`.
+3. SD `/Settings/layout.txt` (custom layout).
+
+Missing keys inherit from the previous tier. A malformed file is rejected as a
+whole; it does not discard a valid earlier tier. The canonical repository file
+is the single source of truth for the standard layout; PlatformIO and CMake
+regenerate the same embedded header when it changes. There is no second
+hardcoded normal layout. A minimal Settings/Tools recovery mapping exists only
+in case a malformed canonical file was built; the simulator regression test
+requires the embedded file to parse successfully.
+
+The firmware reads the files once after storage initialization, before
+constructing the menus. Edit them on a PC and restart the watch. No firmware
+rebuild is required for SD edits.
 
 ```ini
 home.swipe_left = time
@@ -24,7 +42,8 @@ quick.controls = wifi, bluetooth, gps, lora, nfc, brightness
 quick.actions = settings, lock
 ```
 
-The example above reproduces the current default layout. Direction names describe
+The shorter example above reproduces the current default layout; the canonical
+file lists the full Tools order. Direction names describe
 the movement of the finger, not the side from which the swipe starts.
 
 ## Home destinations
@@ -70,10 +89,12 @@ not configurable.
 ## Menus
 
 - `tools.order`: exact, case-sensitive existing tile labels, comma separated.
-  Listed items move to the front of the two-column grid; any unlisted items
-  retain their default relative order. This lets a short list act as favorites.
+  Listed items move to the front of the two-column grid. All unlisted built-in
+  tools are appended at the end in the previous tier’s relative order, even
+  when new built-in tools are added to the firmware. Only tools explicitly
+  hidden by `tools.hide` are not shown. This lets a short list act as favorites.
 - `tools.hide`: exact existing tile labels to hide from this grid. Does not
-  disable a service or remove its implementation. An empty value hides none.
+  disable a service or remove its implementation. An empty value clears inherited hiding and hides none.
 - `quick.controls`: exact order of visible large tiles. Available IDs:
   `wifi, bluetooth, gps, lora, nfc, brightness`. Unlisted tiles are hidden.
 - `quick.actions`: exact order of visible bottom buttons: `settings, lock`.
@@ -87,14 +108,16 @@ this is not an access-control mechanism.
 ## Validation and recovery
 
 The file is limited to 4096 bytes and accepts blank lines, spaces, comments
-starting with `#`, CRLF/LF and a UTF-8 BOM. Missing keys use factory defaults.
+starting with `#`, CRLF/LF and a UTF-8 BOM. Missing keys inherit from the previous tier.
 Invalid keys, destinations, duplicate keys or list entries, unknown tile labels,
 malformed syntax, read failures and unsafe Settings reachability reject the
-entire file. If there is no SD card/file, the watch uses built-in defaults.
-No writeback to SD occurs. Diagnostics reports whether the layout came from
-the SD file, built-in defaults, or an invalid file with defaults restored.
+entire affected file. If both SD files are missing or invalid, the watch uses
+the embedded canonical defaults. No writeback to SD occurs. Diagnostics reports
+the effective source (Custom SD, Default SD, Embedded defaults) and any rejected
+files.
 
-To recover, remove or correct the file and reboot. No changes are applied on
+To restore the SD default layout, remove or rename the custom layout.txt and
+reboot. To restore the embedded default, remove or rename both SD layout files. No changes are applied on
 card insertion, removal or while the UI is running.
 
 ## Desktop simulator
@@ -104,12 +127,13 @@ Launch the packaged desktop executable with:
 
 ```
 twatch_desktop.exe --layout layout.txt
+twatch_desktop.exe --layout-default layout_default.txt --layout layout.txt
 ```
 
-The explicit local file is copied to the simulator's virtual SD, and is read
-during simulated boot (real files are not used as watch SD storage). Without
-the argument, default mappings apply. A simulated deep reboot reloads the
-virtual file and restores menu positions; light sleep retains the current
+The explicitly supplied local files are copied to the simulator's virtual SD
+and read during simulated boot (real files are not used as watch SD storage).
+Without arguments, embedded defaults apply. A simulated deep reboot reloads
+the virtual files and restores menu positions; light sleep retains the current
 layout. The simulator's screen catalog remains a developer/testing interface
 independent of the configured watch menu.
 
