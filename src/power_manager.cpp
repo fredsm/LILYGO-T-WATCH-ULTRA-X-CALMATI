@@ -1,5 +1,6 @@
 #include "power_manager.h"
 #include "power_hold.h"
+#include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <lvgl.h>
 #ifndef TWATCH_SIMULATOR
@@ -78,6 +79,7 @@ void screenoff() {
     if (off) return;
     off = true;
     sync_input();
+    pin_lock_on_screenoff();
 #ifdef TWATCH_SIMULATOR
     sim::hardware.watch.set_display_on(false);
 #else
@@ -126,6 +128,7 @@ void lightsleep() {
     screenoff();
     light_asleep = true;
 #else
+    pin_lock_on_screenoff();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     instance.lightSleep(WAKEUP_SRC_POWER_KEY);
     power_init();
@@ -140,6 +143,7 @@ void lightsleep() {
     screenunlock();
     power_note_activity(millis());
     consume_click = true;
+    pin_lock_handle_button();
 #endif
 }
 
@@ -187,8 +191,11 @@ void sim_wake(uint32_t now) {
     power_note_activity(now);
     consume_click = true;
     if (cold_boot) {
+        pin_lock_restore();
         sim::show_home();
         sim::start_boot(false);
+    } else {
+        pin_lock_handle_button();
     }
 }
 }
@@ -204,11 +211,13 @@ void power_button_down(uint32_t now) {
     if (off) {
         consume_click = true;
         screenon();
+        pin_lock_handle_button();
         power_note_activity(now);
         return;
     }
     consume_click = false;
     hold.press(now);
+    consume_click = pin_lock_handle_button();
 }
 void power_button_up(uint32_t now) {
 #ifdef TWATCH_SIMULATOR
@@ -219,11 +228,13 @@ void power_button_up(uint32_t now) {
     }
 #endif
     power_note_activity(now);
-    if (!consume_click && hold.release(now)) requested = true;
+    // A PIN-locked press is consumed for navigation, but still supports
+    // the normal five-second shutdown hold. Wake presses have no active hold.
+    if (hold.release(now)) requested = true;
 }
 bool power_allow_click() {
     if (consume_click) { consume_click = false; return false; }
-    return !power_shutting_down() && !off && !power_is_asleep();
+    return !power_shutting_down() && !off && !power_is_asleep() && !pin_lock_active();
 }
 void power_tick(uint32_t now, bool check_idle) {
 #ifdef TWATCH_SIMULATOR

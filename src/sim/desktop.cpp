@@ -11,6 +11,7 @@
 #include "pointer.hpp"
 #include "keyboard.hpp"
 #include "../power_manager.h"
+#include "../pin_lock_screen.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -226,6 +227,7 @@ int main(int argc,char** argv) {
                 if(key==SDLK_F2 || (!editing && key==SDLK_p)){power_down();continue;}
                 if(input_blocked())continue;
                 power_note_activity(lv_tick_get());
+                if(pin_lock_handle_button())continue;
                 if(key==SDLK_F3 || (!editing && (key==SDLK_b || key==SDLK_ESCAPE)))sim::back_button_click();
                 if(key==SDLK_F4)sim::show_home();
                 if(key==SDLK_F5)watch.set_display_on(!watch.display_on());
@@ -242,7 +244,9 @@ int main(int argc,char** argv) {
         if(!input_blocked() && pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
             sim::dispatch_pointer(input,pressed);held_read_at=now;
         }
+        if(!sim::startup_active())pin_lock_enforce();
         lv_timer_handler();
+        if(!sim::startup_active())pin_lock_enforce();
         sim::ButtonEvent event{};
         while(watch.pop_button(event)) std::printf("button %d %s\n",static_cast<int>(event.button),event.pressed?"down":"up");
         SDL_UpdateTexture(texture,nullptr,pixels.data(),W*sizeof(uint16_t));

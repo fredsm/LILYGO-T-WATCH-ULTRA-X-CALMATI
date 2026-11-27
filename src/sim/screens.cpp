@@ -21,6 +21,8 @@
 #include "screens.hpp"
 #include "clock.hpp"
 #include "navigation.hpp"
+#include "startup.hpp"
+#include "../pin_lock_screen.h"
 #include "../tools_screen.h"
 #include "../task_manager.h"
 #include <ctime>
@@ -87,7 +89,7 @@ namespace sim {
 void initialize_filesystem();
 const Screen* screens(std::size_t& count){count=sizeof(registry)/sizeof(registry[0]);return registry;}
 void initialize_screens(lv_obj_t* home){create_clock();home_screen=home;initialize_filesystem();for(const auto& s:registry)if(s.create)s.create();initialize_navigation();lv_screen_load(home);}
-void tick(){refresh_clock();nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();}
+void tick(){refresh_clock();nfc_screen_worker();nfc_write_screen_worker();nfc_credit_screen_worker();mifare_screen_worker();wardriver_bg_tick();wardriver_screen_update();if(!sim::startup_active())pin_lock_enforce();}
 void leave_screen(){for(const auto& s:registry)if(s.active()&&s.stop)s.stop();}
 void show_home(){leave_screen();lv_screen_load(home_screen);}
 }

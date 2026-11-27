@@ -25,6 +25,7 @@
 #include "../tools_screen.h"
 #include "../time_screen.h"
 #include "../stealth.h"
+#include "../pin_lock_screen.h"
 #include <ctime>
 #include <cstdio>
 
@@ -50,11 +51,11 @@ void refresh_status_icons(){
         ? instance.gps.satellites.value() : 0);
 }
 void home_gesture(lv_event_t* e){on_clock_gesture(e);}
-void power_button_click(){original_power_click();}
+void power_button_click(){if(!pin_lock_handle_button())original_power_click();}
 void back_button_click(){
     static bool seen=false;static uint32_t last=0;
     const auto now=lv_tick_get();if(seen && now-last<250)return;
-    seen=true;last=now;original_back_click();
+    seen=true;last=now;if(!pin_lock_handle_button())original_back_click();
 }
 lv_obj_t* create_clock(){
     if(!clock_screen){

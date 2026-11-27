@@ -150,7 +150,7 @@ int main(){
   auto saved=sim_sd_files.find("/Settings/settings.txt");
   if(saved==sim_sd_files.end() || saved->second->find("brightness="+std::to_string(expected))==std::string::npos)return 35;}
  sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Back closes shortcuts"))return 28;
- sim::show_quick_controls();pump();sample(205,425,true);sample(205,425,false);pump();
+ sim::show_quick_controls();pump();sample(115,425,true);sample(115,425,false);pump();
  if(!check(settings_screen_is_active(),"Settings shortcut opens original settings"))return 29;
  sim::back_button_click();pump();if(!check(lv_screen_active()==home,"Settings Back returns home"))return 30;
  for(bool ready:{false,true}){

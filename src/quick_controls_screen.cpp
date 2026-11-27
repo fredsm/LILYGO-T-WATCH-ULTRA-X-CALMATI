@@ -1,4 +1,5 @@
 #include "quick_controls_screen.h"
+#include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <esp_bt.h>
 #include <esp_wifi.h>
@@ -83,13 +84,22 @@ void quick_controls_screen_create(){
             value<DEVICE_MAX_BRIGHTNESS_LEVEL*4/5 ? DEVICE_MAX_BRIGHTNESS_LEVEL : DEVICE_MAX_BRIGHTNESS_LEVEL/3);
         quick_controls_screen_refresh();
     },LV_EVENT_CLICKED,nullptr);
-    auto* settings=lv_button_create(quick);lv_obj_set_size(settings,250,40);
-    lv_obj_align(settings,LV_ALIGN_TOP_MID,0,405);lv_obj_set_style_radius(settings,14,0);
+    auto* settings=lv_button_create(quick);lv_obj_set_size(settings,160,40);
+    lv_obj_set_pos(settings,35,405);lv_obj_set_style_radius(settings,14,0);
     lv_obj_set_style_bg_color(settings,lv_color_hex(0x26394c),0);
     auto* settings_label=lv_label_create(settings);
     lv_label_set_text(settings_label,LV_SYMBOL_SETTINGS "  Settings");lv_obj_center(settings_label);
     tile_icons_passthrough(settings);
     lv_obj_add_event_cb(settings,[](lv_event_t*){settings_screen_show();},LV_EVENT_CLICKED,nullptr);
+    auto* lock=lv_button_create(quick);lv_obj_set_size(lock,160,40);
+    lv_obj_set_pos(lock,215,405);lv_obj_set_style_radius(lock,14,0);
+    lv_obj_set_style_bg_color(lock,lv_color_hex(0x26394c),0);
+    auto* lock_icon=pin_lock_icon_create(lock,lv_color_white(),20);
+    lv_obj_align(lock_icon,LV_ALIGN_LEFT_MID,24,0);
+    auto* lock_label=lv_label_create(lock);
+    lv_label_set_text(lock_label,"Lock");lv_obj_align(lock_label,LV_ALIGN_CENTER,10,0);
+    tile_icons_passthrough(lock);
+    lv_obj_add_event_cb(lock,[](lv_event_t*){pin_lock_activate();},LV_EVENT_CLICKED,nullptr);
     notice=lv_label_create(quick);lv_label_set_text(notice,"Swipe up to close");
     lv_obj_set_width(notice,340);lv_obj_set_style_text_align(notice,LV_TEXT_ALIGN_CENTER,0);
     lv_obj_align(notice,LV_ALIGN_BOTTOM_MID,0,-20);

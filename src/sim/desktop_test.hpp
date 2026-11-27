@@ -1,6 +1,7 @@
 #pragma once
 #include "panel.hpp"
 #include "../power_manager.h"
+#include "../pin_lock_screen.h"
 #include "clock.hpp"
 #include "navigation.hpp"
 #include "../gps_screen.h"
@@ -45,7 +46,7 @@ public:
         swipe(330,250,-240,0);check(time_screen_is_active,"left opens Time");swipe(25,12,300,0);check(home,"Time returns home");
         swipe(80,250,240,0);check(meshtastic_screen_is_active,"right opens mesh");swipe(350,12,-300,0);check(home,"mesh returns home");
         swipe(205,100,0,240);check(quick_controls_active,"down opens quick controls");
-        sample(watch_id,205,425,SDL_MOUSEBUTTONDOWN);sample(watch_id,205,425,SDL_MOUSEBUTTONUP);wait();
+        sample(watch_id,115,425,SDL_MOUSEBUTTONDOWN);sample(watch_id,115,425,SDL_MOUSEBUTTONUP);wait();
         check(settings_screen_is_active,"quick Settings shortcut opens settings");key(SDLK_F4,watch_id);
         swipe(205,100,0,240);swipe(5,400,0,-300);check(home,"quick controls returns home");
         swipe(205,330,0,-240);check(tools_screen_is_active,"up opens tools");
@@ -93,6 +94,19 @@ public:
         key(SDLK_F3,watch_id);check(power_screen_off,"Back cannot wake screen");
         key(SDLK_F2,watch_id);check([]{return !power_screen_off()&&settings_screen_is_active();},"Power wakes screen without changing page");
         key(SDLK_F4,watch_id);
+        // Use the real quick-control shortcut and the actual on-screen keypad.
+        swipe(205,100,0,240);
+        sample(watch_id,295,425,SDL_MOUSEBUTTONDOWN);sample(watch_id,295,425,SDL_MOUSEBUTTONUP);wait();
+        check([home]{return pin_lock_active()&&home();},"Lock shortcut returns to locked clock");
+        sample(watch_id,85,200,SDL_MOUSEBUTTONDOWN);sample(watch_id,85,200,SDL_MOUSEBUTTONUP);wait();
+        check(pin_lock_unlock_screen_active,"touch opens PIN screen");
+        key(SDLK_F3,watch_id);check(pin_lock_unlock_screen_active,"Back cannot bypass PIN");
+        key(SDLK_F1,watch_id);check(pin_lock_unlock_screen_active,"catalog shortcut cannot bypass PIN");
+        auto pin_key=[&](int x,int y){sample(watch_id,x,y,SDL_MOUSEBUTTONDOWN);sample(watch_id,x,y,SDL_MOUSEBUTTONUP);wait();};
+        pin_key(325,353);pin_key(205,353);pin_key(85,353);pin_key(325,276);
+        check([]{return pin_lock_active()&&pin_lock_unlock_screen_active();},"wrong PIN stays locked");
+        pin_key(85,200);pin_key(205,200);pin_key(325,200);pin_key(85,276);
+        check([home]{return !pin_lock_active()&&home();},"1234 unlocks to home");
         // Real SDL mouse hold with deterministic 20 ms frames.
         sample(watch_id,90,530,SDL_MOUSEBUTTONDOWN);wait(240);
         check([]{return !power_screen_off();},"less than five seconds stays on");

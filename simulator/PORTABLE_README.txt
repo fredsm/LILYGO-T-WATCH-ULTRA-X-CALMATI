@@ -51,7 +51,9 @@ Quick Controls toggles Wi-Fi, Bluetooth, GPS, LoRa and NFC. Brightness cycles
 These navigation and control handlers are shared with the physical firmware.
 Bluetooth/LoRa stay on while another tool owns them; the UI explains why.
 
-Quick Controls also includes a Settings shortcut beneath the radio tiles.
+Quick Controls includes Settings and Lock shortcuts beneath the radio tiles.
+Lock returns to the clock with a green padlock. Tap or press Power/Back to
+open the numeric keypad; enter 1234 to unlock.
 The existing Back-from-home Settings shortcut remains available.
 
 Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens

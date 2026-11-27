@@ -90,3 +90,17 @@ opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
 - Verify physical five-second wake qualification on battery and USB: the PMIC
   wakes the MCU on the press edge, but the screen stays dark until the hold
   qualifies. A short tap returns to deep sleep without normal boot.
+
+## PIN lock
+- Swipe down on the clock and tap **Lock** next to Settings. The watch stays
+  on the clock with a green padlock at the top; touch or either physical
+  button opens the numeric unlock screen without navigating elsewhere.
+- The PIN is currently hardcoded to `1234`. Four digits submit automatically;
+  wrong PINs clear the masked entry and display an error. Clear and Backspace
+  are available. The opening touch must not enter a digit.
+- After correct entry the watch returns to its clock with the gray indicator.
+  PIN lock is separate from duress and from the temporary sleep input block.
+- The screen-off timer still runs while locked; it discards partial PIN digits.
+  Power wakes the keypad, and a five-second shutdown remains available.
+  Internal NVS retains the lock across a reboot (desktop NVS is session-only).
+- `pin_lock_authentication` and the SDL end-to-end test exercise these flows.

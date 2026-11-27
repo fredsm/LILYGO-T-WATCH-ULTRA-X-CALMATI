@@ -74,6 +74,7 @@
 #include "calendar_screen.h"
 #include "time_screen.h"
 #include "quick_controls_screen.h"
+#include "pin_lock_screen.h"
 #include "airtag.h"
 #include "flipper.h"
 #include "skimmer.h"
@@ -682,7 +683,7 @@ static void on_clock_gesture(lv_event_t *e)
     // swipe here so no target screen even briefly renders (before, the loop's
     // fallback bounced back to the clock a frame later — you could glimpse the
     // Tools icons). Long-press 4 s still disarms.
-    if (stealth_active()) return;
+    if (stealth_active() || pin_lock_active()) return;
 
     lv_indev_t *indev = lv_event_get_indev(e);
     lv_dir_t dir = lv_indev_get_gesture_dir(indev);
@@ -1722,6 +1723,7 @@ void setup()
     lv_obj_set_style_text_color(flock_count_label, lv_color_make(0xFF, 0x88, 0x00), LV_PART_MAIN);
     lv_label_set_text(flock_count_label, "0");
 
+    pin_lock_init(clock_screen);
     gps_screen_create();
     lora_screen_create();
     nfc_screen_create();
@@ -1898,11 +1900,12 @@ void loop()
     onboarding_bg_tick(); // send the one-time install ping once WiFi is available
     // Cheap on every iteration (an indev_state read + a millis() compare);
     // only crosses into the heavy capture+SD-write path on the 3 s edge.
-    screenshot_poll();
-    stealth_poll();   // 4 s long-press disarms the duress disguise
+    if (!pin_lock_active()) screenshot_poll();
+    if (!pin_lock_active()) stealth_poll();   // 4 s long-press disarms the duress disguise
     // While the disguise is armed, pin the UI to the bare clock no matter what
     // navigation tried to fire — the tooling stays out of sight.
-    if (stealth_active() && lv_screen_active() != clock_screen) clock_screen_show();
+    if (stealth_active() && !pin_lock_active() && lv_screen_active() != clock_screen) clock_screen_show();
+    pin_lock_enforce();
 
     // Back button (GPIO0) — consumed here, outside ISR context.
     // 250 ms debounce: mechanical bounce on GPIO0 can fire several FALLING
@@ -1918,6 +1921,7 @@ void loop()
             power_note_activity(now);
             dim_reset_activity();
             if (clock_vibrate) instance.vibrator();
+            if (pin_lock_handle_button()) return;
             if (settings_screen_is_active()) {
                 clock_screen_show();
             } else if (time_screen_is_active()) {
@@ -2097,7 +2101,9 @@ void loop()
         nfc_credit_screen_worker();
         mifare_screen_worker();
     }
+    pin_lock_enforce();
     lv_task_handler();
+    pin_lock_enforce();
 
     // Any touchscreen press resets the dim timer; rising edge also triggers vibration
     {
