@@ -1,4 +1,6 @@
 #include "timezone.h"
+#include "event_manager.h"
+#include "status_cache.h"
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <WiFi.h>
@@ -65,13 +67,7 @@ void timezone_load_on_boot()
 // task; the results are applied back on the main loop (timezone_bg_tick) so the
 // RTC / clock / SD are only touched from one context.
 
-static volatile bool s_sync_pending = false;   // WiFi GOT_IP -> request a sync
-static volatile bool s_result_ready = false;   // worker -> main: results ready
-static volatile bool s_got_time     = false;
-static volatile bool s_got_offset   = false;
-static volatile int  s_offset_h     = 0;
-static struct tm     s_utc_tm       = {};
-static TaskHandle_t  s_task         = nullptr;
+static TaskHandle_t s_task = nullptr;
 
 // Query ip-api.com for the current UTC offset (seconds, DST-aware). Free tier
 // is plain HTTP. Returns true and fills *out_h on success.
@@ -101,8 +97,7 @@ static bool http_get_offset(int *out_h)
 static void tz_worker(void *)
 {
     for (;;) {
-        if (!s_sync_pending) { vTaskDelay(pdMS_TO_TICKS(250)); continue; }
-        s_sync_pending = false;
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (WiFi.status() != WL_CONNECTED) continue;
 
         bool      got_time = false, got_off = false;
@@ -116,48 +111,40 @@ static void tz_worker(void *)
         // IP geolocation -> current UTC offset.
         if (http_get_offset(&off_h)) got_off = true;
 
-        if (got_time) s_utc_tm = tmutc;
-        s_got_time     = got_time;
-        s_offset_h     = off_h;
-        s_got_offset   = got_off;
-        s_result_ready = true;
+        UiEvent result;
+        result.kind=UiEventKind::Timezone;
+        result.utc=tmutc;result.value=off_h;
+        result.first=got_time;result.second=got_off;
+        event_publish(result);
     }
 }
 
 static void on_wifi_got_ip(arduino_event_id_t, arduino_event_info_t)
 {
-    s_sync_pending = true;   // worker picks it up
+    if(s_task)xTaskNotifyGive(s_task);
 }
 
 void timezone_init()
 {
-    WiFi.onEvent(on_wifi_got_ip, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-    if (!s_task)
-        xTaskCreate(tz_worker, "tz_sync", 8192, nullptr, 3, &s_task);
+    if(!s_task && xTaskCreatePinnedToCore(tz_worker,"tz_sync",8192,nullptr,2,&s_task,0)==pdPASS)
+        WiFi.onEvent(on_wifi_got_ip, ARDUINO_EVENT_WIFI_STA_GOT_IP);
 }
 
 void timezone_bg_tick()
 {
-    if (!s_result_ready) return;
-    s_result_ready = false;
-
-    // Manual Time wins — drop the results untouched.
-    if (clock_screen_manual_time_active()) {
-        s_got_time = s_got_offset = false;
-        return;
-    }
-
-    if (s_got_time) {
-        instance.rtc.setDateTime(s_utc_tm.tm_year + 1900, s_utc_tm.tm_mon + 1,
-                                 s_utc_tm.tm_mday, s_utc_tm.tm_hour,
-                                 s_utc_tm.tm_min, s_utc_tm.tm_sec);
+    UiEvent result;
+    if(!ui_task_is_owner() || !event_take(UiEventKind::Timezone,result))return;
+    // Manual Time wins; apply RTC, SD and UI results in the existing owner.
+    if(clock_screen_manual_time_active())return;
+    if(result.first){
+        instance.rtc.setDateTime(result.utc.tm_year+1900,result.utc.tm_mon+1,
+            result.utc.tm_mday,result.utc.tm_hour,result.utc.tm_min,result.utc.tm_sec);
         instance.rtc.hwClockRead();
-        s_got_time = false;
+        status_cache_sample_clock();
     }
-    if (s_got_offset) {
-        clock_screen_set_utc_offset(s_offset_h);
-        timezone_note_detected(s_offset_h);
-        s_got_offset = false;
+    if(result.second){
+        clock_screen_set_utc_offset(result.value);
+        timezone_note_detected(result.value);
     }
     clock_screen_refresh();
 }

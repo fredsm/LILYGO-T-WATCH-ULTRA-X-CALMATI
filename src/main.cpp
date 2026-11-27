@@ -75,6 +75,9 @@
 #include "time_screen.h"
 #include "quick_controls_screen.h"
 #include "diagnostics_manager.h"
+#include "event_manager.h"
+#include "gps_service.h"
+#include "status_cache.h"
 #include "diagnostics_screen.h"
 #include "task_manager.h"
 #include "pin_lock_screen.h"
@@ -521,7 +524,7 @@ static void update_nfc_indicator()
 
 static void update_battery()
 {
-    int pct = instance.pmu.getBatteryPercent();
+    int pct = status_cache_battery_percent();
     if (pct < 0)   pct = 0;
     if (pct > 100) pct = 100;
 
@@ -532,7 +535,7 @@ static void update_battery()
     lv_obj_set_style_bg_color(bat_nub, color, LV_PART_MAIN);
 
     char buf[16];
-    if (instance.pmu.isCharging())
+    if (status_cache_charging())
         snprintf(buf, sizeof(buf), "%d%% " LV_SYMBOL_CHARGE, pct);
     else
         snprintf(buf, sizeof(buf), "%d%%", pct);
@@ -715,7 +718,7 @@ void clock_screen_set_analog_face(bool analog)
         if (defcon_countdown) lv_obj_add_flag(defcon_countdown, LV_OBJ_FLAG_HIDDEN);
         // Immediately drive hands to the current time
         struct tm t;
-        instance.rtc.getDateTime(&t);
+        status_cache_clock(&t);
         if (clock_utc_offset != 0) { t.tm_hour += clock_utc_offset; mktime(&t); }
         update_analog_clock(&t);
     } else {
@@ -1043,7 +1046,7 @@ void clock_screen_set_manual_override(bool on)
 // (the RTC holds UTC; clock_utc_offset shifts it to local).
 void clock_screen_get_local_time(struct tm *out)
 {
-    instance.rtc.getDateTime(out);
+    status_cache_clock(out);
     if (clock_utc_offset != 0) {
         out->tm_hour += clock_utc_offset;
         mktime(out);
@@ -1057,6 +1060,7 @@ void clock_screen_apply_manual_time(int year, int mon, int day, int hour, int mi
 {
     instance.rtc.setDateTime(year, mon, day, hour, min, 0);
     instance.rtc.hwClockRead();
+    status_cache_sample_clock();
     clock_utc_offset     = 0;
     manual_time_override = true;
     update_clock();
@@ -1199,7 +1203,7 @@ static void resize_clock_text()
 static void update_clock()
 {
     struct tm t;
-    instance.rtc.getDateTime(&t); // RTC stores UTC
+    status_cache_clock(&t); // RTC stores UTC
 
     // Apply longitude-derived offset to get local time.
     // mktime() normalises any hour/day/month overflow after the addition.
@@ -1299,6 +1303,8 @@ static void update_clock()
 
 void setup()
 {
+    event_manager_init();
+    ui_task_claim();
     power_boot_gate();
     Serial.begin(115200);
     delay(50);   // let the USB-CDC link settle so the banner isn't truncated
@@ -1887,6 +1893,7 @@ void setup()
     // so NTP + geolocation come up without ever touching the tiny keyboard.
     wifi_creds_autoconnect();
     power_note_activity(millis());
+    gps_service_init();
     diagnostics_init();
 }
 
@@ -1895,6 +1902,7 @@ void loop()
     DIAG_RUN(HardwareEvents, instance.loop()); // required for power button and PMU event dispatch
     DIAG_RUN(Power, power_tick(millis(), false)); // process the hold first, inactivity after touch/Back
     if (power_shutting_down()) { delay(5); return; }
+    diagnostics_ui_handler(); // UI heartbeat before legacy background calls
     DIAG_RUN(Motion, motion_wake_poll());   // accel-driven wake; no-op when toggle is off
     DIAG_RUN(ScanRadio, scan_radio_tick());    // unified Scanner: switch WiFi/BLE slices; no-op when idle
     DIAG_RUN(CaptivePortal, evil_portal_tick());   // Evil Twin captive portal: serve DNS+HTTP; no-op when idle
@@ -2040,7 +2048,7 @@ void loop()
 
     // Feed NMEA bytes to TinyGPSPlus while the GPS radio is on
     if (gps_screen_is_powered()) {
-        DIAG_RUN(GPS, instance.gps.loop(false));
+        DIAG_RUN(GPS, gps_service_tick());
     }
 
     // When a screen transition was just requested, skip all the heavy
@@ -2152,10 +2160,12 @@ void loop()
     // Missing one 1Hz tick during a screen transition is invisible.
     if (millis() - last_update_ms >= 1000 && !lvgl_priority) {
         last_update_ms = millis();
-        DIAG_RUN(RTC, update_clock());
+        DIAG_RUN(RTC, status_cache_sample_clock());
+        update_clock();
         DIAG_RUN(Alarm, alarm_tick());              // fires the alarm at the set time
         layout_battery_indicators(); // pack alarm/stopwatch/timer icons R→L
-        DIAG_RUN(Battery, update_battery());
+        DIAG_RUN(Battery, status_cache_sample_battery());
+        update_battery();
         DIAG_RUN(Indicators, update_lora_indicator());
         DIAG_RUN(Indicators, update_bt_indicator());
         DIAG_RUN(Indicators, update_wifi_indicator());

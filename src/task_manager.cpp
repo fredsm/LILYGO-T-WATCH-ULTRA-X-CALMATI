@@ -1,5 +1,6 @@
 #include "task_manager.h"
 #include "diagnostics_screen.h"
+#include "status_cache.h"
 #include "tools_screen.h"
 #include <LilyGoLib.h>
 #include <WiFi.h>
@@ -157,9 +158,9 @@ static void add_row(int idx)
 
 static void refresh()
 {
-    int pct = instance.pmu.getBatteryPercent();
+    int pct = status_cache_battery_percent();
     lv_label_set_text_fmt(s_batt, LV_SYMBOL_BATTERY_FULL "  %d%%%s",
-                          pct, instance.pmu.isCharging() ? "  " LV_SYMBOL_CHARGE : "");
+                          pct, status_cache_charging() ? "  " LV_SYMBOL_CHARGE : "");
 
     lv_obj_clean(s_list);
     int active = 0;

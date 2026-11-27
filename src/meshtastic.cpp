@@ -1,3 +1,4 @@
+#include "status_cache.h"
 #include "meshtastic.h"
 #include "tracker_rep.h"
 #include "usb_sd.h"
@@ -354,7 +355,7 @@ static void send_telemetry_broadcast()
 
     // Inner DeviceMetrics. Battery percent from the AXP2101 PMU;
     // uptime is the watch's millis() since boot in seconds.
-    int batt_pct = instance.pmu.getBatteryPercent();
+    int batt_pct = status_cache_battery_percent();
     if (batt_pct < 0)   batt_pct = 0;
     if (batt_pct > 100) batt_pct = 100;
     uint32_t uptime_s = millis() / 1000;
@@ -1514,7 +1515,7 @@ static void process_packet(const uint8_t *buf, size_t len,
     }
 
     struct tm t;
-    instance.rtc.getDateTime(&t);
+    status_cache_clock(&t);
     int utc_off = clock_screen_get_utc_offset();
     if (utc_off != 0) { t.tm_hour += utc_off; mktime(&t); }
 

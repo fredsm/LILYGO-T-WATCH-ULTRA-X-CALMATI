@@ -3,6 +3,8 @@
 #include "cpu_governor.h"
 #include "cpu_load_sampler.h"
 #include "diagnostics_manager.h"
+#include "gps_service.h"
+#include "gps_screen.h"
 #include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <lvgl.h>
@@ -376,6 +378,7 @@ void lightsleep() {
     // policy is implemented. The vendor routine shuts down several rails.
     if (power_shutting_down()) return;
     diagnostics_pause();
+    gps_service_session(false);
     pause_cpu_governor();
     screenlock();
 #ifdef TWATCH_SIMULATOR
@@ -399,6 +402,7 @@ void lightsleep() {
     consume_click = true;
     pin_lock_handle_button();
     resume_cpu_governor();
+    gps_service_session(gps_screen_is_powered());
     diagnostics_resume();
 #endif
 }
@@ -408,6 +412,7 @@ void poweroff() { deepsleep(); }
 void deepsleep() {
     if (asleep) return;
     diagnostics_pause();
+    gps_service_session(false);
     pause_cpu_governor();
     screenlock();
     screenoff();

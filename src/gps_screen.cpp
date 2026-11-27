@@ -1,6 +1,8 @@
 #include "gps_screen.h"
 #include <LilyGoLib.h>
 #include "timezone.h"
+#include "gps_service.h"
+#include "status_cache.h"
 
 // Defined in main.cpp
 void clock_screen_set_gps_active(bool active);
@@ -118,6 +120,7 @@ static void on_toggle(lv_event_t *e)
         instance.powerControl(POWER_GPS, false); // disableBLDO1 + reset pins
         Serial1.end();
     }
+    gps_service_session(gps_powered);
     clock_screen_set_gps_active(gps_powered);
     if (!gps_powered)
         rtc_synced = false; // allow re-sync on next power-on
@@ -133,6 +136,7 @@ void gps_screen_power_on()
     gps_powered = true;
     Serial1.end();
     instance.powerControl(POWER_GPS, true);
+    gps_service_session(true);
     clock_screen_set_gps_active(true);
     if (toggle_sw) {
         lv_obj_add_state(toggle_sw, LV_STATE_CHECKED);
@@ -146,6 +150,7 @@ void gps_screen_power_off()
     gps_powered = false;
     instance.powerControl(POWER_GPS, false);
     Serial1.end();
+    gps_service_session(false);
     clock_screen_set_gps_active(false);
     rtc_synced = false;
     if (toggle_sw) {
@@ -232,6 +237,7 @@ static void on_gps_update(lv_timer_t *timer)
             instance.gps.time.second()
         );
         instance.rtc.hwClockRead();
+        status_cache_sample_clock();
         // Base offset comes from longitude. North-American time zones
         // (UTC-5 Eastern through UTC-8 Pacific) get a +1 added when the
         // current date falls inside the US DST window. The check

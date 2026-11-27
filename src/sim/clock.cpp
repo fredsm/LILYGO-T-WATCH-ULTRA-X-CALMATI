@@ -28,6 +28,7 @@
 #include "../pin_lock_screen.h"
 #include "../diagnostics_screen.h"
 #include "../task_manager.h"
+#include "../status_cache.h"
 #include <ctime>
 #include <cstdio>
 
@@ -40,7 +41,7 @@ void clock_screen_show();
 
 #include "original_clock.inc"
 
-void clock_screen_get_local_time(struct tm* out){instance.rtc.getDateTime(out);}
+void clock_screen_get_local_time(struct tm* out){status_cache_clock(out);}
 
 namespace sim {
 // Use the firmware renderers against host-only device state.
@@ -76,6 +77,7 @@ void refresh_clock(){
     if(!clock_screen)return;
     if(lv_tick_get()-last_update_ms>=1000){
         last_update_ms=lv_tick_get();
+        status_cache_sample_clock();status_cache_sample_battery();
         update_clock();update_battery();layout_battery_indicators();
         refresh_status_icons();
     }

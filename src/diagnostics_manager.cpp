@@ -1,5 +1,6 @@
 #include "diagnostics_manager.h"
 #include "cpu_load_sampler.h"
+#include "event_manager.h"
 #include <lvgl.h>
 #include <stdio.h>
 #include <string.h>
@@ -268,6 +269,7 @@ void diagnostics_exit(DiagToken token) {
     stage_since=token.since;
 }
 void diagnostics_ui_handler() {
+    if(!ui_task_is_owner())return;
     uint32_t start=now_ms();
     { DiagScope scope(DiagStage::LVGL); lv_timer_handler(); }
     uint32_t now=now_ms();
