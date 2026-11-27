@@ -291,8 +291,9 @@ bool mifare_dict_start() {
     return true;
 }
 
+void mifare_dict_request_stop(){s_dict_running=false;}
 void mifare_dict_stop() {
-    s_dict_running = false;
+    mifare_dict_request_stop();
     while (!s_dict_done.load()) vTaskDelay(1);
 }
 

@@ -1,4 +1,5 @@
 #include "diagnostics_screen.h"
+#include "power_manager.h"
 #include "diagnostics_manager.h"
 #include "event_manager.h"
 #include "gps_service.h"
@@ -14,7 +15,7 @@
 
 namespace {
 lv_obj_t *screen=nullptr, *status=nullptr, *cpu=nullptr, *ui=nullptr, *memory=nullptr,
-         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr, *qspi=nullptr, *radio=nullptr, *audio=nullptr, *gps=nullptr;
+         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr, *qspi=nullptr, *radio=nullptr, *audio=nullptr, *gps=nullptr, *power=nullptr;
 lv_timer_t* timer=nullptr;
 lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
     auto* obj=lv_label_create(parent);
@@ -24,6 +25,17 @@ lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
     lv_obj_set_style_text_color(obj,heading?lv_color_hex(0x62D5F4):lv_color_hex(0xE0E0E0),0);
     lv_label_set_text(obj,text);
     return obj;
+}
+void power_blocks(char* out,size_t size,uint32_t mask){
+    static const char* names[]={"Radio","Audio","SD","Display","SPI","I2C","Peripheral","Alarm/timer","USB","Motion","PMU IRQ","Driver"};
+    size_t used=0;out[0]=0;
+    for(unsigned i=0;i<sizeof(names)/sizeof(names[0]);++i){
+        if(!(mask&(1u<<i)))continue;
+        int n=snprintf(out+used,size-used,"%s%s",used?", ":"",names[i]);
+        if(n<0 || size_t(n)>=size-used)break;
+        used+=size_t(n);
+    }
+    if(!used)snprintf(out,size,"None");
 }
 void refresh() {
     const auto d=diagnostics_snapshot();
@@ -104,6 +116,13 @@ void refresh() {
         (unsigned long)au.read_errors,(unsigned long)au.write_errors,
         (unsigned long)au.max_read_us,(unsigned long)au.max_write_us,
         (unsigned long)au.buffer_peak,(unsigned long)au.dropped_bytes,(unsigned long)au.max_sd_us);
+    const auto p=power_lifecycle_stats();
+    char idle[128],drain[128];
+    power_blocks(idle,sizeof(idle),p.blockers|p.last_idle_blockers);
+    power_blocks(drain,sizeof(drain),p.last_shutdown_blockers);
+    lv_label_set_text_fmt(power,"%s\nIdle blockers: %s\nLight sleeps: %lu | Wakes: %lu | Aborts: %lu\nLast light sleep: %lu ms\nLast shutdown drain: %lu ms\nShutdown waited for: %s",
+        power_stage_name(p.stage),idle,(unsigned long)p.light_entries,(unsigned long)p.light_wakes,
+        (unsigned long)p.light_aborts,(unsigned long)p.last_light_ms,(unsigned long)p.last_shutdown_ms,drain);
     if (!d.ready || !d.memory_sample_ms) lv_label_set_text(memory,"Memory sample pending");
     else lv_label_set_text_fmt(memory,"Internal free: %lu KB\nMinimum free: %lu KB\nLargest block: %lu KB\nFree PSRAM: %lu KB\nUI stack headroom: %lu B\nMemory sample age: %lu s",
         (unsigned long)(d.heap/1024),(unsigned long)(d.min_heap/1024),
@@ -160,6 +179,7 @@ void create() {
     label(body,"RADIO COORDINATION",true);radio=label(body,"");
     label(body,"GPS SERVICE",true);gps=label(body,"");
     label(body,"AUDIO SERVICE",true);audio=label(body,"");
+    label(body,"POWER LIFECYCLE",true);power=label(body,"");
     label(body,"MEMORY",true);memory=label(body,"");
     label(body,"SLOWEST OPERATIONS",true);timings=label(body,"");
     label(body,"RECENT UI STALLS",true);history=label(body,"");

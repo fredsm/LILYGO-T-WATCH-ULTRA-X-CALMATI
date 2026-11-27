@@ -133,10 +133,17 @@ replace_once(ultra,
              '    // Clear PMU Interrupt Status Register\n    pmu.clearIrqStatus();',
              '    // Clear PMU Interrupt Status Register\n    pmu.clearIrqStatus();\n'
              '    if (twatch_i2c_failures() != before) xEventGroupSetBits(_event, HW_IRQ_POWER);')
-replace_once(ultra,
+# The later Phase 9 patch extends this same anchor; skip if already applied.
+if '((bits & HW_IRQ_POWER) || digitalRead(PMU_INT) == LOW)' not in open(ultra, encoding='utf-8').read():
+    replace_once(ultra,
              '    if (bits & HW_IRQ_POWER) {\n        clearEventBits(HW_IRQ_POWER);\n        checkPowerStatus();\n    }',
              '    if ((bits & HW_IRQ_POWER) && twatch_i2c_ready(0x34)) {\n'
              '        clearEventBits(HW_IRQ_POWER);\n        checkPowerStatus();\n    }')
+# Retentive sleep: an IRQ that went low while the CPU slept may not produce
+# another falling edge after wake. Service a latched low PMU level too.
+replace_once(ultra,
+             '    if ((bits & HW_IRQ_POWER) && twatch_i2c_ready(0x34)) {',
+             '    if (((bits & HW_IRQ_POWER) || digitalRead(PMU_INT) == LOW) && twatch_i2c_ready(0x34)) {')
 replace_once(ultra,
              '    if (bits & HW_IRQ_SENSOR) {\n        clearEventBits(HW_IRQ_SENSOR);\n        sensor.update();\n        sendEvent(SENSOR_EVENT);\n    }',
              '    if ((bits & HW_IRQ_SENSOR) && twatch_i2c_ready(0x28)) {\n'

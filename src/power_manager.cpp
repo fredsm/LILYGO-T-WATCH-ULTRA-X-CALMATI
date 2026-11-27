@@ -1,5 +1,17 @@
 #include "power_manager.h"
 #include "power_hold.h"
+#include "power_lifecycle.h"
+#include "radio_manager.h"
+#include "audio_manager.h"
+#include "storage_manager.h"
+#include "spi_bus_manager.h"
+#include "alarm.h"
+#include "timer_screen.h"
+#include "stopwatch_screen.h"
+#include "settings_screen.h"
+#include "usb_sd.h"
+#include <WiFi.h>
+#include "lora_screen.h"
 #include "cpu_governor.h"
 #include "cpu_load_sampler.h"
 #include "diagnostics_manager.h"
@@ -20,11 +32,13 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <Wire.h>
-#include <WiFi.h>
 #include <esp_bt.h>
 #include <esp_bt_main.h>
-#include "usb_sd.h"
-#include "storage_manager.h"
+#include <esp_wifi.h>
+#include "lora_analyze_screen.h"
+#include "pager.h"
+#include "aprs.h"
+#include "onboarding.h"
 #include "mic_rec.h"
 #include "wake_word.h"
 #include "wardriver_screen.h"
@@ -32,15 +46,11 @@
 #include "mifare.h"
 #include "i2c_bus_manager.h"
 #include "qspi_display.h"
-#include "radio_manager.h"
-#include "audio_manager.h"
 #include "adsb.h"
-#include "alarm.h"
-#include "settings_screen.h"
+bool clock_screen_motion_wake_enabled();
 #else
 #include "sim/screens.hpp"
 #include "sim/startup.hpp"
-#include "settings_screen.h"
 #endif
 
 namespace {
@@ -211,6 +221,11 @@ void resume_cpu_governor() {
 uint32_t last_activity = 0, screenoff_timeout = 60000;
 bool consume_click = false;
 bool locked = false, off = false, asleep = false, requested = false;
+bool light_asleep=false;
+PowerLifecycle lifecycle;
+uint32_t last_idle_attempt=0;
+bool final_storage_started=false, final_storage_retried=false;
+void sync_input();
 #ifndef TWATCH_SIMULATOR
 bool panel_transition_pending=false;
 uint32_t panel_last_attempt=0;
@@ -222,10 +237,15 @@ void panel_transition(bool force=false) {
     if(off){
         instance.setBrightness(0);
         if(!qspi_display_idle() || !qspi_display_prepare_sleep())return;
+        if(!i2c_bus_ready(0x20))return;
+        const auto before=i2c_bus_failures();
         instance.sleepDisplay(); // SLPIN is already acknowledged; then gate panel rail
+        if(i2c_bus_failures()!=before)return;
     }else{
+        if(!i2c_bus_ready(0x20))return;
+        const auto before=i2c_bus_failures();
         instance.wakeupDisplay();
-        if(!qspi_display_panel_awake())return;
+        if(i2c_bus_failures()!=before || !qspi_display_panel_awake())return;
         instance.setBrightness(settings_get_brightness());
         if(!qspi_display_idle() || instance.getBrightness()!=settings_get_brightness())return;
         qspi_display_pause(false);
@@ -234,22 +254,25 @@ void panel_transition(bool force=false) {
         lv_obj_invalidate(lv_screen_active());
     }
     panel_transition_pending=false;
+    sync_input();
 }
 #endif
 
 #ifdef TWATCH_SIMULATOR
-bool light_asleep = false;
 PowerHold wake_hold;
+uint32_t last_shutdown_ms=0,last_shutdown_blockers=0;
 #else
 // Only our intentional deep-sleep path sets this cookie. Cold boots remain normal.
 RTC_DATA_ATTR uint32_t deep_wake_cookie = 0;
+RTC_DATA_ATTR uint32_t last_shutdown_ms=0,last_shutdown_blockers=0;
 constexpr uint32_t deep_wake_magic = 0x50575235;
 #endif
 void sync_input() {
 #ifndef TWATCH_SIMULATOR
     for (auto* input = lv_indev_get_next(nullptr); input; input = lv_indev_get_next(input)) {
-        if (!locked && !off) lv_indev_wait_release(input);
-        lv_indev_enable(input, !locked && !off);
+        const bool enabled=!locked && !off && !panel_transition_pending;
+        if(enabled)lv_indev_wait_release(input);
+        lv_indev_enable(input,enabled);
     }
 #endif
 }
@@ -336,12 +359,10 @@ uint32_t power_get_screenoff_timeout() { return screenoff_timeout; }
 
 bool power_screen_locked() { return locked; }
 bool power_screen_off() { return off; }
-bool power_is_asleep() {
-#ifdef TWATCH_SIMULATOR
-    return asleep || light_asleep;
-#else
-    return asleep;
-#endif
+bool power_is_asleep(){return asleep || light_asleep;}
+PowerLifecycleStats power_lifecycle_stats(){
+    auto s=lifecycle.snapshot(millis());
+    s.last_shutdown_ms=last_shutdown_ms;s.last_shutdown_blockers=last_shutdown_blockers;return s;
 }
 bool power_shutting_down() { return hold.armed() || requested || asleep; }
 
@@ -360,6 +381,7 @@ void screenunlock() {
 void screenoff() {
     if (off) return;
     off = true;
+    lifecycle.screen(true,millis());
     sync_input();
     pin_lock_on_screenoff();
 #ifdef TWATCH_SIMULATOR
@@ -378,11 +400,14 @@ void screenoff() {
 void screenon() {
     if (!off || power_shutting_down()) return;
     off = false;
+    lifecycle.screen(false,millis());
+#ifndef TWATCH_SIMULATOR
+    panel_transition_pending=true;
+#endif
     sync_input();
 #ifdef TWATCH_SIMULATOR
     sim::hardware.watch.set_display_on(true);
 #else
-    panel_transition_pending=true;
     qspi_display_drain();
     panel_transition(true);
 #endif
@@ -410,144 +435,205 @@ void power_init() {
 #endif
 }
 
-void lightsleep() {
-    // Do not invoke from the idle timer until peripheral ownership/resume
-    // policy is implemented. The vendor routine shuts down several rails.
-    if (power_shutting_down()) return;
-#ifndef TWATCH_SIMULATOR
-    if(radio_job_busy() || !audio_idle())return;
-    audio_suspend(true);
-    if(!audio_idle()){audio_suspend(false);return;}
-#endif
-    diagnostics_pause();
-    gps_service_session(false);
-    pause_cpu_governor();
-    screenlock();
+namespace {
+uint32_t idle_blockers(){
+    uint32_t blocked=0;
+    if(radio_job_busy())blocked|=BlockRadio;
+    if(!audio_idle())blocked|=BlockAudio;
+    if(!storage_idle() || storage_needs_remount())blocked|=BlockStorage;
+    if(usb_sd_is_running())blocked|=BlockUsb;
+    if(gps_screen_is_powered() || lora_screen_is_powered())blocked|=BlockPeripheral;
+    if(alarm_has_deadline() || timer_is_running() || stopwatch_is_running())blocked|=BlockDeadline;
 #ifdef TWATCH_SIMULATOR
-    screenoff();
-    light_asleep = true;
+    if(WiFi.getMode()!=WIFI_OFF)blocked|=BlockRadio;
+    if(instance.pmu.isEnableDLDO1())blocked|=BlockPeripheral;
+    if(instance.pmu.isCharging())blocked|=BlockUsb;
+#endif
+    const auto spi=spi_bus_stats();
+    if(spi.active || spi.waiters || spi.lifecycle)blocked|=BlockSpi;
+#ifndef TWATCH_SIMULATOR
+    wifi_mode_t mode;
+    if(esp_wifi_get_mode(&mode)==ESP_OK || esp_bt_controller_get_status()!=ESP_BT_CONTROLLER_STATUS_IDLE)blocked|=BlockRadio;
+    if(wardriver_is_running() || wardriver_storage_pending() ||
+       pager_is_running() || tpms_is_running() || aprs_is_running() || lora_analyze_is_running() ||
+       mifare_dict_running() || onboarding_needed())blocked|=BlockPeripheral;
+    if(clock_screen_motion_wake_enabled())blocked|=BlockMotion;
+    if(panel_transition_pending || !qspi_display_idle())blocked|=BlockDisplay;
+    const auto wire=i2c_bus_stats();
+    if(wire.active || wire.cooling || !i2c_bus_ready(0x34))blocked|=BlockI2c;
+    else{
+        const auto before=i2c_bus_failures();
+        if(instance.pmu.isVbusIn())blocked|=BlockUsb;
+        if(instance.pmu.isEnableDLDO1())blocked|=BlockPeripheral;
+        if(i2c_bus_failures()!=before)blocked|=BlockI2c;
+    }
+    if(digitalRead(PMU_INT)==LOW)blocked|=BlockIrq;
+#endif
+    return blocked;
+}
+void resume_admission(){
+    storage_resume();radio_manager_suspend(false);audio_suspend(false);
+}
+#ifndef TWATCH_SIMULATOR
+bool arm_power_wakeup(){
+    if(esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL)!=ESP_OK)return false;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
+    return esp_sleep_enable_ext1_wakeup_io(1ULL<<PMU_INT,ESP_EXT1_WAKEUP_ANY_LOW)==ESP_OK;
 #else
-    // Light sleep must not cut SD rails while the card is in use.
-    storage_release_image_cache();
-    storage_suspend();
-    if(!storage_idle()){
-        storage_resume();
-        audio_suspend(false);
-        gps_service_session(gps_screen_is_powered());
-        resume_cpu_governor();
-        screenunlock();
-        diagnostics_resume();
-        return;
-    }
-    qspi_display_pause(true);
-    auto* refresh=lv_display_get_refr_timer(lv_display_get_default());
-    if(refresh)lv_timer_pause(refresh);
-    if(!qspi_display_drain() || !qspi_display_prepare_sleep()){
-        // Do not cut a rail or enter vendor sleep while DMA owns a descriptor.
-        panel_transition_pending=true;
-        storage_resume();
-        audio_suspend(false);
-        gps_service_session(gps_screen_is_powered());
-        resume_cpu_governor();
-        screenunlock();
-        diagnostics_resume();
-        return;
-    }
-    alarm_stop_chime_loop();
-    tpms_stop();
-    mifare_dict_stop();
-    pin_lock_on_screenoff();
-    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
-    i2c_bus_runtime(false); // vendor lifecycle operations must not be skipped
-    instance.lightSleep(WAKEUP_SRC_POWER_KEY);
-    i2c_bus_runtime(true);
-    if(instance.isCardReady())storage_media_inserted();
-    else storage_media_removed();
-    power_init();
-    // SDK attempted panel wake; don't resume LVGL until it is acknowledged.
-    off=false;
-    panel_transition_pending=true;
-    panel_transition(true);
-    screenunlock();
-    power_note_activity(millis());
-    consume_click = true;
-    pin_lock_handle_button();
-    resume_cpu_governor();
-    gps_service_session(gps_screen_is_powered());
-    storage_resume();
-    audio_suspend(false);
-    diagnostics_resume();
+    return esp_sleep_enable_ext1_wakeup(1ULL<<PMU_INT,ESP_EXT1_WAKEUP_ANY_LOW)==ESP_OK;
 #endif
 }
-
-void poweroff() { deepsleep(); }
-
-void deepsleep() {
-    if (asleep) return;
-    diagnostics_pause();
-    gps_service_session(false);
-    pause_cpu_governor();
-    screenlock();
+bool controllers_down(){
+    // Stop only after managed leases have drained. Check actual SDK state,
+    // not the cached radio toggle. Accepted stop/deinit must finish first.
+    WiFi.mode(WIFI_OFF);
+    wifi_mode_t mode;
+    if(esp_wifi_get_mode(&mode)==ESP_OK){
+        esp_wifi_stop();
+        if(esp_wifi_deinit()!=ESP_OK)return false;
+    }
+    if(esp_wifi_get_mode(&mode)==ESP_OK)return false;
+    if(esp_bluedroid_get_status()==ESP_BLUEDROID_STATUS_ENABLED && esp_bluedroid_disable()!=ESP_OK)return false;
+    if(esp_bluedroid_get_status()==ESP_BLUEDROID_STATUS_INITIALIZED && esp_bluedroid_deinit()!=ESP_OK)return false;
+    if(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_ENABLED && esp_bt_controller_disable()!=ESP_OK)return false;
+    if(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_INITED && esp_bt_controller_deinit()!=ESP_OK)return false;
+    return esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_IDLE &&
+        esp_bluedroid_get_status()==ESP_BLUEDROID_STATUS_UNINITIALIZED;
+}
+#endif
+}
+void lightsleep(){
+    if(power_shutting_down() || light_asleep)return;
+    // Retentive sleep: never call the vendor lightSleep(), which unmounts
+    // SD and re-enables GPS/NFC unconditionally after wake.
+    auto blocked=idle_blockers();
+    // Release cached images before testing the storage lease, not a live
+    // file or USB host. Screen-off remains usable if any service is active.
+    if(blocked&BlockStorage){
+        storage_release_image_cache();
+        blocked=idle_blockers();
+    }
+    if(blocked){lifecycle.idle_blocked(blocked);return;}
     screenoff();
 #ifndef TWATCH_SIMULATOR
-    if(panel_transition_pending || !qspi_display_idle()){
-        requested=true; // power_tick retries instead of freeing active DMA
-        return;
-    }
-    radio_manager_suspend(true);
-    audio_suspend(true);
-    adsb_stop();
-    wake_word_stop();
-    mic_rec_stop();
-    alarm_stop_chime_loop();
-    alarm_service_audio();
-    if(radio_job_busy() || !audio_idle()){
-        requested=true; // let the workers release radio/I2S/SD resources first
-        return;
+    if(panel_transition_pending){lifecycle.idle_blocked(BlockDisplay);return;}
+#endif
+    radio_manager_suspend(true);audio_suspend(true);storage_suspend();
+    blocked=idle_blockers();
+    if(blocked){resume_admission();lifecycle.idle_blocked(blocked);return;}
+#ifndef TWATCH_SIMULATOR
+    RadioTransition radio_guard;
+    if(!radio_guard){resume_admission();lifecycle.idle_blocked(BlockRadio);return;}
+    if(!spi_bus_lifecycle_begin()){resume_admission();lifecycle.idle_blocked(BlockSpi);return;}
+    if(!arm_power_wakeup()){
+        spi_bus_lifecycle_end();resume_admission();lifecycle.idle_blocked(BlockDriver);return;
     }
 #endif
-    asleep = true;
+    diagnostics_pause();pause_cpu_governor();screenlock();
+    lifecycle.light_enter(millis());light_asleep=true;
 #ifdef TWATCH_SIMULATOR
-    sim::leave_screen();
+    // Mock wake is delivered by the simulated power-key contact.
 #else
-    // Finish local SD writers before LilyGoLib unmounts and powers off SD.
-    // USB hosts should eject first; unsynced host writes cannot be recovered.
-    usb_sd_stop();
-    wardriver_stop();
-    // If the queue was full at stop, retry the final snapshot after accepted
-    // jobs finish. Allocation/media failure is not retried indefinitely.
-    if(wardriver_storage_pending() && storage_stats().worker && storage_stats().media){
-        while(storage_stats().pending || storage_stats().active)delay(10);
-        wardriver_bg_tick();
-    }
-    alarm_stop_chime_loop();
-    tpms_stop();
-    mifare_dict_stop();
-    // Drain accepted immutable work before the SDK powers down SPI/SD.
-    // Do not force an unmount during a hung in-flight operation.
-    storage_release_image_cache();
-    storage_suspend();
-    while (!storage_idle()) {
-        delay(10);
-    }
-    WiFi.mode(WIFI_OFF);
-    if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED) esp_bluedroid_disable();
-    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED) esp_bt_controller_disable();
-    // Explicitly remove any previous wake sources; SDK handles PMU IRQ,
-    // panel, touch, peripheral rails, SD/SPI/I2C and ESP deep sleep.
+    const auto result=esp_light_sleep_start();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
-    deep_wake_cookie = deep_wake_magic;
-    i2c_bus_runtime(false);
-    instance.sleep(WAKEUP_SRC_POWER_KEY, false); // patched SDK arms key edges, retain RTC backup
-    // A valid power-key wake configuration must never return.
-    ESP.restart();
+    spi_bus_lifecycle_end();
+    light_asleep=false;
+    lifecycle.light_exit(millis(),result==ESP_OK);
+    resume_admission();resume_cpu_governor();screenunlock();diagnostics_resume();
+    // The latched PMU IRQ is serviced by instance.loop() on the next tick.
+    // Only an actual key edge lights the panel; charging IRQs merely wake CPU.
+    // No rail or bus was torn down, so no peripheral is spuriously restarted.
 #endif
+}
+void poweroff(){deepsleep();}
+void deepsleep(){
+    if(asleep)return;
+    const auto now=millis();
+    if(lifecycle.snapshot(now).stage<PowerStage::Stopping){
+        lifecycle.begin_shutdown(now);requested=true;
+        diagnostics_pause();pause_cpu_governor();screenlock();screenoff();
+        radio_manager_suspend(true);audio_suspend(true);
+        gps_service_session(false);
+#ifndef TWATCH_SIMULATOR
+        adsb_stop();wake_word_stop();mic_rec_stop();alarm_stop_chime_loop();
+        tpms_request_stop();mifare_dict_request_stop();usb_sd_stop();
+#endif
+    }
+    // At most four cheap stage transitions per call; no waiting loops.
+    for(unsigned n=0;n<4;++n){
+        const auto stage=lifecycle.snapshot(millis()).stage;
+        uint32_t blocked=0;
+        if(stage==PowerStage::Stopping){
+            if(radio_job_busy())blocked|=BlockRadio;
+            if(!audio_idle())blocked|=BlockAudio;
+#ifndef TWATCH_SIMULATOR
+            alarm_service_audio();
+            const auto bus=spi_bus_stats();
+            if(mifare_dict_running() || bus.active || bus.waiters || !tpms_stop_ready())blocked|=BlockPeripheral;
+#endif
+        }else if(stage==PowerStage::FinalStorage){
+#ifndef TWATCH_SIMULATOR
+            if(!final_storage_started){wardriver_stop();final_storage_started=true;}
+            // Preserve one final submission retry once already accepted jobs
+            // finish. A failed allocation/media is not retried indefinitely.
+            if(wardriver_storage_pending() && !final_storage_retried && storage_stats().worker && storage_stats().media){
+                auto s=storage_stats();
+                if(s.pending || s.active)blocked|=BlockStorage;
+                else{wardriver_bg_tick();final_storage_retried=true;}
+            }
+#endif
+            if(!blocked){storage_release_image_cache();storage_suspend();}
+        }else if(stage==PowerStage::Draining){
+            if(!storage_idle())blocked|=BlockStorage;
+#ifndef TWATCH_SIMULATOR
+            if(panel_transition_pending || !qspi_display_idle())blocked|=BlockDisplay;
+            const auto spi=spi_bus_stats();
+            if(spi.active || spi.waiters || spi.lifecycle)blocked|=BlockSpi;
+            const auto wire=i2c_bus_stats();
+            if(wire.active || wire.cooling)blocked|=BlockI2c;
+#endif
+        }else if(stage==PowerStage::Drivers){
+#ifdef TWATCH_SIMULATOR
+            lifecycle.advance(0,millis());asleep=true;
+            last_shutdown_ms=lifecycle.snapshot(millis()).shutdown_ms;
+            last_shutdown_blockers=lifecycle.snapshot(millis()).shutdown_blockers;
+            sim::leave_screen();return;
+#else
+            RadioTransition radio_guard;
+            if(!radio_guard){lifecycle.advance(BlockRadio,millis());return;}
+            if(!controllers_down()){lifecycle.advance(BlockDriver,millis());return;}
+            if(!spi_bus_lifecycle_begin()){lifecycle.advance(BlockSpi,millis());return;}
+            // Recheck ownership after reserving SPI. I2C remains UI-owned;
+            // no HAL barrier is held across Wire calls (lock-order inversion).
+            uint32_t late=0;
+            if(!storage_idle())late|=BlockStorage;
+            if(i2c_bus_stats().active)late|=BlockI2c;
+            if(!qspi_display_idle() || panel_transition_pending)late|=BlockDisplay;
+            if(late){spi_bus_lifecycle_end();lifecycle.advance(late,millis());return;}
+            if(!arm_power_wakeup()){
+                spi_bus_lifecycle_end();lifecycle.advance(BlockDriver,millis());return;
+            }
+            lifecycle.advance(0,millis());asleep=true;
+            last_shutdown_ms=lifecycle.snapshot(millis()).shutdown_ms;
+            last_shutdown_blockers=lifecycle.snapshot(millis()).shutdown_blockers;
+            deep_wake_cookie=deep_wake_magic;
+            i2c_bus_runtime(false);
+            instance.sleep(WAKEUP_SRC_POWER_KEY,false);
+            // SDK should never return; recover via a clean reboot if it does.
+            ESP.restart();return;
+#endif
+        }else return;
+        if(!lifecycle.advance(blocked,millis()))return;
+    }
 }
 
 #ifdef TWATCH_SIMULATOR
 namespace {
 void sim_wake(uint32_t now) {
     const bool cold_boot = asleep;
+    if(cold_boot){lifecycle.reboot();final_storage_started=final_storage_retried=false;}
+    else lifecycle.light_exit(now,true);
+    resume_admission();
     hold.reset(); wake_hold.reset(); requested = asleep = light_asleep = false;
     screenon();
     screenunlock();
@@ -601,6 +687,9 @@ void power_button_up(uint32_t now) {
 }
 bool power_allow_click() {
     if (consume_click) { consume_click = false; return false; }
+#ifndef TWATCH_SIMULATOR
+    if(panel_transition_pending)return false;
+#endif
     return !power_shutting_down() && !off && !power_is_asleep() && !pin_lock_active();
 }
 void power_tick(uint32_t now, bool check_idle) {
@@ -613,8 +702,14 @@ void power_tick(uint32_t now, bool check_idle) {
 #endif
     if (hold.update(now)) { diagnostics_pause(); pause_cpu_governor(); screenlock(); screenoff(); }
     if (requested) { poweroff(); return; }
-    if (check_idle && !off && !hold.down() && screenoff_timeout &&
-        uint32_t(now - last_activity) >= screenoff_timeout) screenoff();
+    if(check_idle && !off && !hold.down() && screenoff_timeout &&
+       uint32_t(now-last_activity)>=screenoff_timeout){
+        screenoff();lifecycle.screen(true,now);last_idle_attempt=now;
+    }
+    if(check_idle && off && screenoff_timeout && !hold.down() && lifecycle.idle_due(now) &&
+       uint32_t(now-last_idle_attempt)>=PowerLifecycle::idle_grace_ms){
+        last_idle_attempt=now;lightsleep();
+    }
 }
 void power_cancel_press() {
 #ifdef TWATCH_SIMULATOR
@@ -652,19 +747,15 @@ void reject_wake(uint8_t observed) {
     Wire.end();
     pinMode(SDA, OPEN_DRAIN);
     pinMode(SCL, OPEN_DRAIN);
-    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
-    esp_sleep_enable_ext1_wakeup_io(1ULL << PMU_INT, ESP_EXT1_WAKEUP_ANY_LOW);
-#else
-    esp_sleep_enable_ext1_wakeup(1ULL << PMU_INT, ESP_EXT1_WAKEUP_ANY_LOW);
-#endif
-    esp_deep_sleep_start();
+    if(arm_power_wakeup())esp_deep_sleep_start();
+
 }
 }
 void power_boot_gate() {
     if (deep_wake_cookie != deep_wake_magic ||
         esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_EXT1) {
         deep_wake_cookie = 0;
+        last_shutdown_ms=last_shutdown_blockers=0;
         return;
     }
     Wire.begin(SDA, SCL);

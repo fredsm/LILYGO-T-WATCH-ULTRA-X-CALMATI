@@ -1,4 +1,8 @@
 #include "../../src/power_manager.h"
+#include "../../src/audio_manager.h"
+#include "../../src/storage_manager.h"
+#include "../../src/radio_manager.h"
+#include "../../src/alarm.h"
 #include "../../src/settings_screen.h"
 #include "SD.h"
 #include "../../src/sim/clock.hpp"
@@ -85,6 +89,21 @@ int main() {
     CHECK(sim::hardware.watch.display_on());
     lv_tick_inc(1501);sim::tick_boot();CHECK(lv_screen_active()==sim::create_clock());
     power_button_down(33000);power_cancel_press();power_tick(39000);CHECK(!power_screen_locked());
-    power_button_down(40000);power_button_up(45000);power_tick(45000);CHECK(power_is_asleep());
+    // An enabled alarm must keep the CPU available while the screen is off.
+    alarm_set(7,0,true);
+    screenoff();lightsleep();
+    CHECK(!power_is_asleep() && power_lifecycle_stats().last_idle_blockers&BlockDeadline);
+    screenon();alarm_set(7,0,false);
+    auto token=audio_acquire(AudioClient::Recorder);CHECK(token);
+    CHECK(storage_local_acquire());
+    power_button_down(40000);power_button_up(45000);power_tick(45000);
+    CHECK(!power_is_asleep() && power_lifecycle_stats().stage==PowerStage::Stopping);
+    CHECK(power_lifecycle_stats().blockers&BlockAudio);
+    CHECK(!audio_acquire(AudioClient::Chime));
+    audio_release(AudioClient::Recorder,token);
+    power_tick(45010);CHECK(!power_is_asleep() && power_lifecycle_stats().stage==PowerStage::Draining);
+    CHECK(!storage_local_acquire());
+    storage_local_release();power_tick(45020);CHECK(power_is_asleep());
+    CHECK(power_lifecycle_stats().last_shutdown_blockers&(BlockAudio|BlockStorage));
     return 0;
 }

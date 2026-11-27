@@ -23,6 +23,8 @@ enum TpmsFormat {
 // Returns false if LoRa radio is currently in use.
 bool              tpms_start(bool freq_433, TpmsFormat fmt = TPMS_FORMAT_FSK);
 void              tpms_stop();
+void tpms_request_stop();
+bool tpms_stop_ready();
 bool              tpms_is_running();
 bool              tpms_is_freq_433();
 TpmsFormat        tpms_get_format();

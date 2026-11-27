@@ -134,6 +134,7 @@ int  alarm_get_hour()      { return s_hour; }
 int  alarm_get_minute()    { return s_minute; }
 bool alarm_is_enabled()    { return s_enabled; }
 bool alarm_is_ringing()    { return s_ringing; }
+bool alarm_has_deadline(){return s_enabled || s_ringing || s_snooze_until_ms!=0;}
 bool alarm_is_configured() { return s_configured; }
 
 bool    alarm_get_vibrate()         { return s_vibrate;        }

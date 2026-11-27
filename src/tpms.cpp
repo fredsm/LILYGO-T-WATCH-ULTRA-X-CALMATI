@@ -470,20 +470,25 @@ bool tpms_start(bool freq_433, TpmsFormat fmt)
     return true;
 }
 
-void tpms_stop()
-{
-    if (!s_running) return;
-    s_running    = false;
-
-    if (s_ook_task_handle) {
-        // Never delete a task while it may own an SPI transaction.
-        while (!s_ook_done.load()) vTaskDelay(1);
-        s_ook_task_handle = nullptr;
-        enableCore0WDT();  // restore IDLE_0 watchdog now that the task is gone
+static bool s_stop_pending=false;
+void tpms_request_stop(){
+    if(s_running){s_running=false;s_stop_pending=true;}
+}
+bool tpms_stop_ready(){
+    if(!s_stop_pending)return true;
+    if(s_ook_task_handle){
+        if(!s_ook_done.load())return false;
+        s_ook_task_handle=nullptr;
+        enableCore0WDT();
     }
-
     radio.clearPacketReceivedAction();
     radio.standby();
+    s_stop_pending=false;
+    return true;
+}
+void tpms_stop(){
+    tpms_request_stop();
+    while(!tpms_stop_ready())vTaskDelay(1);
 }
 
 bool       tpms_is_running()      { return s_running;    }

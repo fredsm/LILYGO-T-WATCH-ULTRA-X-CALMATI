@@ -11,7 +11,8 @@
 
 namespace {
 #ifdef TWATCH_SIMULATOR
-std::mutex bus, metadata;
+std::recursive_mutex bus;
+std::mutex metadata;
 struct Guard { std::lock_guard<std::mutex> lock{metadata}; };
 uint64_t now_us() {
     using namespace std::chrono;
@@ -29,9 +30,9 @@ struct Guard {
     ~Guard() { portEXIT_CRITICAL(&metadata); }
 };
 uint64_t now_us() { return esp_timer_get_time(); }
-bool try_lock() { configASSERT(bus); return xSemaphoreTake(bus,0)==pdTRUE; }
-void lock() { xSemaphoreTake(bus,portMAX_DELAY); }
-void unlock() { xSemaphoreGive(bus); }
+bool try_lock() { configASSERT(bus); return xSemaphoreTakeRecursive(bus,0)==pdTRUE; }
+void lock() { xSemaphoreTakeRecursive(bus,portMAX_DELAY); }
+void unlock() { xSemaphoreGiveRecursive(bus); }
 #endif
 SpiBusStats stats;
 uint64_t acquired_at=0;
@@ -43,7 +44,7 @@ unsigned index(SpiClient c) { return static_cast<unsigned>(c); }
 }
 void spi_bus_init() {
 #ifndef TWATCH_SIMULATOR
-    if(!bus) bus=xSemaphoreCreateMutexStatic(&bus_memory);
+    if(!bus) bus=xSemaphoreCreateRecursiveMutexStatic(&bus_memory);
     configASSERT(bus);
 #endif
 }
@@ -81,11 +82,22 @@ void spi_bus_release() {
 }
 bool spi_bus_ui_ready(SpiClient client) {
     Guard g;
-    if(stats.active || stats.waiters) {
+    if(stats.active || stats.waiters || stats.lifecycle) {
         ++stats.clients[index(client)].deferred;
         return false;
     }
     return true;
+}
+bool spi_bus_lifecycle_begin(){
+    if(!try_lock())return false;
+    bool ready;
+    {Guard g;ready=!stats.active && !stats.waiters && !stats.lifecycle;if(ready)stats.lifecycle=true;}
+    if(!ready)unlock();
+    return ready;
+}
+void spi_bus_lifecycle_end(){
+    {Guard g;assert(stats.lifecycle && !stats.active);stats.lifecycle=false;}
+    unlock();
 }
 SpiBusStats spi_bus_stats() {
     Guard g;

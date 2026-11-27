@@ -7,6 +7,7 @@ int alarm_get_minute(){return minute;}
 bool alarm_is_enabled(){return enabled;}
 void alarm_set(int h,int m,bool e){hour=h;minute=m;enabled=e;configured=true;}
 bool alarm_is_ringing(){return ringing;}
+bool alarm_has_deadline(){return enabled || ringing;}
 void alarm_dismiss(){ringing=false;}
 void alarm_snooze(int){ringing=false;}
 void alarm_get_next_fire_time(int* h,int* m){*h=hour;*m=minute;}

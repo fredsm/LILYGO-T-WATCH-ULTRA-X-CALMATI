@@ -49,4 +49,15 @@ int main() {
     s=spi_bus_stats();
     CHECK(!s.active && !s.waiters);
     for(auto& client:s.clients) CHECK(client.transactions==1001);
+    spi_bus_acquire(SpiClient::Sd);
+    CHECK(!spi_bus_lifecycle_begin());spi_bus_release();
+    CHECK(spi_bus_lifecycle_begin() && spi_bus_stats().lifecycle);
+    CHECK(!spi_bus_ui_ready(SpiClient::Nfc));
+    // Vendor teardown can take an ordinary transaction on its own task.
+    spi_bus_acquire(SpiClient::Sd);spi_bus_release();
+    entered=false;
+    std::thread late([&]{spi_bus_acquire(SpiClient::Nfc);entered=true;spi_bus_release();});
+    while(!spi_bus_stats().waiters)std::this_thread::yield();
+    CHECK(!entered);spi_bus_lifecycle_end();late.join();
+    CHECK(entered && !spi_bus_stats().lifecycle);
 }

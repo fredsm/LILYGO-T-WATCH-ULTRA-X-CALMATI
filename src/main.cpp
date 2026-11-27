@@ -998,6 +998,8 @@ static float     s_motion_last_mag        = 0.0f;
 // 0.2 g.
 #define MOTION_DELTA_G          0.20f
 
+bool clock_screen_motion_wake_enabled(){return s_motion_wake_enabled;}
+
 void clock_screen_set_motion_wake(bool enabled)
 {
     s_motion_wake_enabled = enabled;
@@ -1371,6 +1373,10 @@ void setup()
     spi_bus_init();
     instance.begin();
     instance.powerControl(POWER_NFC, false); // ensure NFC is off on boot
+    // GPS switch starts OFF; don't leave the boot-probed UART/rail powered.
+    Serial1.end();
+    instance.powerControl(POWER_GPS,false);
+    instance.powerControl(POWER_SPEAK,false); // chime owns later amplifier power
     beginLvglHelper(instance);
     qspi_display_init();
 

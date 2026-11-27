@@ -38,6 +38,7 @@ void mifare_forget_card();     // clear + re-arm discovery for the next tap
 // ⚠️ Experimental: the crypto core is canonical crapto1, but the ST25R3916
 //    bit-level encrypted-parity TX/timing may need tuning on real hardware.
 bool mifare_dict_start();      // false if no Classic card present or already running
+void mifare_dict_request_stop();
 void mifare_dict_stop();       // abort a running attack
 bool mifare_dict_running();
 int  mifare_dict_progress();   // 0..100

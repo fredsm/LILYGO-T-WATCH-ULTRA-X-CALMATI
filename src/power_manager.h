@@ -1,18 +1,20 @@
 #pragma once
 #include <stdint.h>
+#include "power_lifecycle.h"
 
 // Reusable power primitives. Screen lock is an input lock, not authentication.
 void screenlock();
 void screenunlock();
 void screenoff();
 void screenon();
-void lightsleep(); // reserved for idle policy; only call when peripherals are idle
+void lightsleep(); // retentive standby, only when peripherals and deadlines permit
 void poweroff();   // user-facing full power-off action
 void deepsleep();  // full power-off; only power key is a configured wake source
 bool power_screen_locked();
 bool power_screen_off();
 bool power_is_asleep();
 bool power_shutting_down();
+PowerLifecycleStats power_lifecycle_stats();
 void power_init();
 void power_boot_gate(); // early firmware boot: qualify deep-sleep wake before UI init
 void power_note_activity(uint32_t now);

@@ -16,6 +16,7 @@ bool alarm_is_enabled();
 void alarm_set(int hour, int minute, bool enabled);   // updates + persists
 
 bool alarm_is_ringing();
+bool alarm_has_deadline(); // includes pending snooze
 void alarm_dismiss();              // stop ringing; no further fire today
 void alarm_snooze(int minutes);    // stop now, re-ring after `minutes`
 
