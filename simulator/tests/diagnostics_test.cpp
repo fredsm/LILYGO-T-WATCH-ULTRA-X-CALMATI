@@ -65,6 +65,8 @@ int main(){
     CHECK(diagnostics_screen_is_active());
     CHECK(find_label(lv_screen_active(),"SYSTEM DIAGNOSTICS"));
     CHECK(find_label(lv_screen_active(),"Core 0: 22%"));
+    CHECK(find_label(lv_screen_active(),"Auto sampled time"));
+    CHECK(find_label(lv_screen_active(),"Fixed frequency"));
     CHECK(find_label(lv_screen_active(),"RECENT UI STALLS"));
     CHECK(!task_manager_is_active());
     diagnostics_reset();finish();snap=diagnostics_snapshot();CHECK(snap.ready&&snap.history_count==0&&snap.stalls==0);

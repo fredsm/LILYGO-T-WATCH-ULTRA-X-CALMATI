@@ -79,28 +79,43 @@ bool valid_cpu_frequency(uint32_t mhz) {
 bool valid_cpu_preference(uint32_t mhz) {
     return mhz == CPU_AUTO || valid_cpu_frequency(mhz);
 }
-void governor_sample(unsigned core0, unsigned core1, uint32_t elapsed_ms = CpuGovernor::window_ms) {
+// Caller holds CpuGuard; every attempted hardware change is measured.
+void apply_governor_target(uint32_t current,uint32_t wanted) {
+    if(wanted==current)return;
+    const uint32_t start=millis();
+    const bool ok=setCpuFrequency(wanted);
+    governor.record_change(current,wanted,ok,uint32_t(millis()-start));
+}
+void governor_sample(int core0, int core1, uint32_t elapsed_ms) {
     CpuGuard guard;
     if (!governor_running || preferred_cpu_mhz != CPU_AUTO) return;
-    cpu_load[0] = core0;
-    cpu_load[1] = core1;
     const uint32_t current = getCpuFrequency();
-    const uint32_t wanted = governor.evaluate(current, core0, core1, elapsed_ms);
-    if (wanted != current && !setCpuFrequency(wanted)) governor.reset();
+    if(core0<0 || core0>100 || core1<0 || core1>100 ||
+        elapsed_ms<CpuGovernor::min_window_ms || elapsed_ms>CpuGovernor::max_window_ms){
+        cpu_load[0]=cpu_load[1]=-1;
+        apply_governor_target(current,governor.invalid(current));
+        return;
+    }
+    cpu_load[0]=core0;cpu_load[1]=core1;
+    apply_governor_target(current,governor.evaluate(current,core0,core1,elapsed_ms));
 }
 
 #ifdef TWATCH_SIMULATOR
 lv_timer_t* governor_timer = nullptr;
+uint32_t last_sim_sample_ms=0;
 bool prepare_governor() {
     if (governor_timer) return true;
     governor_timer = lv_timer_create([](lv_timer_t*) {
-        governor_sample(sim::hardware.core_load[0], sim::hardware.core_load[1]);
+        const uint32_t now=lv_tick_get();
+        const auto elapsed=uint32_t(now-last_sim_sample_ms);last_sim_sample_ms=now;
+        governor_sample(sim::hardware.core_load[0], sim::hardware.core_load[1],elapsed);
     }, CpuGovernor::window_ms, nullptr);
     if (!governor_timer) return false;
     lv_timer_pause(governor_timer);
     return true;
 }
 bool start_governor_timer() {
+    last_sim_sample_ms=lv_tick_get();
     lv_timer_reset(governor_timer);
     lv_timer_resume(governor_timer);
     return true;
@@ -127,29 +142,17 @@ void governor_worker(void*) {
         const int64_t now = esp_timer_get_time();
         const int64_t elapsed_us = now - last_sample_us;
         last_sample_us = now;
-        unsigned load[2] = {};
-        bool valid = elapsed_us >= 400000 && elapsed_us <= 1000000;
-        for (unsigned core = 0; core < 2; ++core) {
-            uint32_t total, busy;
-            snapshot(core, total, busy);
-            const uint32_t samples = total - previous_total[core];
-            const uint32_t active = busy - previous_busy[core];
-            previous_total[core] = total;
-            previous_busy[core] = busy;
-            // Skip incomplete or stale windows, e.g. across a sleep boundary.
-            const uint32_t expected = valid ? uint32_t(elapsed_us * configTICK_RATE_HZ / 1000000) : 0;
-            if (!expected || samples < expected * 8 / 10 || samples > expected * 12 / 10 || active > samples) {
-                valid = false;
-            } else {
-                // Round up so 80.1% qualifies as >80%, and exactly 80% does not.
-                load[core] = (active * 100u + samples - 1) / samples;
-            }
+        const uint32_t elapsed_ms=elapsed_us>0 && elapsed_us<=int64_t(CpuGovernor::max_window_ms)*1000
+            ? uint32_t(elapsed_us/1000):0;
+        int load[2];
+        for (unsigned core=0;core<2;++core) {
+            uint32_t total,busy;
+            snapshot(core,total,busy);
+            load[core]=cpu_window_load({previous_total[core],previous_busy[core]},
+                                       {total,busy},elapsed_ms,configTICK_RATE_HZ);
+            previous_total[core]=total;previous_busy[core]=busy;
         }
-        if (valid) governor_sample(load[0], load[1], uint32_t(elapsed_us / 1000));
-        else {
-            governor.reset();
-            cpu_load[0] = cpu_load[1] = -1;
-        }
+        governor_sample(load[0],load[1],elapsed_ms);
     }
 }
 bool prepare_governor() {
@@ -158,6 +161,7 @@ bool prepare_governor() {
     esp_timer_create_args_t args = {};
     args.callback = [](void*) { if (governor_task) xTaskNotifyGive(governor_task); };
     args.name = "cpu_governor";
+    args.skip_unhandled_events = true;
     if (esp_timer_create(&args, &governor_timer) == ESP_OK &&
         xTaskCreatePinnedToCore(governor_worker, "cpu_governor", 3072,
                                nullptr, tskIDLE_PRIORITY + 8, &governor_task, 1) == pdPASS)
@@ -300,6 +304,7 @@ uint32_t getCpuFrequency() {
 uint32_t getPreferredCpuFrequency() { CpuGuard guard; return preferred_cpu_mhz; }
 bool cpuAutomaticEnabled() { CpuGuard guard; return preferred_cpu_mhz == CPU_AUTO; }
 int getCpuLoad(unsigned core) { CpuGuard guard; return core < 2 ? cpu_load[core] : -1; }
+CpuGovernorStats cpu_governor_stats(){CpuGuard guard;auto stats=governor.stats();stats.running=governor_running;return stats;}
 
 bool increaseCpuFrequency() {
     CpuGuard guard;
@@ -641,6 +646,7 @@ void sim_wake(uint32_t now) {
     consume_click = true;
     if (cold_boot) {
         diagnostics_reset();
+        governor.clear();
         load_cpu_preference();
         pin_lock_restore();
         sim::show_home();

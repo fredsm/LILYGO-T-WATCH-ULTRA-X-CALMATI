@@ -27,8 +27,10 @@ public:
     uint32_t cpu_frequency() const { return cpu_mhz_; }
     bool set_cpu_frequency(uint32_t mhz) {
         if (mhz != 80 && mhz != 160 && mhz != 240) return false;
+        if (fail_cpu_change_) { fail_cpu_change_=false;return false; }
         cpu_mhz_ = mhz; return true;
     }
+    void fail_next_cpu_change() { fail_cpu_change_=true; }
     bool display_on() const { return display_on_; }
     void set_display_on(bool value) { display_on_=value; }
     void set_haptic_available(bool value) { haptic_available_=value; }
@@ -54,6 +56,7 @@ private:
     int64_t rtc_base_=1704067200;
     int battery_=100,brightness_=255;
     uint32_t cpu_mhz_=240;
+    bool fail_cpu_change_=false;
     bool charging_=false,display_on_=true,haptic_available_=true;
     bool power_=false,back_=false,motion_=false;
     std::deque<ButtonEvent> buttons_;

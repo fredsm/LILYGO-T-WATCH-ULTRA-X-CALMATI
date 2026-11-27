@@ -161,12 +161,9 @@ void monitor_task(void*) {
             int loads[2] = {-1,-1};
             for (unsigned i=0; i<2; ++i) {
                 CpuSamples next = cpu_sampler_snapshot(i);
-                uint32_t total = next.total-prev[i].total, busy = next.busy-prev[i].busy;
+                if(sampling && !paused)
+                    loads[i]=cpu_window_load(prev[i],next,elapsed,configTICK_RATE_HZ);
                 prev[i]=next;
-                uint32_t expected = elapsed * configTICK_RATE_HZ / 1000;
-                if (sampling && !paused && elapsed <= 1000 && total &&
-                    total >= expected*8/10 && total <= expected*12/10 && busy <= total)
-                    loads[i] = int((busy*100u+total-1)/total);
             }
             uint32_t mhz=getCpuFrequencyMhz();
             Guard lock;

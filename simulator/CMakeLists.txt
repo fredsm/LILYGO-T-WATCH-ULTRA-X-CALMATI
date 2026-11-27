@@ -192,3 +192,5 @@ set_tests_properties(audio_gps_ownership PROPERTIES TIMEOUT 10)
 
 add_executable(power_lifecycle_test tests/power_lifecycle_test.cpp ../src/power_lifecycle.cpp)
 add_test(NAME peripheral_power_lifecycle COMMAND power_lifecycle_test)
+add_executable(cpu_policy_test tests/cpu_policy_test.cpp)
+add_test(NAME cpu_governor_window_and_stability COMMAND cpu_policy_test)

@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "power_lifecycle.h"
+#include "cpu_governor.h"
 
 // Reusable power primitives. Screen lock is an input lock, not authentication.
 void screenlock();
@@ -39,3 +40,6 @@ uint32_t getPreferredCpuFrequency();
 bool cpuAutomaticEnabled();
 // Last sampled utilization (0..100), or -1 when sampling is not active.
 int getCpuLoad(unsigned core);
+
+// Per-boot automatic policy metrics; fixed modes never apply these decisions.
+CpuGovernorStats cpu_governor_stats();

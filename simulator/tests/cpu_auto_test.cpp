@@ -35,7 +35,7 @@ int main() {
     CHECK(policy.evaluate(80,51,5)==160);
     for (int i=0;i<9;++i) CHECK(policy.evaluate(240,1,1)==240);
     CHECK(policy.evaluate(240,1,1)==80);
-    for (int i=0;i<9;++i) CHECK(policy.evaluate(240,75,5)==240);
+    for (int i=0;i<9;++i) CHECK(policy.evaluate(240,45,5)==240);
     CHECK(policy.evaluate(240,1,1)==240); // different lower tier resets dwell
     CHECK(policy.evaluate(240,90,1)==240);
     for (int i=0;i<9;++i) CHECK(policy.evaluate(240,30,5)==240);
@@ -55,15 +55,26 @@ int main() {
     CHECK(dropdown&&lv_dropdown_get_selected(dropdown)==2);
     lv_dropdown_set_selected(dropdown,3);lv_obj_send_event(dropdown,LV_EVENT_VALUE_CHANGED,nullptr);
     CHECK(cpuAutomaticEnabled() && saved()==CPU_AUTO && getCpuFrequency()==240);
-    load(10,50);windows(9);CHECK(getCpuFrequency()==240);
-    windows(1);CHECK(getCpuFrequency()==80 && getCpuLoad(0)==10 && getCpuLoad(1)==50);
+    load(10,15);windows(9);CHECK(getCpuFrequency()==240);
+    windows(1);CHECK(getCpuFrequency()==80 && getCpuLoad(0)==10 && getCpuLoad(1)==15);
     load(51,2);windows(1);CHECK(getCpuFrequency()==160);
     load(0,81);windows(1);CHECK(getCpuFrequency()==240);
-    load(80,0);windows(9);CHECK(getCpuFrequency()==240);
+    load(80,0);windows(10);CHECK(getCpuFrequency()==240); // unsafe projected demand
+    load(50,0);windows(9);CHECK(getCpuFrequency()==240);
     windows(1);CHECK(getCpuFrequency()==160);
-    load(0,50);windows(10);CHECK(getCpuFrequency()==80);
+    load(0,25);windows(10);CHECK(getCpuFrequency()==160); // 50% at 80 MHz leaves no margin
+    load(0,22);windows(10);CHECK(getCpuFrequency()==80);
     load(100,0);windows(1);CHECK(getCpuFrequency()==240); // direct 80->240
     load(0,0);windows(10);CHECK(getCpuFrequency()==80); // direct 240->80
+    // Delayed timer windows do not count as idle; two invalid windows fail high.
+    lv_tick_inc(2000);lv_timer_handler();CHECK(getCpuFrequency()==80 && getCpuLoad(0)==-1);
+    lv_tick_inc(2000);lv_timer_handler();CHECK(getCpuFrequency()==240&&cpu_governor_stats().failsafe_upshifts==1);
+    load(0,0);windows(10);CHECK(getCpuFrequency()==80);
+    // Transient HAL error leaves clock unchanged and is visible; next high window retries.
+    sim::hardware.watch.fail_next_cpu_change();
+    load(100,0);windows(1);CHECK(getCpuFrequency()==80&&cpu_governor_stats().failed_changes==1);
+    windows(1);CHECK(getCpuFrequency()==240);
+    load(0,0);windows(10);CHECK(getCpuFrequency()==80);
     screenoff();load(100,0);windows(1);CHECK(getCpuFrequency()==240); // background demand
     screenon();
 
@@ -82,7 +93,9 @@ int main() {
     lv_tick_inc(1501);sim::tick_boot();
     CHECK(!power_is_asleep()&&cpuAutomaticEnabled()&&saved()==CPU_AUTO);
     CHECK(getCpuFrequency()==240);
-    load(25,25);windows(10);CHECK(getCpuFrequency()==80);
+    CHECK(cpu_governor_stats().valid_windows==0);
+    load(15,15);windows(1);CHECK(getCpuFrequency()==240&&getCpuLoad(0)==-1); // boot animation skipped timer windows
+    windows(10);CHECK(getCpuFrequency()==80);
     CHECK(setCpuFrequencyPreference(240));load(0,0);windows(12);CHECK(getCpuFrequency()==240);
     return 0;
 }

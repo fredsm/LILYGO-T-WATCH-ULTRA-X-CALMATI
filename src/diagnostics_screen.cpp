@@ -47,8 +47,21 @@ void refresh() {
     char a[12],b[12];
     if (d.core0<0) snprintf(a,sizeof(a),"N/A"); else snprintf(a,sizeof(a),"%d%%",d.core0);
     if (d.core1<0) snprintf(b,sizeof(b),"N/A"); else snprintf(b,sizeof(b),"%d%%",d.core1);
-    lv_label_set_text_fmt(cpu,"Frequency: %lu MHz\nCore 0: %s   Core 1: %s",
-        (unsigned long)d.cpu_mhz,a,b);
+    const auto gov=cpu_governor_stats();
+    char decision[96];
+    if(!cpuAutomaticEnabled()) snprintf(decision,sizeof(decision),"Fixed frequency");
+    else if(!gov.running) snprintf(decision,sizeof(decision),"Auto paused/unavailable");
+    else if(gov.consecutive_invalid) snprintf(decision,sizeof(decision),"Invalid samples: %lu%s",
+        (unsigned long)gov.consecutive_invalid,gov.consecutive_invalid>=CpuGovernor::invalid_limit?" | Safe 240 MHz":"");
+    else if(!gov.raw_target) snprintf(decision,sizeof(decision),"Awaiting fresh samples");
+    else snprintf(decision,sizeof(decision),"Raw %lu | Safe %lu MHz\nDownshift dwell: %lu / %lu ms",
+        (unsigned long)gov.raw_target,(unsigned long)gov.safe_target,(unsigned long)gov.lower_ms,(unsigned long)CpuGovernor::downshift_ms);
+    lv_label_set_text_fmt(cpu,"Frequency: %lu MHz | %s\nCore 0: %s   Core 1: %s\n%s\nAuto up/down: %lu / %lu | Failsafe: %lu\nValid/invalid: %lu / %lu | Guarded: %lu\nClock errors: %lu | Max change: %lu ms\nAuto sampled time (s): 80:%lu 160:%lu 240:%lu",
+        (unsigned long)d.cpu_mhz,cpuAutomaticEnabled()?"Auto":"Manual",a,b,decision,
+        (unsigned long)gov.upshifts,(unsigned long)gov.downshifts,(unsigned long)gov.failsafe_upshifts,
+        (unsigned long)gov.valid_windows,(unsigned long)gov.invalid_windows,(unsigned long)gov.guarded_windows,
+        (unsigned long)gov.failed_changes,(unsigned long)gov.max_change_ms,
+        (unsigned long)(gov.sampled_ms[0]/1000),(unsigned long)(gov.sampled_ms[1]/1000),(unsigned long)(gov.sampled_ms[2]/1000));
     lv_label_set_text_fmt(ui,"UI handler: %lu ms\nMax UI gap: %lu ms   Stalls: %lu\nActive: %s\nEvents pending: %u | Coalesced: %lu\nBack edges merged: %lu\nGPS UART backlog peak: %lu B\nJob slice max: %lu ms | Over 4 ms: %lu\nSD queue: %u | %lu KB%s\nSD done: %lu | Failed: %lu | Rejected: %lu | Cancelled: %lu\nSD merged: %lu | Max job: %lu ms",
         (unsigned long)d.last_ui_ms,(unsigned long)d.max_ui_gap_ms,(unsigned long)d.stalls,
         diagnostics_stage_name(d.active),events.pending,(unsigned long)events.replaced,
