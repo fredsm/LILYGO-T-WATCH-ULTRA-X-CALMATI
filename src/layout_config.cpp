@@ -1,6 +1,7 @@
 #include "layout_config.h"
 #include "layout_default_embedded.h"
 #include <string.h>
+#include <stdlib.h>
 
 namespace {
 // Order matches the existing compiled Tools menu; labels are stable config IDs.
@@ -18,7 +19,8 @@ const char* const actions[]={"settings","lock"};
 const char* const targets[]={"none","time","meshtastic","tools","quick_controls","settings","gps","lora",
     "wifi_radio","bluetooth","nfc","calendar","stopwatch","timer","alarm","diagnostics","task_manager"};
 const char* const keys[]={"home.swipe_left","home.swipe_right","home.swipe_up","home.swipe_down",
-    "home.back","home.power","tools.order","tools.hide","quick.controls","quick.actions"};
+    "home.back","home.power","tools.order","tools.hide","quick.controls","quick.actions",
+    "available-screens","available-home-targets"};
 char* trim(char* s){
     while(*s==' '||*s=='\t'||*s=='\r')++s;
     char* end=s+strlen(s);
@@ -85,10 +87,12 @@ static bool parse(char* text,size_t length,const LayoutConfig& base,LayoutConfig
             }else if(key==9){
                 if(!list(value,actions,c.actions,c.action_count))return false;
             }
+            // The two inventory keys are informational only. They cannot
+            // register screens or alter the compiled shortcut allowlist.
         }
         line=next;
     }
-    if(complete && seen!=((1u<<10)-1))return false;
+    if(complete && (seen&((1u<<10)-1))!=((1u<<10)-1))return false;
     // Never strand the user without access to Settings.
     bool quick_settings=false, reachable=false;
     for(unsigned i=0;i<c.action_count;++i)if(c.actions[i]==0)quick_settings=true;
@@ -106,9 +110,13 @@ struct EmbeddedLayout {
     LayoutConfig config=inventory();
     bool valid=false;
     EmbeddedLayout(){
-        char text[sizeof(layout_embedded_text)];
-        memcpy(text,layout_embedded_text,sizeof(text));
-        valid=parse(text,sizeof(text)-1,config,config,true);
+        // Avoid placing the entire reference inventory on the early boot stack.
+        auto* text=static_cast<char*>(malloc(sizeof(layout_embedded_text)));
+        if(text){
+            memcpy(text,layout_embedded_text,sizeof(layout_embedded_text));
+            valid=parse(text,sizeof(layout_embedded_text)-1,config,config,true);
+            free(text);
+        }
         if(!valid){
             config.home[static_cast<unsigned>(HomeInput::Back)]=HomeTarget::Settings;
             config.home[static_cast<unsigned>(HomeInput::SwipeUp)]=HomeTarget::Tools;

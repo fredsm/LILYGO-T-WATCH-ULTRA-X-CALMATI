@@ -1,8 +1,11 @@
 # T-Watch Ultra built-in navigation layout. Copy to /Settings/layout_default.txt on SD.
 # Boot-loaded; copy this file to layout.txt to customize. Swipe directions refer to finger motion.
-# Targets: none, time, meshtastic, tools, quick_controls, settings, gps, lora,
-# wifi_radio, bluetooth, nfc, calendar, stopwatch, timer, alarm, diagnostics,
-# task_manager. Keep at least one Home path to Settings.
+# Reference inventory only; these lists do not register or enable screens.
+# Includes internal screens reached through their existing menus and workflows.
+available-screens = adsb, alarm, analyze, aprs, arp_mitm, badusb, ble_pair, bluetooth, bt_analyze, calendar, calmati_remote, calmati_result, calmati_targets, camera, car, channels, configuration, deauther, diagnostics, drone, espnow, evil_twin, gatt_explorer, gps, home, lora, lora_analyze, map, meshtastic, meta, mic, mifare, mouse, nfc, nfc_credit, nfc_write, nodes, onboarding, pager, pet, phantom_flood, pin_lock, portscan, printer, quick_controls, rid_spoof, scan, send_message, settings, skimmer, stopwatch, subghz_sentinel, task_manager, tesla_cp, threat_radar, time, timer, tools, tpms, usb_sd, voice, wardriver, waterfall, webpanel, wifi, wifi_radio, wpa3_sae
+# Valid direct Home shortcut targets (none disables the shortcut).
+available-home-targets = none, time, meshtastic, tools, quick_controls, settings, gps, lora, wifi_radio, bluetooth, nfc, calendar, stopwatch, timer, alarm, diagnostics, task_manager
+# Keep at least one Home path to Settings.
 home.swipe_left = time
 home.swipe_right = meshtastic
 home.swipe_up = tools

@@ -46,6 +46,16 @@ The shorter example above reproduces the current default layout; the canonical
 file lists the full Tools order. Direction names describe
 the movement of the finger, not the side from which the swipe starts.
 
+## Screen inventory
+
+The canonical file includes two informational, comma-separated fields:
+`available-screens` lists all built-in dedicated screens, including internal
+screens, Home, onboarding and the PIN lock. `available-home-targets` lists
+the supported direct Home mappings, including `none`. Changing these
+reference lists does not register, unlock, hide or remap screens. Use
+`tools.order` to arrange existing tool tiles and the Home keys to select
+supported shortcuts. The inventory is checked by a regression test.
+
 ## Home destinations
 
 Each of the six Home inputs accepts one value:

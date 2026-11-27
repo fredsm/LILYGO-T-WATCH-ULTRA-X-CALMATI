@@ -65,7 +65,9 @@ int main(){
         "bad=key","home.back=none\nhome.swipe_down=none","home.back=none\nquick.actions=lock"}){
         CHECK(!parse(bad,c));CHECK(c.home[5]==HomeTarget::Settings);
     }
-    CHECK(parse("home.power=none\nquick.controls=\n",c));
+    // Inventory keys are informational and do not grant access to an unknown target.
+    CHECK(parse("available-screens=home,time\navailable-home-targets=none,time\nhome.power=none\nquick.controls=\n",c));
+    CHECK(!parse("available-home-targets=unregistered\nhome.power=unregistered",c));
     CHECK(c.home[5]==HomeTarget::None&&c.control_count==0&&c.home[0]==HomeTarget::Time);
     std::string huge(LAYOUT_MAX_BYTES+2,'#');CHECK(!layout_parse(huge.data(),huge.size()-1,c));
     char nul[]={'a',0,'b',0};CHECK(!layout_parse(nul,3,c));
