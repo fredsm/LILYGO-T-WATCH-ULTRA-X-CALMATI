@@ -1,5 +1,6 @@
 #include "panel.hpp"
 #include "../power_manager.h"
+#include "../diagnostics_manager.h"
 #include <algorithm>
 namespace sim {
 bool HardwarePanel::open(lv_display_t* watch_display){
@@ -45,6 +46,8 @@ bool HardwarePanel::open(lv_display_t* watch_display){
     gps=checkbox("GPS fix available");sd=checkbox("SD card present (virtual)");
     auto* reset=lv_button_create(root);lv_label_set_text(lv_label_create(reset),"Reset simulated inputs");
     lv_obj_add_event_cb(reset,[](lv_event_t* e){hardware.reset_inputs();if(power_screen_off())hardware.watch.set_display_on(false);static_cast<HardwarePanel*>(lv_event_get_user_data(e))->sync();},LV_EVENT_CLICKED,this);
+    auto* stall=lv_button_create(root);lv_label_set_text(lv_label_create(stall),"Simulate 30s SD stall");
+    lv_obj_add_event_cb(stall,[](lv_event_t*){diagnostics_simulate_stall(DiagStage::WardriverSD,30000);},LV_EVENT_CLICKED,nullptr);
     auto* note=lv_label_create(root);lv_obj_set_width(note,370);lv_label_set_long_mode(note,LV_LABEL_LONG_WRAP);
     lv_label_set_text(note,"GPS/SD changes appear when the original UI refreshes or reopens. No real devices, files or radio traffic. Close hides this panel; F6 reopens it.");
     sync();lv_display_set_default(watch_display);return true;

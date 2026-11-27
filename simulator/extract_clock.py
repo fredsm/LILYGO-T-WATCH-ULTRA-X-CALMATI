@@ -60,7 +60,7 @@ def extract(source):
     parts.append('static void create_original_clock() {\n' + layout + '\n}\n')
     power = between(source, '            if (lv_screen_active() == clock_screen)\n',
                     '\n        }\n    }, POWER_EVENT, NULL);')
-    back = between(source, '            if (settings_screen_is_active()) {',
+    back = between(source, '            if (diagnostics_screen_is_active()) {',
                    '\n        }\n    }\n\n    // Feed NMEA')
     parts.append('static void original_power_click() {\n' + power + '\n}\n')
     parts.append('static void original_back_click() {\n' + back + '\n}\n')

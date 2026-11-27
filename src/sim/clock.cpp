@@ -26,6 +26,8 @@
 #include "../time_screen.h"
 #include "../stealth.h"
 #include "../pin_lock_screen.h"
+#include "../diagnostics_screen.h"
+#include "../task_manager.h"
 #include <ctime>
 #include <cstdio>
 

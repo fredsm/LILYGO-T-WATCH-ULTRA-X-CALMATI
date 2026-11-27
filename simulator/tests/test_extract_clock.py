@@ -19,7 +19,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(before, path.read_bytes())
         self.assertIn(extract_clock.between(source, '            if (lv_screen_active() == clock_screen)\n',
                                            '\n        }\n    }, POWER_EVENT, NULL);'), generated)
-        self.assertIn(extract_clock.between(source, '            if (settings_screen_is_active()) {',
+        self.assertIn(extract_clock.between(source, '            if (diagnostics_screen_is_active()) {',
                                            '\n        }\n    }\n\n    // Feed NMEA'), generated)
 
     def test_comments_and_strings_do_not_terminate_function(self):

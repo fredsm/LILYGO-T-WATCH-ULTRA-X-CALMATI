@@ -71,3 +71,7 @@ hardware panel shows the current frequency; this does not change the host CPU
 or emulate actual watch timing/current draw. Auto uses the Core 0/Core 1
 demand sliders: >80% = 240 MHz, >50% = 160 MHz, otherwise 80 MHz.
 Upward transitions are immediate; downward transitions wait five seconds.
+
+System Diagnostics: open Tools > Task Mgr > Diagnostics. F6 hardware panel
+has "Simulate 30s SD stall" to test stall history without blocking the desktop.
+CPU loads use the core demand sliders, and memory statistics are simulated.

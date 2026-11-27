@@ -1,6 +1,8 @@
 #include "power_manager.h"
 #include "power_hold.h"
 #include "cpu_governor.h"
+#include "cpu_load_sampler.h"
+#include "diagnostics_manager.h"
 #include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <lvgl.h>
@@ -84,35 +86,16 @@ bool start_governor_timer() {
 }
 void stop_governor_timer() { if (governor_timer) lv_timer_pause(governor_timer); }
 #else
-// The prebuilt Arduino SDK has PM_ENABLE and runtime stats disabled.
-// Fixed-time scheduler samples are independent of CPU frequency. The tick
-// hook records only whether the currently scheduled task is the idle task.
-// The pinned SDK links FreeRTOS task routines into IRAM (sections.ld).
-struct CoreSamples { uint32_t total = 0, busy = 0; TaskHandle_t idle = nullptr; };
-DRAM_ATTR CoreSamples core_samples[2];
-DRAM_ATTR portMUX_TYPE sample_mux[2] = {portMUX_INITIALIZER_UNLOCKED, portMUX_INITIALIZER_UNLOCKED};
-DRAM_ATTR volatile bool sampling_enabled = false;
+// The SDK has PM_ENABLE and runtime stats disabled. Reuse the
+// lightweight per-core scheduler samples collected for diagnostics.
 TaskHandle_t governor_task = nullptr;
 esp_timer_handle_t governor_timer = nullptr;
 uint32_t previous_total[2] = {}, previous_busy[2] = {};
 int64_t last_sample_us = 0;
-
-void IRAM_ATTR sample_core(unsigned core) {
-    if (!sampling_enabled) return;
-    // Read only the scheduler's task pointer on the core running this tick.
-    const bool busy = xTaskGetCurrentTaskHandleForCPU(core) != core_samples[core].idle;
-    portENTER_CRITICAL_ISR(&sample_mux[core]);
-    ++core_samples[core].total;
-    if (busy) ++core_samples[core].busy;
-    portEXIT_CRITICAL_ISR(&sample_mux[core]);
-}
-void IRAM_ATTR sample_core0() { sample_core(0); }
-void IRAM_ATTR sample_core1() { sample_core(1); }
 void snapshot(unsigned core, uint32_t& total, uint32_t& busy) {
-    portENTER_CRITICAL(&sample_mux[core]);
-    total = core_samples[core].total;
-    busy = core_samples[core].busy;
-    portEXIT_CRITICAL(&sample_mux[core]);
+    const auto sample = cpu_sampler_snapshot(core);
+    total = sample.total;
+    busy = sample.busy;
 }
 void governor_worker(void*) {
     for (;;) {
@@ -150,14 +133,7 @@ void governor_worker(void*) {
 }
 bool prepare_governor() {
     if (governor_timer) return true;
-    core_samples[0].idle = xTaskGetIdleTaskHandleForCPU(0);
-    core_samples[1].idle = xTaskGetIdleTaskHandleForCPU(1);
-    if (!core_samples[0].idle || !core_samples[1].idle) return false;
-    if (esp_register_freertos_tick_hook_for_cpu(sample_core0, 0) != ESP_OK) return false;
-    if (esp_register_freertos_tick_hook_for_cpu(sample_core1, 1) != ESP_OK) {
-        esp_deregister_freertos_tick_hook_for_cpu(sample_core0, 0);
-        return false;
-    }
+    if (!cpu_sampler_begin()) return false;
     esp_timer_create_args_t args = {};
     args.callback = [](void*) { if (governor_task) xTaskNotifyGive(governor_task); };
     args.name = "cpu_governor";
@@ -166,22 +142,17 @@ bool prepare_governor() {
                                nullptr, tskIDLE_PRIORITY + 8, &governor_task, 1) == pdPASS)
         return true;
     if (governor_timer) { esp_timer_delete(governor_timer); governor_timer = nullptr; }
-    esp_deregister_freertos_tick_hook_for_cpu(sample_core0, 0);
-    esp_deregister_freertos_tick_hook_for_cpu(sample_core1, 1);
     return false;
 }
 bool start_governor_timer() {
     for (unsigned core = 0; core < 2; ++core)
         snapshot(core, previous_total[core], previous_busy[core]);
     last_sample_us = esp_timer_get_time();
-    sampling_enabled = true;
     if (esp_timer_start_periodic(governor_timer, CpuGovernor::window_ms * 1000ULL) == ESP_OK)
         return true;
-    sampling_enabled = false;
     return false;
 }
 void stop_governor_timer() {
-    sampling_enabled = false;
     if (governor_timer) esp_timer_stop(governor_timer);
 }
 #endif
@@ -404,6 +375,7 @@ void lightsleep() {
     // Do not invoke from the idle timer until peripheral ownership/resume
     // policy is implemented. The vendor routine shuts down several rails.
     if (power_shutting_down()) return;
+    diagnostics_pause();
     pause_cpu_governor();
     screenlock();
 #ifdef TWATCH_SIMULATOR
@@ -427,6 +399,7 @@ void lightsleep() {
     consume_click = true;
     pin_lock_handle_button();
     resume_cpu_governor();
+    diagnostics_resume();
 #endif
 }
 
@@ -434,6 +407,7 @@ void poweroff() { deepsleep(); }
 
 void deepsleep() {
     if (asleep) return;
+    diagnostics_pause();
     pause_cpu_governor();
     screenlock();
     screenoff();
@@ -475,6 +449,7 @@ void sim_wake(uint32_t now) {
     power_note_activity(now);
     consume_click = true;
     if (cold_boot) {
+        diagnostics_reset();
         load_cpu_preference();
         pin_lock_restore();
         sim::show_home();
@@ -483,6 +458,7 @@ void sim_wake(uint32_t now) {
         resume_cpu_governor();
         pin_lock_handle_button();
     }
+    diagnostics_resume();
 }
 }
 #endif
@@ -527,7 +503,7 @@ void power_tick(uint32_t now, bool check_idle) {
     if (asleep) { if (wake_hold.update(now)) sim_wake(now); return; }
 #endif
     if (power_is_asleep()) return;
-    if (hold.update(now)) { pause_cpu_governor(); screenlock(); screenoff(); }
+    if (hold.update(now)) { diagnostics_pause(); pause_cpu_governor(); screenlock(); screenoff(); }
     if (requested) { poweroff(); return; }
     if (check_idle && !off && !hold.down() && screenoff_timeout &&
         uint32_t(now - last_activity) >= screenoff_timeout) screenoff();

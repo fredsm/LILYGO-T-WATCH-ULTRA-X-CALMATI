@@ -7,7 +7,7 @@ namespace sim {
 // Independent SDL/LVGL surface; never changes the watch's default display.
 class HardwarePanel {
 public:
-    static constexpr int width=420,height=730;
+    static constexpr int width=420,height=780;
     SDL_Window* window=nullptr;
     lv_obj_t *battery=nullptr,*brightness=nullptr,*charging=nullptr,*display_on=nullptr;
     lv_obj_t *gps=nullptr,*satellites=nullptr,*sd=nullptr,*summary=nullptr,*core0=nullptr,*core1=nullptr;

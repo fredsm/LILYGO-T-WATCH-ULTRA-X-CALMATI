@@ -11,6 +11,7 @@
 #include "pointer.hpp"
 #include "keyboard.hpp"
 #include "../power_manager.h"
+#include "../diagnostics_manager.h"
 #include "../pin_lock_screen.h"
 #include <algorithm>
 #include <array>
@@ -245,7 +246,8 @@ int main(int argc,char** argv) {
             sim::dispatch_pointer(input,pressed);held_read_at=now;
         }
         if(!sim::startup_active())pin_lock_enforce();
-        lv_timer_handler();
+        diagnostics_ui_handler();
+        diagnostics_sim_tick();
         if(!sim::startup_active())pin_lock_enforce();
         sim::ButtonEvent event{};
         while(watch.pop_button(event)) std::printf("button %d %s\n",static_cast<int>(event.button),event.pressed?"down":"up");

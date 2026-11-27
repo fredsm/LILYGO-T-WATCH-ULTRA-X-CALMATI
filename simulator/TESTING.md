@@ -121,3 +121,28 @@ opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
   require the same lower target for five seconds. Fixed settings disable
   the governor. In the mock, use the core-demand sliders in the hardware
   panel to exercise the same policy. Auto persists across reboot.
+
+## System Diagnostics (Phase 1)
+- Open **Tools > Task Mgr > Diagnostics**; Back returns to Task Mgr.
+- Monitor the current CPU frequency, both core occupancy estimates (including
+  fixed 240 MHz), UI handler duration, largest UI service gap, recent stalls,
+  slowest main-loop operations, internal free/minimum/largest heap, free
+  PSRAM, UI stack headroom, uptime and reset reason.
+- Firmware: the heartbeat task runs independently of LVGL on core 0, checking
+  every 50 ms for UI service gaps >=100 ms. Latest 12 stalls live in a fixed
+  RAM buffer (screen shows five); it records recovery and likely active
+  operation. No SD logging or hardware bus access from the monitor. A separate
+  low-priority telemetry task samples heap and attempts best-effort USB serial
+  reports. USB issues cannot block the heartbeat task. Sampling is approximate;
+  short or invalid CPU sample windows can show N/A.
+- Operation timings include all blocking work within the named main-loop call.
+  QSPI flush/wait timing is captured using the LVGL display events. These are
+  not individual electrical SPI/I2C transaction timings. Background worker
+  internals and callback internals are not separately timed in Phase 1.
+- Screen-off continues monitoring the UI service loop; intentional shutdown and
+  sleep pause stall detection. RAM-only history is reset on reboot.
+- Desktop: F6 hardware panel > **Simulate 30s SD stall** injects a recovered
+  Wardriver/SD stall without actually freezing or advancing the watch clock.
+  Core demand sliders work in fixed and Auto modes; memory values are fixtures.
+  `diagnostics_monitor` exercises ongoing/recovered stalls, rollover history,
+  metrics, pause/resume, reset, and the Task Manager entry point.

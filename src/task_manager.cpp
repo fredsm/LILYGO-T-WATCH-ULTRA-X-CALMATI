@@ -1,4 +1,5 @@
 #include "task_manager.h"
+#include "diagnostics_screen.h"
 #include "tools_screen.h"
 #include <LilyGoLib.h>
 #include <WiFi.h>
@@ -174,7 +175,7 @@ static void refresh()
     }
 }
 
-static void on_timer(lv_timer_t *) { if (s_active) refresh(); }
+static void on_timer(lv_timer_t *) { if (task_manager_is_active()) refresh(); }
 
 static void on_gesture(lv_event_t *e)
 {
@@ -203,7 +204,14 @@ void task_manager_create()
     lv_obj_set_style_text_font(s_batt, &lv_font_montserrat_18, LV_PART_MAIN);
     lv_obj_set_style_text_color(s_batt, lv_color_make(0x00, 0xCC, 0x66), LV_PART_MAIN);
     lv_label_set_text(s_batt, "");
-    lv_obj_align(s_batt, LV_ALIGN_TOP_MID, 0, 50);
+    lv_obj_align(s_batt, LV_ALIGN_TOP_LEFT, 18, 52);
+    auto* diag = lv_button_create(s_screen);
+    lv_obj_set_size(diag, 154, 32);
+    lv_obj_align(diag, LV_ALIGN_TOP_RIGHT, -12, 48);
+    auto* diag_label = lv_label_create(diag);
+    lv_label_set_text(diag_label, "Diagnostics");
+    lv_obj_center(diag_label);
+    lv_obj_add_event_cb(diag, [](lv_event_t*) { s_active=false; diagnostics_screen_show(); }, LV_EVENT_CLICKED, nullptr);
 
     s_list = lv_obj_create(s_screen);
     lv_obj_set_size(s_list, 404, 340);
@@ -234,4 +242,4 @@ void task_manager_show()
     lv_scr_load(s_screen);
 }
 
-bool task_manager_is_active() { return s_active; }
+bool task_manager_is_active() { return s_active && lv_screen_active()==s_screen; }
