@@ -77,6 +77,7 @@
 #include "diagnostics_manager.h"
 #include "spi_bus_manager.h"
 #include "i2c_bus_manager.h"
+#include "qspi_display.h"
 #include "event_manager.h"
 #include "ui_scheduler.h"
 #include "gps_service.h"
@@ -1369,6 +1370,7 @@ void setup()
     instance.begin();
     instance.powerControl(POWER_NFC, false); // ensure NFC is off on boot
     beginLvglHelper(instance);
+    qspi_display_init();
 
     // The default 10 px scroll threshold is tiny on the AMOLED: a tap with a
     // normal fingertip wobble gets read as a scroll, so the tile's CLICKED never
@@ -1933,6 +1935,7 @@ void setup()
 
 void loop()
 {
+    qspi_display_service(); // reap without blocking, request repaint after late recovery
     DIAG_RUN(HardwareEvents, instance.loop()); // required for power button and PMU event dispatch
     DIAG_RUN(Power, power_tick(millis(), false)); // process the hold first, inactivity after touch/Back
     if (power_shutting_down()) { delay(5); return; }

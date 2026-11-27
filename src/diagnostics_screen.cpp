@@ -5,13 +5,14 @@
 #include "storage_manager.h"
 #include "spi_bus_manager.h"
 #include "i2c_bus_manager.h"
+#include "qspi_display.h"
 #include "task_manager.h"
 #include <lvgl.h>
 #include <stdio.h>
 
 namespace {
 lv_obj_t *screen=nullptr, *status=nullptr, *cpu=nullptr, *ui=nullptr, *memory=nullptr,
-         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr;
+         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr, *qspi=nullptr;
 lv_timer_t* timer=nullptr;
 lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
     auto* obj=lv_label_create(parent);
@@ -75,6 +76,15 @@ void refresh() {
         pos+=size_t(n);
     }
     lv_label_set_text(i2c,wire_text);
+    const auto display=qspi_display_stats();
+    lv_label_set_text_fmt(qspi,
+        "%s | %s\nFlushes: %lu | Completed: %lu\nDropped: %lu | Commands: %lu\nTimeouts: %lu | Errors: %lu | Recovered: %lu\nActive: %lu us | Max wait: %lu us\nMax submit: %lu us | Queued-to-reap: %lu us\nPixel data: %lu KB | DMA staging: %u KB",
+        display.enabled?"Async DMA":"Synchronous / simulated",
+        display.quarantined?"QUARANTINED":display.pending?"In flight":display.paused?"Paused":display.cooling?"Cooldown":"Idle",
+        (unsigned long)display.flushes,(unsigned long)display.completed,(unsigned long)display.dropped,(unsigned long)display.commands,
+        (unsigned long)display.timeouts,(unsigned long)display.errors,(unsigned long)display.recoveries,
+        (unsigned long)display.active_us,(unsigned long)display.max_wait_us,(unsigned long)display.max_submit_us,
+        (unsigned long)display.max_transfer_us,(unsigned long)(display.bytes/1024),unsigned(QspiPipeline::capacity/1024));
     if (!d.ready || !d.memory_sample_ms) lv_label_set_text(memory,"Memory sample pending");
     else lv_label_set_text_fmt(memory,"Internal free: %lu KB\nMinimum free: %lu KB\nLargest block: %lu KB\nFree PSRAM: %lu KB\nUI stack headroom: %lu B\nMemory sample age: %lu s",
         (unsigned long)(d.heap/1024),(unsigned long)(d.min_heap/1024),
@@ -127,6 +137,7 @@ void create() {
     label(body,"RESPONSIVENESS",true);ui=label(body,"");
     label(body,"SHARED SPI BUS",true);spi=label(body,"");
     label(body,"SHARED I2C BUS",true);i2c=label(body,"");
+    label(body,"DISPLAY QSPI DMA",true);qspi=label(body,"");
     label(body,"MEMORY",true);memory=label(body,"");
     label(body,"SLOWEST OPERATIONS",true);timings=label(body,"");
     label(body,"RECENT UI STALLS",true);history=label(body,"");

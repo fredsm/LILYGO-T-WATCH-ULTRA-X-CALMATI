@@ -31,6 +31,7 @@
 #include "tpms.h"
 #include "mifare.h"
 #include "i2c_bus_manager.h"
+#include "qspi_display.h"
 #include "alarm.h"
 #include "settings_screen.h"
 #else
@@ -207,6 +208,32 @@ void resume_cpu_governor() {
 uint32_t last_activity = 0, screenoff_timeout = 60000;
 bool consume_click = false;
 bool locked = false, off = false, asleep = false, requested = false;
+#ifndef TWATCH_SIMULATOR
+bool panel_transition_pending=false;
+uint32_t panel_last_attempt=0;
+void panel_transition(bool force=false) {
+    if(!panel_transition_pending || !qspi_display_idle())return;
+    const auto now=millis();
+    if(!force && uint32_t(now-panel_last_attempt)<100)return;
+    panel_last_attempt=now;
+    if(off){
+        instance.setBrightness(0);
+        if(!qspi_display_idle() || !qspi_display_prepare_sleep())return;
+        instance.sleepDisplay(); // SLPIN is already acknowledged; then gate panel rail
+    }else{
+        instance.wakeupDisplay();
+        if(!qspi_display_panel_awake())return;
+        instance.setBrightness(settings_get_brightness());
+        if(!qspi_display_idle() || instance.getBrightness()!=settings_get_brightness())return;
+        qspi_display_pause(false);
+        auto* timer=lv_display_get_refr_timer(lv_display_get_default());
+        if(timer)lv_timer_resume(timer);
+        lv_obj_invalidate(lv_screen_active());
+    }
+    panel_transition_pending=false;
+}
+#endif
+
 #ifdef TWATCH_SIMULATOR
 bool light_asleep = false;
 PowerHold wake_hold;
@@ -335,12 +362,13 @@ void screenoff() {
 #ifdef TWATCH_SIMULATOR
     sim::hardware.watch.set_display_on(false);
 #else
-    instance.setBrightness(0);
-    // No further LVGL flushes while the OLED is sleeping. Other timers may
-    // still run during orderly shutdown (e.g. recording finalization).
+    // Pause first: no new transfers can start while transitioning the panel.
+    qspi_display_pause(true);
     auto* timer = lv_display_get_refr_timer(lv_display_get_default());
     if (timer) lv_timer_pause(timer);
-    instance.sleepDisplay();
+    panel_transition_pending=true;
+    qspi_display_drain(); // at most one bounded wait; retry later if quarantined
+    panel_transition(true);
 #endif
 }
 
@@ -351,12 +379,13 @@ void screenon() {
 #ifdef TWATCH_SIMULATOR
     sim::hardware.watch.set_display_on(true);
 #else
-    instance.wakeupDisplay();
-    auto* timer = lv_display_get_refr_timer(lv_display_get_default());
-    if (timer) lv_timer_resume(timer);
-    lv_obj_invalidate(lv_screen_active());
+    panel_transition_pending=true;
+    qspi_display_drain();
+    panel_transition(true);
 #endif
+#ifdef TWATCH_SIMULATOR
     instance.setBrightness(settings_get_brightness());
+#endif
     power_note_activity(millis());
 }
 
@@ -401,6 +430,19 @@ void lightsleep() {
         diagnostics_resume();
         return;
     }
+    qspi_display_pause(true);
+    auto* refresh=lv_display_get_refr_timer(lv_display_get_default());
+    if(refresh)lv_timer_pause(refresh);
+    if(!qspi_display_drain() || !qspi_display_prepare_sleep()){
+        // Do not cut a rail or enter vendor sleep while DMA owns a descriptor.
+        panel_transition_pending=true;
+        storage_resume();
+        gps_service_session(gps_screen_is_powered());
+        resume_cpu_governor();
+        screenunlock();
+        diagnostics_resume();
+        return;
+    }
     alarm_stop_chime_loop();
     tpms_stop();
     mifare_dict_stop();
@@ -412,14 +454,10 @@ void lightsleep() {
     if(instance.isCardReady())storage_media_inserted();
     else storage_media_removed();
     power_init();
-    // The SDK already woke the panel; restore a previously paused refresh.
-    if (off) {
-        off = false;
-        auto* timer = lv_display_get_refr_timer(lv_display_get_default());
-        if (timer) lv_timer_resume(timer);
-    }
-    instance.setBrightness(settings_get_brightness());
-    lv_obj_invalidate(lv_screen_active());
+    // SDK attempted panel wake; don't resume LVGL until it is acknowledged.
+    off=false;
+    panel_transition_pending=true;
+    panel_transition(true);
     screenunlock();
     power_note_activity(millis());
     consume_click = true;
@@ -440,6 +478,12 @@ void deepsleep() {
     pause_cpu_governor();
     screenlock();
     screenoff();
+#ifndef TWATCH_SIMULATOR
+    if(panel_transition_pending || !qspi_display_idle()){
+        requested=true; // power_tick retries instead of freeing active DMA
+        return;
+    }
+#endif
     asleep = true;
 #ifdef TWATCH_SIMULATOR
     sim::leave_screen();
@@ -550,6 +594,9 @@ void power_tick(uint32_t now, bool check_idle) {
     if (asleep) { if (wake_hold.update(now)) sim_wake(now); return; }
 #endif
     if (power_is_asleep()) return;
+#ifndef TWATCH_SIMULATOR
+    panel_transition();
+#endif
     if (hold.update(now)) { diagnostics_pause(); pause_cpu_governor(); screenlock(); screenoff(); }
     if (requested) { poweroff(); return; }
     if (check_idle && !off && !hold.down() && screenoff_timeout &&

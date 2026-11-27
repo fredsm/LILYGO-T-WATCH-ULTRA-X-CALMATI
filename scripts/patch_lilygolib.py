@@ -171,3 +171,67 @@ replace_once(os.path.join(src_dir, "LV_Helper_v9.cpp"),
              '        lv_indev_reset(drv, nullptr);\n'
              '        data->state = LV_INDEV_STATE_REL;\n'
              '        return;\n    }\n#endif')
+
+# Phase 6: keep the stock boot sequence, but route runtime Ultra QSPI writes
+# through our persistent asynchronous DMA pipeline. No other board is changed.
+qspi = os.path.join(src_dir, "LilyGoDispInterface.cpp")
+replace_once(qspi, '#include <bsp_lcd/esp_lcd_st7796.h>',
+             '#include <bsp_lcd/esp_lcd_st7796.h>\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             'extern "C" void twatch_qspi_bind(spi_device_handle_t,int,uint16_t,uint16_t);\n'
+             'extern "C" void twatch_qspi_offset(uint16_t,uint16_t);\n'
+             'extern "C" bool twatch_qspi_enabled();\n'
+             'extern "C" bool twatch_qspi_command(uint32_t,uint8_t*,uint32_t);\n'
+             'extern "C" bool twatch_qspi_end();\n'
+             'extern "C" void twatch_qspi_push_sync(uint16_t,uint16_t,uint16_t,uint16_t,uint16_t*);\n'
+             '#endif')
+replace_once(qspi,
+             '    pushColors(0, 0, width, height, draw_buf.data());\n\n    return true;',
+             '    pushColors(0, 0, width, height, draw_buf.data());\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    twatch_qspi_bind(_spi_dev,_cs,_offset_x,_offset_y);\n#endif\n\n    return true;')
+replace_once(qspi,
+             '    writeCommand(DISP_CMD_MADCTL, &gbr, 1);',
+             '    writeCommand(DISP_CMD_MADCTL, &gbr, 1);\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    twatch_qspi_offset(_offset_x,_offset_y);\n#endif')
+replace_once(qspi,
+             'void LilyGoDispQSPI::pushColors(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *color)\n{',
+             'void LilyGoDispQSPI::pushColors(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *color)\n{\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    if (twatch_qspi_enabled()) { twatch_qspi_push_sync(x1,y1,x2,y2,color); return; }\n#endif')
+replace_once(qspi,
+             'void LilyGoDispQSPI::writeCommand(uint32_t cmd, uint8_t *pdat, uint32_t length)\n{',
+             'void LilyGoDispQSPI::writeCommand(uint32_t cmd, uint8_t *pdat, uint32_t length)\n{\n'
+             '    if (!_spi_dev) return; // constructor rotation occurs before bus is initialized\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    if (twatch_qspi_enabled()) { twatch_qspi_command(cmd,pdat,length); return; }\n#endif')
+replace_once(qspi,
+             'void LilyGoDispQSPI::end()\n{',
+             'void LilyGoDispQSPI::end()\n{\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    if (twatch_qspi_enabled() && !twatch_qspi_end()) return; // never free an active descriptor\n#endif')
+replace_once(qspi,
+             '    _brightness = level;\n    writeCommand(DISP_CMD_BRIGHTNESS, &level, 1);',
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    if (twatch_qspi_enabled()) {\n'
+             '        if (twatch_qspi_command(DISP_CMD_BRIGHTNESS,&level,1)) _brightness=level;\n'
+             '        return;\n    }\n#endif\n'
+             '    _brightness = level;\n    writeCommand(DISP_CMD_BRIGHTNESS, &level, 1);')
+# PSRAM rendering is double-buffered but partial; separate static DMA staging
+# is allocated in firmware. The second buffer is optional under heap pressure.
+replace_once(os.path.join(src_dir, "LV_Helper_v9.cpp"),
+             '        log_d("Using Not DMA pushColors..");\n        buf = (lv_color16_t *)ps_malloc(lv_buffer_size);\n        assert(buf);\n        buf1 = (lv_color16_t *)ps_malloc(lv_buffer_size);\n        assert(buf1);',
+             '        log_d("Using Not DMA pushColors..");\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA) && TWATCH_QSPI_ASYNC\n'
+             '        lv_buffer_size = 8192; // matches the dedicated DMA staging capacity\n'
+             '#endif\n'
+             '        buf = (lv_color16_t *)ps_malloc(lv_buffer_size);\n        assert(buf);\n'
+             '        buf1 = (lv_color16_t *)ps_malloc(lv_buffer_size);\n'
+             '#if !defined(ARDUINO_T_WATCH_S3_ULTRA) || !TWATCH_QSPI_ASYNC\n        assert(buf1);\n#endif')
+
+replace_once(os.path.join(src_dir, "LV_Helper_v9.cpp"),
+             '    bool useDMA = board.useDMA();',
+             '    bool useDMA = board.useDMA();\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA) && TWATCH_QSPI_ASYNC\n'
+             '    useDMA = false; // LVGL buffers are PSRAM; firmware owns DMA staging\n#endif')
