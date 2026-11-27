@@ -66,6 +66,8 @@ The hardware panel and F5 cannot wake a powered-off watch.
 ScreenOff Timer in Settings defaults to 60 secs (Off / 60 secs / 3000 secs).
 A short Power press wakes normal screen-off without changing pages.
 
-CPU Frequency: choose 80 / 160 / 240 MHz (default) in Settings. The simulated
+CPU Frequency: choose 80 / 160 / 240 MHz (default) or Auto in Settings. The simulated
 hardware panel shows the current frequency; this does not change the host CPU
-or emulate actual watch timing/current draw. No automatic scaling is enabled.
+or emulate actual watch timing/current draw. Auto uses the Core 0/Core 1
+demand sliders: >80% = 240 MHz, >50% = 160 MHz, otherwise 80 MHz.
+Upward transitions are immediate; downward transitions wait five seconds.

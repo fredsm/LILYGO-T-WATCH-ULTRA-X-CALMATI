@@ -37,6 +37,8 @@ bool HardwarePanel::open(lv_display_t* watch_display){
     };
     battery=slider("Battery (%)",100);brightness=slider("Brightness (0-255)",255);
     satellites=slider("GPS satellites",32);
+    core0=slider("Core 0 CPU demand (%)",100);
+    core1=slider("Core 1 CPU demand (%)",100);
     auto checkbox=[&](const char* label){auto* c=lv_checkbox_create(root);lv_checkbox_set_text(c,label);
         lv_obj_add_event_cb(c,changed,LV_EVENT_VALUE_CHANGED,this);return c;};
     charging=checkbox("Charging");display_on=checkbox("Watch display on");
@@ -52,6 +54,8 @@ void HardwarePanel::changed(lv_event_t* e){
     if(target==p->battery)hardware.watch.set_battery(lv_slider_get_value(target));
     if(target==p->brightness)hardware.watch.set_brightness(lv_slider_get_value(target));
     if(target==p->satellites)hardware.satellites=lv_slider_get_value(target);
+    if(target==p->core0)hardware.core_load[0]=lv_slider_get_value(target);
+    if(target==p->core1)hardware.core_load[1]=lv_slider_get_value(target);
     bool checked=lv_obj_has_state(target,LV_STATE_CHECKED);
     if(target==p->charging)hardware.watch.set_charging(checked);
     if(target==p->display_on)hardware.watch.set_display_on(checked&&!power_screen_off());
@@ -62,10 +66,12 @@ void HardwarePanel::sync(){
     lv_slider_set_value(battery,hardware.watch.battery(),LV_ANIM_OFF);
     lv_slider_set_value(brightness,hardware.watch.brightness(),LV_ANIM_OFF);
     lv_slider_set_value(satellites,hardware.satellites,LV_ANIM_OFF);
+    lv_slider_set_value(core0,hardware.core_load[0],LV_ANIM_OFF);
+    lv_slider_set_value(core1,hardware.core_load[1],LV_ANIM_OFF);
     auto check=[](lv_obj_t* obj,bool value){if(value)lv_obj_add_state(obj,LV_STATE_CHECKED);else lv_obj_remove_state(obj,LV_STATE_CHECKED);};
     check(charging,hardware.watch.charging());check(display_on,hardware.watch.display_on());
     check(gps,hardware.gps_fix);check(sd,hardware.sd_ready);
-    lv_label_set_text_fmt(summary,"Battery %d%% | Brightness %d%%\nGPS %s | %d satellites\nCPU %lu MHz (simulated)",hardware.watch.battery(),hardware.watch.brightness()*100/255,hardware.gps_fix?"fix":"no fix",hardware.satellites,(unsigned long)getCpuFrequency());
+    lv_label_set_text_fmt(summary,"Battery %d%% | Brightness %d%%\nGPS %s | %d satellites\nCPU %lu MHz (%s)",hardware.watch.battery(),hardware.watch.brightness()*100/255,hardware.gps_fix?"fix":"no fix",hardware.satellites,(unsigned long)getCpuFrequency(),cpuAutomaticEnabled()?"Auto, simulated":"simulated");
 }
 bool HardwarePanel::event(const SDL_Event& e){
     Uint32 target=0;

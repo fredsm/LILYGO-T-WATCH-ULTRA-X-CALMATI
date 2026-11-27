@@ -54,7 +54,7 @@ int main() {
     CHECK(increaseCpuFrequency() && getCpuFrequency()==160);
     CHECK(increaseCpuFrequency() && getCpuFrequency()==240);
     CHECK(setCpuFrequency(80) && getCpuFrequency()==80);
-    CHECK(!setCpuFrequency(100) && !setCpuFrequencyPreference(0) && getCpuFrequency()==80);
+    CHECK(!setCpuFrequency(100) && !setCpuFrequencyPreference(100) && getCpuFrequency()==80);
     CHECK(saved()==240 && getPreferredCpuFrequency()==240);
     CHECK(restoreCpuFrequency() && getCpuFrequency()==240);
 
@@ -63,7 +63,7 @@ int main() {
     settings_screen_show();
     auto* dropdown=find_dropdown(lv_screen_active());
     CHECK(dropdown && lv_dropdown_get_selected(dropdown)==2);
-    CHECK(!std::strcmp(lv_dropdown_get_options(dropdown),"80 MHz\n160 MHz\n240 MHz"));
+    CHECK(!std::strcmp(lv_dropdown_get_options(dropdown),"80 MHz\n160 MHz\n240 MHz\nAuto"));
     select(dropdown,0);
     CHECK(getCpuFrequency()==80 && sim::hardware.watch.cpu_frequency()==80 && saved()==80);
     select(dropdown,1);

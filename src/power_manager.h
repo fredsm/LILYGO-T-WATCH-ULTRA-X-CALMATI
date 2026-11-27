@@ -24,12 +24,16 @@ void power_button_up(uint32_t now);
 void power_tick(uint32_t now, bool check_idle = true);
 void power_cancel_press();
 
-// Manual CPU policy. Runtime changes do not overwrite the saved preference.
+// CPU policy. Zero denotes Auto; runtime changes never persist the preference.
 constexpr uint32_t CPU_DEFAULT_MHZ = 240;
+constexpr uint32_t CPU_AUTO = 0;
 bool setCpuFrequency(uint32_t mhz);
 uint32_t getCpuFrequency();
 bool increaseCpuFrequency(); // one step, saturates at 240 MHz
 bool decreaseCpuFrequency(); // one step, saturates at 80 MHz
 bool restoreCpuFrequency();  // restore the user's saved preference
-bool setCpuFrequencyPreference(uint32_t mhz);
+bool setCpuFrequencyPreference(uint32_t mhz); // CPU_AUTO or a fixed rate
 uint32_t getPreferredCpuFrequency();
+bool cpuAutomaticEnabled();
+// Last sampled utilization (0..100), or -1 when sampling is not active.
+int getCpuLoad(unsigned core);

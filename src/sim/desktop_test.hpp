@@ -89,6 +89,12 @@ public:
         check([this]{return getCpuFrequency()==80&&std::strstr(lv_label_get_text(panel.summary),"CPU 80 MHz (simulated)");},"CPU setting reaches hardware panel");
         steps.push_back([this]{auto* d=find(lv_obj_get_parent(find(lv_screen_active(),&lv_label_class,"CPU Frequency")),&lv_dropdown_class);lv_dropdown_set_selected(d,2);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
         check([]{return getCpuFrequency()==240;},"CPU setting restores 240 MHz");
+        steps.push_back([this]{auto* d=find(lv_obj_get_parent(find(lv_screen_active(),&lv_label_class,"CPU Frequency")),&lv_dropdown_class);lv_dropdown_set_selected(d,3);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
+        check([this]{return cpuAutomaticEnabled()&&std::strstr(lv_label_get_text(panel.summary),"Auto, simulated");},"Auto CPU mode reaches hardware panel");
+        steps.push_back([this]{lv_slider_set_value(panel.core1,85,LV_ANIM_OFF);lv_obj_send_event(panel.core1,LV_EVENT_VALUE_CHANGED,nullptr);});wait(28);
+        check([]{return hardware.core_load[1]==85&&getCpuLoad(1)==85&&getCpuFrequency()==240;},"per-core simulated demand reaches governor");
+        steps.push_back([this]{auto* d=find(lv_obj_get_parent(find(lv_screen_active(),&lv_label_class,"CPU Frequency")),&lv_dropdown_class);lv_dropdown_set_selected(d,2);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
+        check([]{return !cpuAutomaticEnabled()&&getCpuFrequency()==240;},"fixed CPU selection disables governor");
         check([]{auto* l=find(lv_screen_active(),&lv_label_class,"ScreenOff Timer");if(!l)return false;auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);return d&&lv_dropdown_get_selected(d)==1&&power_get_screenoff_timeout()==60000;},"ScreenOff Timer default 60 seconds");
         steps.push_back([this]{auto* l=find(lv_screen_active(),&lv_label_class,"ScreenOff Timer");if(!l){ok=false;return;}auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);lv_dropdown_set_selected(d,2);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
         check([]{return power_get_screenoff_timeout()==3000000;},"3000 seconds is 50 minutes");

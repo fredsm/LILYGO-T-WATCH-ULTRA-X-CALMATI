@@ -105,13 +105,19 @@ opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
   Internal NVS retains the lock across a reboot (desktop NVS is session-only).
 - `pin_lock_authentication` and the SDL end-to-end test exercise these flows.
 
-## Manual CPU frequency
-- Settings > CPU Frequency: 80 MHz, 160 MHz, or 240 MHz (default). Changes
+## CPU frequency control
+- Settings > CPU Frequency: 80 MHz, 160 MHz, 240 MHz (default), or Auto. Changes
   apply immediately; the chosen rate is stored in internal NVS, not the SD.
 - The hardware panel displays the simulated active CPU frequency. The mock
   models the selected clock state, not host CPU speed, watch timing or current draw.
 - Runtime helpers can step up/down across the three rates and restore the saved
-  preference without changing it. Invalid rates are rejected. Lock, screen-off,
-  and light sleep do not automatically modify the current selection.
+  preference without changing it. Invalid rates are rejected. In fixed mode,
+  lock, screen-off and light sleep do not change the chosen rate. Auto continues
+  while screen-off, pauses during sleep and resumes at 240 MHz on light wake.
 - Test reduced-rate performance with LVGL, Wi-Fi/BLE, LoRa and active tools on
-  actual hardware. Automatic frequency scaling is not enabled yet.
+  actual hardware. Auto samples per-core scheduler occupancy every 500 ms;
+  the busiest core determines the target (>80% = 240 MHz, >50% = 160 MHz,
+  otherwise 80 MHz). Upward transitions are direct, downward transitions
+  require the same lower target for five seconds. Fixed settings disable
+  the governor. In the mock, use the core-demand sliders in the hardware
+  panel to exercise the same policy. Auto persists across reboot.

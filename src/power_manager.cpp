@@ -1,5 +1,6 @@
 #include "power_manager.h"
 #include "power_hold.h"
+#include "cpu_governor.h"
 #include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <lvgl.h>
@@ -10,6 +11,10 @@
 #include <esp_attr.h>
 #include <esp_idf_version.h>
 #include <esp_timer.h>
+#include <esp_freertos_hooks.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
 #include <Wire.h>
 #include <WiFi.h>
 #include <esp_bt.h>
@@ -29,22 +34,197 @@ namespace {
 PowerHold hold;
 uint32_t preferred_cpu_mhz = CPU_DEFAULT_MHZ;
 bool cpu_initialized = false;
+CpuGovernor governor;
+bool governor_running = false;
+int cpu_load[2] = {-1, -1};
+
+#ifndef TWATCH_SIMULATOR
+// Frequency changes from the UI and governor worker must never overlap.
+StaticSemaphore_t cpu_mutex_storage;
+SemaphoreHandle_t cpu_mutex = nullptr;
+struct CpuGuard {
+    CpuGuard() { if (cpu_mutex) xSemaphoreTakeRecursive(cpu_mutex, portMAX_DELAY); }
+    ~CpuGuard() { if (cpu_mutex) xSemaphoreGiveRecursive(cpu_mutex); }
+};
+#else
+struct CpuGuard {};
+#endif
+
 bool valid_cpu_frequency(uint32_t mhz) {
     return mhz == 80 || mhz == 160 || mhz == 240;
 }
+bool valid_cpu_preference(uint32_t mhz) {
+    return mhz == CPU_AUTO || valid_cpu_frequency(mhz);
+}
+void governor_sample(unsigned core0, unsigned core1, uint32_t elapsed_ms = CpuGovernor::window_ms) {
+    CpuGuard guard;
+    if (!governor_running || preferred_cpu_mhz != CPU_AUTO) return;
+    cpu_load[0] = core0;
+    cpu_load[1] = core1;
+    const uint32_t current = getCpuFrequency();
+    const uint32_t wanted = governor.evaluate(current, core0, core1, elapsed_ms);
+    if (wanted != current && !setCpuFrequency(wanted)) governor.reset();
+}
+
+#ifdef TWATCH_SIMULATOR
+lv_timer_t* governor_timer = nullptr;
+bool prepare_governor() {
+    if (governor_timer) return true;
+    governor_timer = lv_timer_create([](lv_timer_t*) {
+        governor_sample(sim::hardware.core_load[0], sim::hardware.core_load[1]);
+    }, CpuGovernor::window_ms, nullptr);
+    if (!governor_timer) return false;
+    lv_timer_pause(governor_timer);
+    return true;
+}
+bool start_governor_timer() {
+    lv_timer_reset(governor_timer);
+    lv_timer_resume(governor_timer);
+    return true;
+}
+void stop_governor_timer() { if (governor_timer) lv_timer_pause(governor_timer); }
+#else
+// The prebuilt Arduino SDK has PM_ENABLE and runtime stats disabled.
+// Fixed-time scheduler samples are independent of CPU frequency. The tick
+// hook records only whether the currently scheduled task is the idle task.
+// The pinned SDK links FreeRTOS task routines into IRAM (sections.ld).
+struct CoreSamples { uint32_t total = 0, busy = 0; TaskHandle_t idle = nullptr; };
+DRAM_ATTR CoreSamples core_samples[2];
+DRAM_ATTR portMUX_TYPE sample_mux[2] = {portMUX_INITIALIZER_UNLOCKED, portMUX_INITIALIZER_UNLOCKED};
+DRAM_ATTR volatile bool sampling_enabled = false;
+TaskHandle_t governor_task = nullptr;
+esp_timer_handle_t governor_timer = nullptr;
+uint32_t previous_total[2] = {}, previous_busy[2] = {};
+int64_t last_sample_us = 0;
+
+void IRAM_ATTR sample_core(unsigned core) {
+    if (!sampling_enabled) return;
+    // Read only the scheduler's task pointer on the core running this tick.
+    const bool busy = xTaskGetCurrentTaskHandleForCPU(core) != core_samples[core].idle;
+    portENTER_CRITICAL_ISR(&sample_mux[core]);
+    ++core_samples[core].total;
+    if (busy) ++core_samples[core].busy;
+    portEXIT_CRITICAL_ISR(&sample_mux[core]);
+}
+void IRAM_ATTR sample_core0() { sample_core(0); }
+void IRAM_ATTR sample_core1() { sample_core(1); }
+void snapshot(unsigned core, uint32_t& total, uint32_t& busy) {
+    portENTER_CRITICAL(&sample_mux[core]);
+    total = core_samples[core].total;
+    busy = core_samples[core].busy;
+    portEXIT_CRITICAL(&sample_mux[core]);
+}
+void governor_worker(void*) {
+    for (;;) {
+        // No polling: an esp_timer callback releases this blocked task.
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        CpuGuard guard;
+        if (!governor_running || preferred_cpu_mhz != CPU_AUTO) continue;
+        const int64_t now = esp_timer_get_time();
+        const int64_t elapsed_us = now - last_sample_us;
+        last_sample_us = now;
+        unsigned load[2] = {};
+        bool valid = elapsed_us >= 400000 && elapsed_us <= 1000000;
+        for (unsigned core = 0; core < 2; ++core) {
+            uint32_t total, busy;
+            snapshot(core, total, busy);
+            const uint32_t samples = total - previous_total[core];
+            const uint32_t active = busy - previous_busy[core];
+            previous_total[core] = total;
+            previous_busy[core] = busy;
+            // Skip incomplete or stale windows, e.g. across a sleep boundary.
+            const uint32_t expected = valid ? uint32_t(elapsed_us * configTICK_RATE_HZ / 1000000) : 0;
+            if (!expected || samples < expected * 8 / 10 || samples > expected * 12 / 10 || active > samples) {
+                valid = false;
+            } else {
+                // Round up so 80.1% qualifies as >80%, and exactly 80% does not.
+                load[core] = (active * 100u + samples - 1) / samples;
+            }
+        }
+        if (valid) governor_sample(load[0], load[1], uint32_t(elapsed_us / 1000));
+        else {
+            governor.reset();
+            cpu_load[0] = cpu_load[1] = -1;
+        }
+    }
+}
+bool prepare_governor() {
+    if (governor_timer) return true;
+    core_samples[0].idle = xTaskGetIdleTaskHandleForCPU(0);
+    core_samples[1].idle = xTaskGetIdleTaskHandleForCPU(1);
+    if (!core_samples[0].idle || !core_samples[1].idle) return false;
+    if (esp_register_freertos_tick_hook_for_cpu(sample_core0, 0) != ESP_OK) return false;
+    if (esp_register_freertos_tick_hook_for_cpu(sample_core1, 1) != ESP_OK) {
+        esp_deregister_freertos_tick_hook_for_cpu(sample_core0, 0);
+        return false;
+    }
+    esp_timer_create_args_t args = {};
+    args.callback = [](void*) { if (governor_task) xTaskNotifyGive(governor_task); };
+    args.name = "cpu_governor";
+    if (esp_timer_create(&args, &governor_timer) == ESP_OK &&
+        xTaskCreatePinnedToCore(governor_worker, "cpu_governor", 3072,
+                               nullptr, tskIDLE_PRIORITY + 8, &governor_task, 1) == pdPASS)
+        return true;
+    if (governor_timer) { esp_timer_delete(governor_timer); governor_timer = nullptr; }
+    esp_deregister_freertos_tick_hook_for_cpu(sample_core0, 0);
+    esp_deregister_freertos_tick_hook_for_cpu(sample_core1, 1);
+    return false;
+}
+bool start_governor_timer() {
+    for (unsigned core = 0; core < 2; ++core)
+        snapshot(core, previous_total[core], previous_busy[core]);
+    last_sample_us = esp_timer_get_time();
+    sampling_enabled = true;
+    if (esp_timer_start_periodic(governor_timer, CpuGovernor::window_ms * 1000ULL) == ESP_OK)
+        return true;
+    sampling_enabled = false;
+    return false;
+}
+void stop_governor_timer() {
+    sampling_enabled = false;
+    if (governor_timer) esp_timer_stop(governor_timer);
+}
+#endif
+
+void stop_governor() {
+    governor_running = false;
+    stop_governor_timer();
+    governor.reset();
+    cpu_load[0] = cpu_load[1] = -1;
+}
+bool start_governor() {
+    if (governor_running) return true;
+    governor.reset();
+    cpu_load[0] = cpu_load[1] = -1;
+    if (!prepare_governor() || !start_governor_timer()) return false;
+    governor_running = true;
+    return true;
+}
 void load_cpu_preference() {
+    CpuGuard guard;
+    stop_governor();
     uint32_t saved = CPU_DEFAULT_MHZ;
     Preferences prefs;
     if (prefs.begin("watchpower", true)) {
         saved = prefs.getUInt("cpu_mhz", CPU_DEFAULT_MHZ);
         prefs.end();
     }
-    preferred_cpu_mhz = valid_cpu_frequency(saved) ? saved : CPU_DEFAULT_MHZ;
-    if (!restoreCpuFrequency()) {
+    preferred_cpu_mhz = valid_cpu_preference(saved) ? saved : CPU_DEFAULT_MHZ;
+    if (!restoreCpuFrequency() || (preferred_cpu_mhz == CPU_AUTO && !start_governor())) {
+        stop_governor();
         preferred_cpu_mhz = CPU_DEFAULT_MHZ;
         restoreCpuFrequency();
     }
     cpu_initialized = true;
+}
+void pause_cpu_governor() { CpuGuard guard; stop_governor(); }
+void resume_cpu_governor() {
+    CpuGuard guard;
+    if (preferred_cpu_mhz == CPU_AUTO) {
+        // Wake into a safe high-performance state until a fresh window arrives.
+        setCpuFrequency(CPU_DEFAULT_MHZ);
+        start_governor();
+    }
 }
 uint32_t last_activity = 0, screenoff_timeout = 60000;
 bool consume_click = false;
@@ -67,6 +247,7 @@ void sync_input() {
 }
 }
 bool setCpuFrequency(uint32_t mhz) {
+    CpuGuard guard;
     if (!valid_cpu_frequency(mhz)) return false;
 #ifdef TWATCH_SIMULATOR
     return sim::hardware.watch.set_cpu_frequency(mhz);
@@ -78,42 +259,63 @@ bool setCpuFrequency(uint32_t mhz) {
 }
 
 uint32_t getCpuFrequency() {
+    CpuGuard guard;
 #ifdef TWATCH_SIMULATOR
     return sim::hardware.watch.cpu_frequency();
 #else
     return getCpuFrequencyMhz();
 #endif
 }
-uint32_t getPreferredCpuFrequency() { return preferred_cpu_mhz; }
+uint32_t getPreferredCpuFrequency() { CpuGuard guard; return preferred_cpu_mhz; }
+bool cpuAutomaticEnabled() { CpuGuard guard; return preferred_cpu_mhz == CPU_AUTO; }
+int getCpuLoad(unsigned core) { CpuGuard guard; return core < 2 ? cpu_load[core] : -1; }
 
 bool increaseCpuFrequency() {
+    CpuGuard guard;
     const uint32_t current = getCpuFrequency();
     return setCpuFrequency(current < 80 ? 80 : current < 160 ? 160 : 240);
 }
 bool decreaseCpuFrequency() {
+    CpuGuard guard;
     const uint32_t current = getCpuFrequency();
     return setCpuFrequency(current > 240 ? 240 : current > 160 ? 160 : 80);
 }
-bool restoreCpuFrequency() { return setCpuFrequency(preferred_cpu_mhz); }
+bool restoreCpuFrequency() {
+    CpuGuard guard;
+    if (preferred_cpu_mhz == CPU_AUTO) {
+        governor.reset();
+        return setCpuFrequency(CPU_DEFAULT_MHZ);
+    }
+    return setCpuFrequency(preferred_cpu_mhz);
+}
 
 bool setCpuFrequencyPreference(uint32_t mhz) {
-    if (!valid_cpu_frequency(mhz)) return false;
+    CpuGuard guard;
+    if (!valid_cpu_preference(mhz)) return false;
     const uint32_t previous = getCpuFrequency();
-    if (!setCpuFrequency(mhz)) {
+    const uint32_t old_preference = preferred_cpu_mhz;
+    if (mhz == CPU_AUTO && old_preference == CPU_AUTO && governor_running) return true;
+    if (!setCpuFrequency(mhz == CPU_AUTO ? CPU_DEFAULT_MHZ : mhz)) {
         if (valid_cpu_frequency(previous)) setCpuFrequency(previous);
         return false;
     }
-    if (mhz == preferred_cpu_mhz) return true;
-    // CPU policy is device configuration, independent of removable SD storage.
-    Preferences prefs;
-    const bool opened = prefs.begin("watchpower", false);
-    const bool saved = opened && prefs.putUInt("cpu_mhz", mhz) == sizeof(uint32_t);
-    if (opened) prefs.end();
-    if (!saved) {
+    if (mhz == CPU_AUTO && !start_governor()) {
         if (valid_cpu_frequency(previous)) setCpuFrequency(previous);
         return false;
+    }
+    if (mhz != old_preference) {
+        Preferences prefs;
+        const bool opened = prefs.begin("watchpower", false);
+        const bool saved = opened && prefs.putUInt("cpu_mhz", mhz) == sizeof(uint32_t);
+        if (opened) prefs.end();
+        if (!saved) {
+            if (old_preference != CPU_AUTO) stop_governor();
+            if (valid_cpu_frequency(previous)) setCpuFrequency(previous);
+            return false;
+        }
     }
     preferred_cpu_mhz = mhz;
+    if (mhz != CPU_AUTO) stop_governor();
     return true;
 }
 
@@ -182,7 +384,12 @@ void screenon() {
 
 void power_init() {
     // Resuming light sleep must not overwrite a temporary runtime override.
-    if (!cpu_initialized) load_cpu_preference();
+    if (!cpu_initialized) {
+#ifndef TWATCH_SIMULATOR
+        cpu_mutex = xSemaphoreCreateRecursiveMutexStatic(&cpu_mutex_storage);
+#endif
+        load_cpu_preference();
+    }
     power_note_activity(millis());
 #ifndef TWATCH_SIMULATOR
     // AXP2101 generates independent falling/press and rising/release IRQs.
@@ -197,6 +404,7 @@ void lightsleep() {
     // Do not invoke from the idle timer until peripheral ownership/resume
     // policy is implemented. The vendor routine shuts down several rails.
     if (power_shutting_down()) return;
+    pause_cpu_governor();
     screenlock();
 #ifdef TWATCH_SIMULATOR
     screenoff();
@@ -218,6 +426,7 @@ void lightsleep() {
     power_note_activity(millis());
     consume_click = true;
     pin_lock_handle_button();
+    resume_cpu_governor();
 #endif
 }
 
@@ -225,6 +434,7 @@ void poweroff() { deepsleep(); }
 
 void deepsleep() {
     if (asleep) return;
+    pause_cpu_governor();
     screenlock();
     screenoff();
     asleep = true;
@@ -270,6 +480,7 @@ void sim_wake(uint32_t now) {
         sim::show_home();
         sim::start_boot(false);
     } else {
+        resume_cpu_governor();
         pin_lock_handle_button();
     }
 }
@@ -316,7 +527,7 @@ void power_tick(uint32_t now, bool check_idle) {
     if (asleep) { if (wake_hold.update(now)) sim_wake(now); return; }
 #endif
     if (power_is_asleep()) return;
-    if (hold.update(now)) { screenlock(); screenoff(); }
+    if (hold.update(now)) { pause_cpu_governor(); screenlock(); screenoff(); }
     if (requested) { poweroff(); return; }
     if (check_idle && !off && !hold.down() && screenoff_timeout &&
         uint32_t(now - last_activity) >= screenoff_timeout) screenoff();

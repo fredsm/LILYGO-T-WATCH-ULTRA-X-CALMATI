@@ -220,11 +220,11 @@ static void on_screenoff_timeout_changed(lv_event_t *)
     settings_save_to_sd();
 }
 
-static const uint32_t CPU_FREQUENCIES[] = {80, 160, 240};
+static const uint32_t CPU_FREQUENCIES[] = {80, 160, 240, CPU_AUTO};
 static void refresh_cpu_selection()
 {
     const uint32_t mhz = getPreferredCpuFrequency();
-    uint32_t idx = mhz == 80 ? 0 : mhz == 160 ? 1 : 2;
+    uint32_t idx = mhz == CPU_AUTO ? 3 : mhz == 80 ? 0 : mhz == 160 ? 1 : 2;
     lv_dropdown_set_selected(cpu_dropdown, idx);
     lv_label_set_text(cpu_lbl, "CPU Frequency");
     lv_obj_set_style_text_color(cpu_lbl, lv_color_hex(0x00aa00), LV_PART_MAIN);
@@ -232,7 +232,7 @@ static void refresh_cpu_selection()
 static void on_cpu_frequency_changed(lv_event_t *)
 {
     uint32_t idx = lv_dropdown_get_selected(cpu_dropdown);
-    if (idx >= 3 || !setCpuFrequencyPreference(CPU_FREQUENCIES[idx])) {
+    if (idx >= 4 || !setCpuFrequencyPreference(CPU_FREQUENCIES[idx])) {
         refresh_cpu_selection();
         lv_label_set_text(cpu_lbl, "CPU change failed");
         lv_obj_set_style_text_color(cpu_lbl, lv_color_hex(0xff6666), LV_PART_MAIN);
@@ -819,7 +819,7 @@ void settings_screen_create()
     lv_obj_align(cpu_lbl, LV_ALIGN_LEFT_MID, 0, 0);
 
     cpu_dropdown = lv_dropdown_create(cpu_row);
-    lv_dropdown_set_options(cpu_dropdown, "80 MHz\n160 MHz\n240 MHz");
+    lv_dropdown_set_options(cpu_dropdown, "80 MHz\n160 MHz\n240 MHz\nAuto");
     lv_dropdown_set_selected(cpu_dropdown, 2);
     lv_obj_set_size(cpu_dropdown, 185, 34);
     lv_obj_set_style_text_font(cpu_dropdown, &lv_font_montserrat_16, LV_PART_MAIN);
