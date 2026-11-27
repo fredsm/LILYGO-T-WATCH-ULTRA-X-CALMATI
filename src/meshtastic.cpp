@@ -5,6 +5,7 @@
 #include "gps_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include "mbedtls/aes.h"
 #include <math.h>         // NAN, isnan
 #include <string.h>
@@ -1229,10 +1230,8 @@ static void handle_neighborinfo(uint32_t node_id, const uint8_t *payload, size_t
 // SD.mkdir is not recursive, so each path level is created in turn.
 static void save_message_to_sd(const MeshMessage &m, const struct tm &t)
 {
-    if (!instance.isCardReady() || usb_sd_is_running()) return;
+    if (!storage_stats().accepting) return;
 
-    if (!SD.exists("/Meshtastic"))          SD.mkdir("/Meshtastic");
-    if (!SD.exists("/Meshtastic/Messages")) SD.mkdir("/Meshtastic/Messages");
 
     char path[64];
     snprintf(path, sizeof(path),
@@ -1240,16 +1239,12 @@ static void save_message_to_sd(const MeshMessage &m, const struct tm &t)
              t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
              t.tm_hour, t.tm_min, t.tm_sec);
 
-    File f = SD.open(path, FILE_WRITE);
-    if (!f) {
-        Serial.printf("[MESH] SD open failed: %s\n", path);
-        return;
-    }
+    StorageText f;
     f.printf("From: !%08lx\n", (unsigned long)m.from_node);
     f.printf("Time: %s\n", m.time_str);
     f.printf("Message: %s\n", m.text);
-    f.close();
-    MESH_LOG("[MESH] Saved message to %s\n", path);
+    f.commit(path, StorageMode::Replace);
+
 }
 
 // Archive a discovered node to /Meshtastic/Nodes/<discovery-timestamp>.txt.
@@ -1257,20 +1252,14 @@ static void save_message_to_sd(const MeshMessage &m, const struct tm &t)
 // the same file in place to enrich it. No-op if no card is mounted.
 static void save_node_to_sd(const MeshNode &n)
 {
-    if (!instance.isCardReady() || usb_sd_is_running()) return;
+    if (!storage_stats().accepting) return;
     if (!n.disco_ts[0]) return;   // no discovery timestamp recorded
 
-    if (!SD.exists("/Meshtastic"))       SD.mkdir("/Meshtastic");
-    if (!SD.exists("/Meshtastic/Nodes")) SD.mkdir("/Meshtastic/Nodes");
 
     char path[64];
     snprintf(path, sizeof(path), "/Meshtastic/Nodes/%s.txt", n.disco_ts);
 
-    File f = SD.open(path, FILE_WRITE);
-    if (!f) {
-        Serial.printf("[MESH] SD open failed: %s\n", path);
-        return;
-    }
+    StorageText f;
 
     // disco_ts is "YYYYMMDD_HHMMSS"; print it back as a readable datetime
     const char *ts = n.disco_ts;
@@ -1303,8 +1292,7 @@ static void save_node_to_sd(const MeshNode &n)
     }
     if (n.has_altitude) f.printf("Altitude: %ldm\n", (long)n.altitude);
 
-    f.close();
-    MESH_LOG("[MESH] Saved node to %s\n", path);
+    if(f.commit(path, StorageMode::Replace)) MESH_LOG("[MESH] Queued node save to %s\n", path);
 }
 
 // Mesh packets are rebroadcast by relay nodes, so the same (from_node, packet_id)
@@ -1970,6 +1958,8 @@ void meshtastic_set_active_channel(int idx)
 // hex PSK + enabled. The active_channel index sits at the top.
 void meshtastic_save_channels_to_sd()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists("/Meshtastic")) SD.mkdir("/Meshtastic");
     File f = SD.open("/Meshtastic/channels.txt", FILE_WRITE);
@@ -2026,6 +2016,8 @@ static void apply_channel_kv(const char *key, const char *val)
 void meshtastic_load_channels_from_sd()
 {
     ensure_channels_initialised();
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists("/Meshtastic/channels.txt")) return;
     File f = SD.open("/Meshtastic/channels.txt", FILE_READ);

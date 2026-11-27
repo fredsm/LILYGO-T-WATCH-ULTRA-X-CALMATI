@@ -3,6 +3,7 @@
 #include "tools_screen.h"
 #include <lvgl.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <LilyGoLib.h>          // instance.isCardReady()
 #include "esp_heap_caps.h"
 #include <stdio.h>
@@ -80,6 +81,8 @@ static void free_photo()
 // Load /meta/<name>.bin ([w:u16][h:u16][RGB565…]) into s_img_dsc. False if absent.
 static bool load_photo(const char *name)
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return false; }
     free_photo();
     if (!instance.isCardReady()) return false;   // never touch SD when the card isn't mounted
     char path[48];

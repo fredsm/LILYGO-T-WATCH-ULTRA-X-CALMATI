@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <esp_heap_caps.h>
 #include <stdlib.h>              // rand()
 #include <freertos/FreeRTOS.h>
@@ -186,6 +187,8 @@ static void upload_task(void *)
 // a toccare la SD, come da design del firmware).
 static bool load_wav()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return false; }
     const char *p = mic_rec_last_path();
     if (!p || !p[0]) return false;
     File f = SD.open(p, FILE_READ);
@@ -268,6 +271,8 @@ static void read_wifi2(char *ssid, size_t sn, char *pass, size_t pn)
 {
     snprintf(ssid, sn, "UDDA");
     pass[0] = '\0';
+    StorageAccess sd_access;
+    if (!sd_access) return;
     if (!SD.exists("/wifi2.txt"))
         return;
     File f = SD.open("/wifi2.txt", FILE_READ);

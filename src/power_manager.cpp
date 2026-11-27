@@ -24,6 +24,7 @@
 #include <esp_bt.h>
 #include <esp_bt_main.h>
 #include "usb_sd.h"
+#include "storage_manager.h"
 #include "mic_rec.h"
 #include "wake_word.h"
 #include "wardriver_screen.h"
@@ -385,9 +386,22 @@ void lightsleep() {
     screenoff();
     light_asleep = true;
 #else
+    // Light sleep must not cut SD rails while the card is in use.
+    storage_release_image_cache();
+    storage_suspend();
+    if(!storage_idle()){
+        storage_resume();
+        gps_service_session(gps_screen_is_powered());
+        resume_cpu_governor();
+        screenunlock();
+        diagnostics_resume();
+        return;
+    }
     pin_lock_on_screenoff();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     instance.lightSleep(WAKEUP_SRC_POWER_KEY);
+    if(instance.isCardReady())storage_media_inserted();
+    else storage_media_removed();
     power_init();
     // The SDK already woke the panel; restore a previously paused refresh.
     if (off) {
@@ -403,6 +417,7 @@ void lightsleep() {
     pin_lock_handle_button();
     resume_cpu_governor();
     gps_service_session(gps_screen_is_powered());
+    storage_resume();
     diagnostics_resume();
 #endif
 }
@@ -429,6 +444,20 @@ void deepsleep() {
     const uint32_t started = millis();
     while (mic_rec_is_recording() && uint32_t(millis() - started) < 2000) {
         lv_timer_handler();
+        delay(10);
+    }
+    // If the queue was full at stop, retry the final snapshot after accepted
+    // jobs finish. Allocation/media failure is not retried indefinitely.
+    if(wardriver_storage_pending() && storage_stats().worker && storage_stats().media){
+        while(storage_stats().pending || storage_stats().active)delay(10);
+        wardriver_bg_tick();
+    }
+    // Drain accepted immutable work before the SDK powers down SPI/SD.
+    // Do not force an unmount during a hung in-flight operation.
+    storage_release_image_cache();
+    storage_suspend();
+    while (!storage_idle()) {
+        if(mic_rec_is_recording())lv_timer_handler(); // lets recorder finalize/release its lease
         delay(10);
     }
     WiFi.mode(WIFI_OFF);

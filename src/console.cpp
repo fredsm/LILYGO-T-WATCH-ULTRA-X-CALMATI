@@ -7,6 +7,7 @@
 #include <LilyGoLib.h>
 #include <WiFi.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <string.h>
 #include <strings.h>   // strcasecmp
 
@@ -204,6 +205,8 @@ static void cmd_weather(char **av, int ac, String &o)
 
 static void cmd_recs(String &o)
 {
+    StorageAccess sd_access;
+    if (!sd_access) { o += "SD unavailable\n"; return; }
     if (!instance.isCardReady()) { o += "no SD card\n"; return; }
     File dir = SD.open("/Recordings");
     if (!dir) { o += "no recordings\n"; return; }

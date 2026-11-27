@@ -3,8 +3,12 @@
 void clock_screen_get_local_time(struct tm *out);
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include "esp_heap_caps.h"
 #include "freertos/queue.h"
+#ifndef TWATCH_SIMULATOR
+#include "freertos/task.h"
+#endif
 #include "gps_screen.h"
 #include "esp_gap_ble_api.h"
 #include "ble_scan_manager.h"
@@ -74,6 +78,7 @@ static bool          wd_wifi_en  = true;
 static bool          wd_bt_en    = true;
 static char          csv_path[48] = {};
 static uint32_t      last_flush_ms = 0;
+static bool final_flush_pending = false;
 
 // ─── UI objects ────────────────────────────────────────────────
 static lv_obj_t *wardriver_screen;
@@ -251,24 +256,26 @@ static void drain_queue() {
     }
 }
 
-// ─── CSV flush (rewrites entire file from ap_table) ───────────
-static void flush_to_sd() {
-    if (!csv_path[0] || (wifi_count + bt_count) == 0) return;
-    if (!instance.isCardReady()) return;
+// A compact immutable record snapshot crosses the task boundary. The live
+// hash table and the GPS/UI state remain exclusively on Core 1.
+static const char csv_header[] =
+    "WigleWifi-1.6,appRelease=1.0,model=T-Watch-Ultra,release=1.0,"
+    "device=twatch-ultra,display=,board=ESP32-S3,brand=LilyGo,"
+    "star=Sol,body=3,subBody=0\r\n"
+    "MAC,SSID,AuthMode,FirstSeen,Channel,Frequency,RSSI,"
+    "CurrentLatitude,CurrentLongitude,AltitudeMeters,"
+    "AccuracyMeters,RCOIs,MfgrId,Type\r\n";
+static bool write_snapshot(const char* path,const void* data,size_t bytes) {
+    if (!SD.exists("/Wardrive") && !SD.mkdir("/Wardrive")) return false;
+    File f = SD.open(path, FILE_WRITE);
+    if (!f) return false;
+    if (f.write((const uint8_t*)csv_header, sizeof(csv_header)-1) != sizeof(csv_header)-1) {
+        f.close(); return false;
+    }
+    const ApRecord* records = static_cast<const ApRecord*>(data);
+    for (size_t i = 0; i < bytes / sizeof(ApRecord); i++) {
+        const ApRecord *r = &records[i];
 
-    File f = SD.open(csv_path, FILE_WRITE);
-    if (!f) return;
-
-    f.println("WigleWifi-1.6,appRelease=1.0,model=T-Watch-Ultra,release=1.0,"
-              "device=twatch-ultra,display=,board=ESP32-S3,brand=LilyGo,"
-              "star=Sol,body=3,subBody=0");
-    f.println("MAC,SSID,AuthMode,FirstSeen,Channel,Frequency,RSSI,"
-              "CurrentLatitude,CurrentLongitude,AltitudeMeters,"
-              "AccuracyMeters,RCOIs,MfgrId,Type");
-
-    for (int i = 0; i < WD_BUCKETS; i++) {
-        const ApRecord *r = &ap_table[i];
-        if (!r->valid) continue;
 
         char mac_str[18];
         snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -285,43 +292,47 @@ static void flush_to_sd() {
         ssid_q[qi++] = '"';
         ssid_q[qi]   = '\0';
 
+        char row[384];
+        int len;
         if (r->type == 'L') {
-            f.printf("%s,%s,%s,%s,0,,%d,%.6f,%.6f,%.1f,0.0,,%s,BLE\n",
+            len=snprintf(row,sizeof(row),"%s,%s,%s,%s,0,,%d,%.6f,%.6f,%.1f,0.0,,%s,BLE\n",
                      mac_str, ssid_q, r->auth, r->first_seen,
                      (int)r->rssi, r->lat, r->lng, (double)r->alt,
                      r->mfgr);
         } else {
-            f.printf("%s,%s,%s,%s,%d,%d,%d,%.6f,%.6f,%.1f,0.0,,,WIFI\n",
+            len=snprintf(row,sizeof(row),"%s,%s,%s,%s,%d,%d,%d,%.6f,%.6f,%.1f,0.0,,,WIFI\n",
                      mac_str, ssid_q, r->auth, r->first_seen,
                      r->channel, ch_to_freq(r->channel), (int)r->rssi,
                      r->lat, r->lng, (double)r->alt);
         }
+        if(len<0 || size_t(len)>=sizeof(row) || f.write((const uint8_t*)row,len)!=size_t(len)){f.close();return false;}
+#ifndef TWATCH_SIMULATOR
+        if ((i & 31) == 31) vTaskDelay(1);
+#endif
     }
 
     f.close();
+    return true;
 }
-
-// ─── New CSV file with WiGLE header ────────────────────────────
-// Generates a fresh timestamped CSV path under /Wardrive and writes the
-// header rows. Used by both start_wardriving() and the session rollover.
+static bool flush_to_sd() {
+    const size_t count=wifi_count+bt_count;
+    if (!csv_path[0] || !count) return true;
+    if (!storage_stats().accepting) return false;
+    auto* copy=static_cast<ApRecord*>(storage_allocate(count*sizeof(ApRecord)));
+    if (!copy) return false;
+    size_t n=0;
+    for (int i=0;i<WD_BUCKETS && n<count;++i)
+        if (ap_table[i].valid) copy[n++]=ap_table[i];
+    return storage_submit_owned(csv_path,copy,n*sizeof(ApRecord),write_snapshot);
+}
 static void open_new_csv() {
-    SD.mkdir("/Wardrive");
     struct tm t;
     clock_screen_get_local_time(&t);
     snprintf(csv_path, sizeof(csv_path),
              "/Wardrive/%04d%02d%02d_%02d%02d%02d.csv",
              t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
              t.tm_hour, t.tm_min, t.tm_sec);
-
-    File f = SD.open(csv_path, FILE_WRITE);
-    if (!f) return;
-    f.println("WigleWifi-1.6,appRelease=1.0,model=T-Watch-Ultra,release=1.0,"
-              "device=twatch-ultra,display=,board=ESP32-S3,brand=LilyGo,"
-              "star=Sol,body=3,subBody=0");
-    f.println("MAC,SSID,AuthMode,FirstSeen,Channel,Frequency,RSSI,"
-              "CurrentLatitude,CurrentLongitude,AltitudeMeters,"
-              "AccuracyMeters,RCOIs,MfgrId,Type");
-    f.close();
+    storage_submit_write(csv_path,csv_header,sizeof(csv_header)-1,StorageMode::Replace);
 }
 
 // ─── Roll session ──────────────────────────────────────────────
@@ -331,7 +342,7 @@ static void open_new_csv() {
 static void roll_session() {
     // Final flush of the filled-up session — writes everything that's in the
     // table to the current CSV.
-    flush_to_sd();
+    if (!flush_to_sd()) return; // keep the full table until submission succeeds
 
     // Move this session's counts into the running totals so the home-screen
     // badge keeps climbing across rollovers.
@@ -351,6 +362,8 @@ static void roll_session() {
 
 // ─── Start / stop ──────────────────────────────────────────────
 static bool start_wardriving() {
+    if (final_flush_pending && !flush_to_sd()) return false;
+    final_flush_pending=false;
     if (!ap_table) {
         ap_table = (ApRecord *)heap_caps_calloc(
             WD_BUCKETS, sizeof(ApRecord), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -394,7 +407,10 @@ static bool start_wardriving() {
 }
 
 void wardriver_stop() {
-    if (!is_running) return;
+    if (!is_running) {
+        if(!storage_stats().media)final_flush_pending=false;
+        return;
+    }
     is_running = false;
 
     if (wd_bt_en && bt_ready) {
@@ -409,7 +425,7 @@ void wardriver_stop() {
     }
 
     drain_queue();
-    flush_to_sd();
+    final_flush_pending = storage_stats().media && !flush_to_sd();
 }
 
 // ─── Toggle callbacks ──────────────────────────────────────────
@@ -584,7 +600,10 @@ bool wardriver_screen_is_active()
 
 void wardriver_bg_tick()
 {
-    if (!is_running) return;
+    if (!is_running) {
+        if (final_flush_pending && (!storage_stats().media || flush_to_sd())) final_flush_pending=false;
+        return;
+    }
 
     // Only auto-stop on SD removal. GPS lock can come and go - especially
     // during start_wardriving()'s WiFi init, which blocks the main loop
@@ -592,7 +611,7 @@ void wardriver_bg_tick()
     // already handles gps.location.isValid()==false by writing lat=lng=0,
     // and existing rows keep their captured fix - so dropping GPS lock
     // is no reason to tear the whole session down.
-    if (!instance.isCardReady()) {
+    if (!storage_stats().media) {
         wardriver_stop();
         lv_obj_clear_state(wifi_toggle_sw, LV_STATE_DISABLED);
         lv_obj_clear_state(bt_toggle_sw,   LV_STATE_DISABLED);
@@ -609,8 +628,7 @@ void wardriver_bg_tick()
 
     uint32_t now = millis();
     if (now - last_flush_ms >= WD_FLUSH_MS) {
-        last_flush_ms = now;
-        flush_to_sd();
+        if (flush_to_sd()) last_flush_ms = now;
     }
 }
 

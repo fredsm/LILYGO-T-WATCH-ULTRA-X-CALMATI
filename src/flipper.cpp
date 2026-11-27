@@ -7,6 +7,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "usb_sd.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include "esp_gap_ble_api.h"
 #include "freertos/queue.h"
@@ -204,11 +205,9 @@ void flipper_bg_tick()
     FlipperHit hit;
     if (xQueueReceive(s_queue, &hit, 0) != pdTRUE) return;
 
-    if (usb_sd_is_running() || !instance.isCardReady()) return;
-    if (!SD.exists("/Flipper")) SD.mkdir("/Flipper");
+    if (!storage_stats().accepting) return;
 
-    File f = SD.open("/Flipper/discovered.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -231,5 +230,5 @@ void flipper_bg_tick()
     }
 
     f.print("\n");
-    f.close();
+    f.commit("/Flipper/discovered.txt", StorageMode::Append);
 }

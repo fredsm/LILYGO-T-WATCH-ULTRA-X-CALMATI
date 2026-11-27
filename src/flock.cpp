@@ -8,6 +8,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "gps_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include "freertos/queue.h"
 #include <string.h>
 #include <stdio.h>
@@ -268,7 +269,7 @@ void flock_reset_count()
 
 void flock_bg_tick()
 {
-    if (!s_queue || !instance.isCardReady()) return;
+    if (!s_queue || !storage_stats().accepting) return;
 
     // One hit per tick - same pattern as the other detectors. A burst of
     // Flock-OUI matches (every dashcam-equipped car nearby) would otherwise
@@ -278,13 +279,11 @@ void flock_bg_tick()
     FlockHit hit;
     if (xQueueReceive(s_queue, &hit, 0) != pdTRUE) return;
 
-    SD.mkdir("/Flock");
 
     char path[48];
     snprintf(path, sizeof(path), "/Flock/%s.txt", hit.time_str);
 
-    File f = SD.open(path, FILE_WRITE);
-    if (!f) return;
+    StorageText f;
 
     f.printf("Time:   %s\n", hit.time_str);
     f.printf("MAC:    %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -307,5 +306,5 @@ void flock_bg_tick()
         if (instance.gps.altitude.isValid())
             f.printf("Alt:    %.1fm\n", instance.gps.altitude.meters());
     }
-    f.close();
+    f.commit(path, StorageMode::Replace);
 }

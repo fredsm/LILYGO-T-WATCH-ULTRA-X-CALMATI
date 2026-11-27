@@ -2,6 +2,7 @@
 #include "wifi_beacon_manager.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <Arduino.h>
 #include <string.h>
 #include <stdio.h>
@@ -108,6 +109,8 @@ static void write_global_header(File &fp)
 
 void handshake_bg_tick()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!s_queue) return;
     HsFrame f;
     if (xQueueReceive(s_queue, &f, 0) != pdTRUE) return;

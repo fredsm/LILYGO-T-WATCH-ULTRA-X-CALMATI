@@ -6,6 +6,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "gps_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include "esp_gap_ble_api.h"
 #include "freertos/queue.h"
@@ -193,11 +194,9 @@ void airtag_bg_tick()
     AirtagHit hit;
     if (xQueueReceive(s_queue, &hit, 0) != pdTRUE) return;
 
-    if (!instance.isCardReady()) return;
-    if (!SD.exists("/AirTag")) SD.mkdir("/AirTag");
+    if (!storage_stats().accepting) return;
 
-    File f = SD.open("/AirTag/discovered.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -230,5 +229,5 @@ void airtag_bg_tick()
     }
 
     f.print("\n");
-    f.close();
+    f.commit("/AirTag/discovered.txt", StorageMode::Append);
 }

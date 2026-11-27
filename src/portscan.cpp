@@ -5,6 +5,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <WiFi.h>
 #include <string.h>
 #include "lwip/sockets.h"
@@ -404,6 +405,8 @@ bool portscan_just_finished()
 
 void portscan_poll()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (s_running || !s_done || s_logged) return;
     s_logged = true;
 

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <string.h>
 #include <time.h>
 
@@ -246,7 +247,8 @@ bool meta_glasses_save_labeled(const uint8_t *mac6, const char *label)
 
     Serial.print(hdr); Serial.println(hex);
 
-    if (!usb_sd_is_running() && instance.isCardReady()) {
+    StorageAccess sd_access;
+    if (sd_access && !usb_sd_is_running() && instance.isCardReady()) {
         if (!SD.exists("/meta")) SD.mkdir("/meta");
         File f = SD.open("/meta/adv_capture.txt", FILE_APPEND);
         if (!f) return false;

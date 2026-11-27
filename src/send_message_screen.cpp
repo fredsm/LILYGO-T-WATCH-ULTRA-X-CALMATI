@@ -7,6 +7,7 @@
 #include "map_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,6 +85,8 @@ static void hide_confirm();
 // extras on disk are dropped.
 static void load_customs()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     s_custom_count = 0;
     if (!instance.isCardReady()) return;
     if (!SD.exists(CUSTOM_FILE)) return;
@@ -107,6 +110,8 @@ static void load_customs()
 
 static void save_customs()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists("/Meshtastic")) SD.mkdir("/Meshtastic");
     File f = SD.open(CUSTOM_FILE, FILE_WRITE);

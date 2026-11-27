@@ -4,6 +4,7 @@
 #include "car_finder.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -80,6 +81,8 @@ static const char    *kLastFixPath    = "/Meshtastic/last_fix.txt";
 
 static void save_last_fix(double lat, double lon)
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     uint32_t now = millis();
     if (s_last_save_ms != 0 && now - s_last_save_ms < kSaveIntervalMs) return;
     if (!instance.isCardReady()) return;
@@ -99,6 +102,8 @@ static void save_last_fix(double lat, double lon)
 // (0,0 world view) path takes over.
 static void load_last_fix()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (s_saved_loaded) return;
     s_saved_loaded = true;
     if (!instance.isCardReady()) return;
@@ -180,6 +185,8 @@ static void rebuild_tiles(double lat, double lon, int z)
 // Walks /map/0 … /map/18 on the SD card to learn which zoom levels are present.
 static void detect_zooms()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) {
         s_zoom_min = 1;
         s_zoom_max = 6;
@@ -661,6 +668,8 @@ void map_screen_focus(double lat, double lon)
 
 bool map_screen_available()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return false; }
     if (!instance.isCardReady()) return false;
     return SD.exists("/map");
 }

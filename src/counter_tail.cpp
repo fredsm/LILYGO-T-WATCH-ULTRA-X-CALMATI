@@ -3,6 +3,7 @@
 #include "tracker_rep.h"    // tracker_rep_hash() — shared MAC hashing
 #include <LilyGoLib.h>      // instance, isCardReady
 #include <SD.h>
+#include "storage_manager.h"
 #include <Arduino.h>        // millis()
 #include <string.h>
 #include <stdio.h>
@@ -78,6 +79,8 @@ static uint32_t today_int()
 
 static void fam_load()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     s_loaded = true;
     if (!instance.isCardReady()) return;
     File f = SD.open("/CounterTail/familiar.txt", FILE_READ);
@@ -101,6 +104,8 @@ static void fam_load()
 
 static void fam_save()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists("/CounterTail")) SD.mkdir("/CounterTail");
     File f = SD.open("/CounterTail/familiar.txt", FILE_WRITE);   // truncate + rewrite

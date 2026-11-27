@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <SD.h>
+#include "storage_manager.h"
 
 #define AP_SSID  "13-37-PANEL"
 #define AP_PASS  "1337panel"          // WPA2, min 8 chars — keep the panel private
@@ -98,6 +99,8 @@ static void handle_cmd()
 
 static void handle_recs()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { s_web->send(503,"text/plain","SD unavailable"); return; }
     String o;
     if (!instance.isCardReady()) { s_web->send(200, "text/html", "no SD"); return; }
     File dir = SD.open("/Recordings");
@@ -119,6 +122,8 @@ static void handle_recs()
 
 static void handle_dl()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { s_web->send(503,"text/plain","SD unavailable"); return; }
     if (!s_web->hasArg("f")) { s_web->send(400, "text/plain", "missing f"); return; }
     String f = s_web->arg("f");
     if (f.indexOf('/') >= 0 || f.indexOf("..") >= 0) {   // no path traversal

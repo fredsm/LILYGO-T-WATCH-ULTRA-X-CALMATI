@@ -79,6 +79,7 @@
 #include "ui_scheduler.h"
 #include "gps_service.h"
 #include "status_cache.h"
+#include "storage_manager.h"
 #include "diagnostics_screen.h"
 #include "task_manager.h"
 #include "pin_lock_screen.h"
@@ -91,6 +92,7 @@
 #include "threat_radar_screen.h"
 #include "adsb_screen.h"
 #include "mic_screen.h"
+#include "mic_rec.h"
 #include "webpanel_screen.h"
 #include "webpanel.h"
 #include "console.h"
@@ -483,14 +485,30 @@ static void update_sd_indicator()
     // claim state matter. Tracked here (rather than just sd_was_ready)
     // so the settings nudge below also fires when the host computer
     // mounts/unmounts the card over USB-MSC.
-    bool prev_usable = sd_was_ready && !usb_sd_is_running();
+    static bool prev_usable = false;
     bool prev_ready  = sd_was_ready;
     if (sd_was_ready) {
         // Use the physical card-detect pin on XL9555 IO10 (active-LOW) for removal.
         // This is a live I2C read, unlike SD.sectorSize() which is cached at mount time.
-        if (instance.io.digitalRead(EXPANDS_SD_DET) == HIGH) {
+        if (!storage_stats().media || instance.io.digitalRead(EXPANDS_SD_DET) == HIGH) {
+            storage_media_removed();
+            usb_sd_stop();
+            wardriver_stop();
+            mic_rec_stop();
+            storage_release_image_cache();
+            // Never tear down the card driver underneath an in-flight write,
+            // open LVGL file, or TinyUSB raw sector callback.
+            if (storage_idle()) {
+                instance.uninstallSD();
+                sd_was_ready = false;
+            }
+        } else if (storage_needs_remount() && storage_idle()) {
+            // Host raw writes bypass the FAT cache. Refresh the filesystem
+            // before allowing any new local file or background job.
             instance.uninstallSD();
-            sd_was_ready = false;
+            sd_was_ready=instance.installSD();
+            if(sd_was_ready)storage_media_inserted();
+            else storage_media_removed();
         }
     } else {
         // Poll for insertion: installSD() reads the physical card-detect pin on
@@ -498,9 +516,10 @@ static void update_sd_indicator()
         // when no card is present without stressing the SPI bus.
         if (instance.installSD()) {
             sd_was_ready = true;
+            storage_media_inserted();
         }
     }
-    lv_color_t color = sd_was_ready
+    lv_color_t color = sd_was_ready && storage_stats().media
         ? lv_color_make(0x00, 0xFF, 0x80)  // green — card mounted
         : lv_color_make(0x33, 0x33, 0x33); // gray  — no card
     lv_obj_set_style_text_color(sd_indicator, color, LV_PART_MAIN);
@@ -508,9 +527,10 @@ static void update_sd_indicator()
     // On any SD-usability state edge (card insert/eject *or* USB-SD
     // claim/release), nudge the settings screen so it can grey out /
     // re-enable the "Screenshot long press" toggle accordingly.
-    bool now_usable = sd_was_ready && !usb_sd_is_running();
+    bool now_usable = storage_stats().accepting;
     if (now_usable != prev_usable || sd_was_ready != prev_ready)
         settings_screen_apply_sd_state();
+    prev_usable = now_usable;
 }
 
 static void update_nfc_indicator()
@@ -1372,6 +1392,8 @@ void setup()
     // Register the USB Mass Storage interface and start the USB stack. Must run
     // after instance.begin() mounts the SD card; the card stays hidden from the
     // host until the USB SD screen mounts it.
+    storage_init(instance.isCardReady());
+    storage_bind_lvgl();
     usb_sd_init();
 
     // Load the saved APRS callsign from the SD card (if present).

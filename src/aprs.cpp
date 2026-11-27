@@ -8,6 +8,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "usb_sd.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -46,6 +47,8 @@ static void IRAM_ATTR on_pkt_isr() { s_pkt_flag = true; }
 
 void aprs_init()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists(APRS_CALLSIGN_FILE)) return;
     File f = SD.open(APRS_CALLSIGN_FILE, FILE_READ);
@@ -76,6 +79,8 @@ void aprs_set_callsign(const char *cs)
     if (j == 0) { strcpy(s_callsign, "N0CALL"); }
 
     // Persist to the SD card (skipped while the card is mounted over USB).
+    StorageAccess sd_access;
+    if (!sd_access) return;
     if (usb_sd_is_running() || !instance.isCardReady()) return;
     if (!SD.exists("/APRS")) SD.mkdir("/APRS");
     File f = SD.open(APRS_CALLSIGN_FILE, FILE_WRITE);   // truncate + rewrite
@@ -173,11 +178,9 @@ static void parse_tnc2(AprsPacket *p)
 static void log_packet(const AprsPacket *p)
 {
     if (usb_sd_is_running()) return;          // host owns the SD card
-    if (!instance.isCardReady()) return;
-    if (!SD.exists("/APRS")) SD.mkdir("/APRS");
+    if (!storage_stats().accepting) return;
 
-    File f = SD.open("/APRS/received.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -185,7 +188,7 @@ static void log_packet(const AprsPacket *p)
         t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
         t.tm_hour, t.tm_min, t.tm_sec,
         p->rssi, p->snr, p->raw);
-    f.close();
+    f.commit("/APRS/received.txt", StorageMode::Append);
 }
 
 // Reads the just-received frame off the radio into *p. Returns false on a read

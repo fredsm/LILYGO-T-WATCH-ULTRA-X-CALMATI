@@ -4,6 +4,7 @@
 #include "usb_sd.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <Arduino.h>
 #include <lvgl.h>
 #include <time.h>
@@ -84,11 +85,7 @@ static void build_bmp_header(uint8_t *hdr, int w, int h, uint32_t data_size)
 
 // ---- Capture --------------------------------------------------------------
 
-static bool ensure_dir()
-{
-    if (SD.exists(SCREENSHOT_DIR)) return true;
-    return SD.mkdir(SCREENSHOT_DIR);
-}
+
 
 static void make_filename(char *out, size_t n)
 {
@@ -105,8 +102,7 @@ bool screenshot_capture()
 {
     // Gate the same way the settings screen does — if USB-SD has the card,
     // or the card simply isn't there, we can't write anything.
-    if (usb_sd_is_running() || !instance.isCardReady()) return false;
-    if (!ensure_dir()) return false;
+    if (!storage_stats().accepting) return false;
 
     lv_obj_t *scr = lv_screen_active();
     if (!scr) return false;
@@ -128,32 +124,22 @@ bool screenshot_capture()
     char filename[64];
     make_filename(filename, sizeof(filename));
 
-    File f = SD.open(filename, FILE_WRITE);
-    if (!f) {
-        lv_draw_buf_destroy(snap);
-        return false;
+    // Copy the draw buffer to an independently owned BMP. The worker must
+    // never retain or destroy an LVGL buffer.
+    const size_t total=BMP_HEADER_SIZE+data_size;
+    auto* bmp=static_cast<uint8_t*>(storage_allocate(total));
+    if (!bmp) { lv_draw_buf_destroy(snap); return false; }
+    build_bmp_header(bmp,w,h,data_size);
+    const uint8_t* pixels=static_cast<const uint8_t*>(snap->data);
+    uint8_t* out=bmp+BMP_HEADER_SIZE;
+    for(int y=0;y<h;++y){
+        memcpy(out,pixels+size_t(y)*stride,row_bytes);
+        if(row_pad)memset(out+row_bytes,0,row_pad);
+        out+=row_bytes+row_pad;
     }
-
-    uint8_t hdr[BMP_HEADER_SIZE];
-    build_bmp_header(hdr, w, h, data_size);
-    f.write(hdr, BMP_HEADER_SIZE);
-
-    // Write one row at a time so we honour the snapshot's `stride` (which
-    // may exceed w*2 for alignment) and pad each BMP row out to the 4-byte
-    // boundary the format requires.
-    const uint8_t *pixels = (const uint8_t *)snap->data;
-    static const uint8_t pad[3] = { 0, 0, 0 };
-    for (int y = 0; y < h; y++) {
-        f.write(pixels + (size_t)y * stride, row_bytes);
-        if (row_pad > 0) f.write(pad, row_pad);
-    }
-
-    f.close();
     lv_draw_buf_destroy(snap);
-
-    // Trace print removed — caller already gets `true` on success and
-    // SD-side errors above print their own diagnostics.
-    return true;
+    // Success means queued; Diagnostics reports completion or disk failure.
+    return storage_submit_owned_write(filename,bmp,total,StorageMode::Replace);
 }
 
 // ---- Long-press poll -------------------------------------------------------

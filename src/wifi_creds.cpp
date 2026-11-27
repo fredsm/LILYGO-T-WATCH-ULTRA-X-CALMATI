@@ -1,6 +1,7 @@
 #include "wifi_creds.h"
 #include <WiFi.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <Preferences.h>
 #include <string.h>
 #include <ctype.h>
@@ -26,6 +27,8 @@ static bool starts_with_ci(const char *s, const char *key)
 
 bool wifi_creds_seed_from_sd()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return false; }
     // Rete di default (casa): /wifi.txt. L'hotspot UDDA lo gestisce la tile
     // Assist da sola (vedi voice_screen), non serve toccare i file.
     if (!SD.exists("/wifi.txt")) return false;

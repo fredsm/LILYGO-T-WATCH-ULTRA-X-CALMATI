@@ -69,7 +69,7 @@ endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
     "${CLOCK_INCLUDE}" ../src/sim/startup.cpp "${ENGLISH_ONBOARDING}" ../src/boot_skull_img.cpp ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
     "${ENGLISH_TASK_MANAGER}" ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
-    ../src/sim/screens.cpp ../src/sim/navigation.cpp ../src/quick_controls_screen.cpp ../src/power_manager.cpp ../src/pin_lock_screen.cpp ../src/diagnostics_manager.cpp ../src/diagnostics_screen.cpp ../src/event_manager.cpp ../src/status_cache.cpp ../src/gps_service.cpp
+    ../src/sim/screens.cpp ../src/sim/navigation.cpp ../src/quick_controls_screen.cpp ../src/power_manager.cpp ../src/pin_lock_screen.cpp ../src/diagnostics_manager.cpp ../src/diagnostics_screen.cpp ../src/event_manager.cpp ../src/status_cache.cpp ../src/gps_service.cpp ../src/storage_manager.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
@@ -155,3 +155,8 @@ add_executable(event_manager_test tests/event_manager_test.cpp ../src/event_mana
 target_compile_definitions(event_manager_test PRIVATE TWATCH_SIMULATOR=1)
 target_link_libraries(event_manager_test PRIVATE Threads::Threads)
 add_test(NAME event_manager_mailboxes COMMAND event_manager_test)
+
+add_executable(storage_manager_test tests/storage_manager_test.cpp)
+target_include_directories(storage_manager_test PRIVATE ../src/sim)
+target_link_libraries(storage_manager_test PRIVATE simulator_ui)
+add_test(NAME storage_manager_queue COMMAND storage_manager_test)

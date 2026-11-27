@@ -7,6 +7,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "usb_sd.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include "esp_gap_ble_api.h"
 #include "freertos/queue.h"
@@ -189,13 +190,11 @@ void skimmer_bg_tick()
     SkimmerHit hit;
     if (xQueueReceive(s_queue, &hit, 0) != pdTRUE) return;
 
-    if (usb_sd_is_running() || !instance.isCardReady()) return;
+    if (!storage_stats().accepting) return;
     // Folder name matches the user spec ("Skimmers" / "Skimmmers" was a
     // typo in the request).
-    if (!SD.exists("/Skimmers")) SD.mkdir("/Skimmers");
 
-    File f = SD.open("/Skimmers/discovered.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -218,5 +217,5 @@ void skimmer_bg_tick()
     }
 
     f.print("\n");
-    f.close();
+    f.commit("/Skimmers/discovered.txt", StorageMode::Append);
 }

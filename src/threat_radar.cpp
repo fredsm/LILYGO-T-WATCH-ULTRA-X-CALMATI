@@ -6,6 +6,7 @@ void clock_screen_get_local_time(struct tm *out);   // defined in main.cpp
 #include "counter_tail.h"
 #include <LilyGoLib.h>   // provides `instance`, whose .gps is a TinyGPSPlus
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include <stdio.h>
 #include "freertos/queue.h"
@@ -155,11 +156,9 @@ static TrContact *find_or_alloc(const uint8_t *mac)
 // Mirrors the per-detector logging format (timestamp + GPS + headline fields).
 static void log_tail_to_sd(const TrContact *c)
 {
-    if (!instance.isCardReady()) return;
-    if (!SD.exists("/ThreatRadar")) SD.mkdir("/ThreatRadar");
+    if (!storage_stats().accepting) return;
 
-    File f = SD.open("/ThreatRadar/discovered.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -179,7 +178,7 @@ static void log_tail_to_sd(const TrContact *c)
     f.printf("\tFirstGPS %.6f,%.6f", c->first_lat, c->first_lon);
     f.printf("\tFarGPS %.6f,%.6f", c->far_lat, c->far_lon);
     f.print("\n");
-    f.close();
+    f.commit("/ThreatRadar/discovered.txt", StorageMode::Append);
 }
 
 static void fill_threat(const TrContact *c, TrThreat *t, uint32_t now)

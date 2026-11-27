@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <time.h>
 #include <limits.h>
 #include "usb_sd.h"
@@ -26,18 +27,18 @@ void timezone_note_detected(int offset_hours)
 {
     if (offset_hours == s_last_written) return;            // unchanged
     if (offset_hours < -12 || offset_hours > 14) return;   // sanity
-    if (!instance.isCardReady() || usb_sd_is_running()) return;
+    if (!storage_stats().accepting) return;
 
-    if (!SD.exists("/Settings")) SD.mkdir("/Settings");
-    File f = SD.open(TZ_PATH, FILE_WRITE);   // FILE_WRITE = truncate
-    if (!f) return;
+    StorageText f;
     f.printf("offset=%d\n", offset_hours);
-    f.close();
+    if (!f.commit(TZ_PATH, StorageMode::Replace)) return;
     s_last_written = offset_hours;
 }
 
 void timezone_load_on_boot()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     // Manual Time wins — in that mode the RTC already holds local time directly.
     if (clock_screen_manual_time_active()) return;
     if (!instance.isCardReady() || usb_sd_is_running()) return;

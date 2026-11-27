@@ -7,6 +7,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "gps_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include <stdio.h>
 #include "freertos/queue.h"
@@ -201,11 +202,9 @@ void evil_twin_bg_tick()
     EvilTwinHit hit;
     if (xQueueReceive(s_queue, &hit, 0) != pdTRUE) return;
 
-    if (usb_sd_is_running() || !instance.isCardReady()) return;
-    if (!SD.exists("/EvilTwin")) SD.mkdir("/EvilTwin");
+    if (!storage_stats().accepting) return;
 
-    File f = SD.open("/EvilTwin/discovered.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -233,5 +232,5 @@ void evil_twin_bg_tick()
     }
 
     f.print("\n");
-    f.close();
+    f.commit("/EvilTwin/discovered.txt", StorageMode::Append);
 }

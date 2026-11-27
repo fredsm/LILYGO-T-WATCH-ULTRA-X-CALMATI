@@ -5,6 +5,7 @@
 #include "map_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -90,6 +91,8 @@ void configuration_screen_commit()
 // handler on this screen so a reboot loses nothing.
 static void save_config_to_sd()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (s_loading || !instance.isCardReady()) return;
     if (!SD.exists("/Meshtastic")) SD.mkdir("/Meshtastic");
     File f = SD.open("/Meshtastic/config.txt", FILE_WRITE);
@@ -172,6 +175,8 @@ static void apply_config_kv(const char *key, const char *val)
 
 static void load_config_from_sd()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists("/Meshtastic/config.txt")) return;
     File f = SD.open("/Meshtastic/config.txt", FILE_READ);

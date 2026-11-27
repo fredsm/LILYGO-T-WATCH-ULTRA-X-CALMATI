@@ -6,6 +6,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <WiFi.h>
 #include <string.h>
 #include "ping/ping_sock.h"
@@ -137,6 +138,8 @@ static void sweep_task(void *)
 
 static void write_log()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (usb_sd_is_running() || !instance.isCardReady()) return;
     if (!SD.exists("/PingSweeps")) SD.mkdir("/PingSweeps");
 

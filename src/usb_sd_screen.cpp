@@ -2,6 +2,7 @@
 #include "usb_sd.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <stdio.h>
 
 // Defined in tools_screen.cpp
@@ -49,6 +50,9 @@ static void update_card_label()
 // same reason — 4 MB / 32 GB rounds to 0 % otherwise.
 static void update_usage_label()
 {
+    const auto usage=storage_usage();
+    s_usage_known=usage.valid;s_total_bytes=usage.total;s_used_bytes=usage.used;
+
     if (usb_sd_card_bytes() == 0) {
         // No card → nothing meaningful to show.
         lv_label_set_text(usage_label, "Usage: --");
@@ -98,18 +102,8 @@ static void update_usage_label()
 // the FAT in the latter case — querying it would race with host I/O).
 static void recompute_usage()
 {
-    if (usb_sd_is_running() || !instance.isCardReady() ||
-        usb_sd_card_bytes() == 0) {
-        return;                  // leave the cache alone
-    }
-    s_total_bytes = SD.totalBytes();
-    s_used_bytes  = SD.usedBytes();
-    s_usage_known = true;
-    // Trace to USB-CDC serial so we can sanity-check the underlying
-    // numbers if the on-screen display ever looks suspect.
-    Serial.printf("[USB SD] usage: total=%llu used=%llu\n",
-        (unsigned long long)s_total_bytes,
-        (unsigned long long)s_used_bytes);
+    if (usb_sd_is_running() || !storage_stats().media) return;
+    storage_request_usage();
 }
 
 static void update_start_button()
@@ -155,9 +149,11 @@ static void refresh()
 
 static void on_refresh(lv_timer_t *)
 {
-    // Pure UI tick — no SD activity depends on it (USB-SD lifecycle is
-    // edge-driven). Skip whenever the user isn't on this screen.
+    // Only enqueue a metadata refresh if the remounted card has no
+    // cached result; the actual FAT scan is performed by the worker.
     if (!usb_sd_screen_is_active()) return;
+    const auto u=storage_usage();
+    if(!usb_sd_is_running() && !u.valid && !u.pending)recompute_usage();
     refresh();
 }
 
@@ -168,8 +164,11 @@ static void on_start_stop(lv_event_t *)
     bool was_running = usb_sd_is_running();
     if (was_running)
         usb_sd_stop();
-    else
-        usb_sd_start();   // no-ops + status shows "No SD card" if none present
+    else if (!usb_sd_start()) {
+        refresh();
+        if (usb_sd_card_bytes()) lv_label_set_text(status_label,"SD busy - retry once writes finish");
+        return;
+    }
 
     // After an unmount the host may have written or deleted files — the
     // cached usage figure is now stale. Re-scan the FAT once (the only

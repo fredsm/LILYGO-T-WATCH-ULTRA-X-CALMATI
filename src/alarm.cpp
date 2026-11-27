@@ -2,6 +2,7 @@
 #include "usb_sd.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <time.h>
 #include <stdio.h>
 #include <math.h>
@@ -54,10 +55,8 @@ static uint32_t s_snooze_until_ms   = 0;
 
 static void save_to_sd()
 {
-    if (usb_sd_is_running() || !instance.isCardReady()) return;
-    if (!SD.exists("/Settings")) SD.mkdir("/Settings");
-    File f = SD.open(ALARM_PATH, FILE_WRITE);
-    if (!f) return;
+    if (!storage_stats().accepting) return;
+    StorageText f;
     f.printf("version=%d\n", ALARM_FILE_VERSION);
     f.printf("enabled=%d\n", s_enabled ? 1 : 0);
     f.printf("hour=%d\n",    s_hour);
@@ -66,11 +65,13 @@ static void save_to_sd()
     f.printf("audio=%d\n",   s_audio   ? 1 : 0);
     f.printf("volume=%d\n",  (int)s_volume);
     f.printf("snooze=%d\n",  s_snooze_minutes);
-    f.close();
+    f.commit(ALARM_PATH, StorageMode::Replace);
 }
 
 void alarm_init()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists(ALARM_PATH)) return;
     File f = SD.open(ALARM_PATH, FILE_READ);

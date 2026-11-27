@@ -3,6 +3,7 @@
 #include "power_manager.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <time.h>
 
 // Defined in main.cpp
@@ -1065,13 +1066,11 @@ void settings_screen_show()
 static void settings_save_to_sd()
 {
     if (g_loading) return;
-    if (!instance.isCardReady()) return;
+    if (!storage_stats().accepting) return;
     if (usb_sd_is_running()) return;   // host owns the SD card while mounted
 
-    if (!SD.exists("/Settings")) SD.mkdir("/Settings");
 
-    File f = SD.open(SETTINGS_PATH, FILE_WRITE);   // FILE_WRITE = "w" (truncate)
-    if (!f) return;
+    StorageText f;
 
     f.printf("brightness=%d\n",      (int)s_brightness);
     f.printf("analog_face=%d\n",     lv_obj_has_state(face_switch,        LV_STATE_CHECKED) ? 1 : 0);
@@ -1088,7 +1087,7 @@ static void settings_save_to_sd()
     f.printf("motion_wake=%d\n",     lv_obj_has_state(motion_wake_switch, LV_STATE_CHECKED) ? 1 : 0);
     f.printf("manual_time=%d\n",     lv_obj_has_state(manual_time_switch, LV_STATE_CHECKED) ? 1 : 0);
     f.printf("screenshot=%d\n",      lv_obj_has_state(screenshot_switch,  LV_STATE_CHECKED) ? 1 : 0);
-    f.close();
+    f.commit(SETTINGS_PATH, StorageMode::Replace);
 }
 
 // Helpers for the load() switch/dropdown application
@@ -1100,6 +1099,8 @@ static void apply_switch(lv_obj_t *sw, bool checked)
 
 void settings_screen_load()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists(SETTINGS_PATH)) return;
 
@@ -1216,7 +1217,7 @@ void settings_screen_apply_sd_state()
 {
     if (!screenshot_switch) return;
 
-    bool sd_usable = instance.isCardReady() && !usb_sd_is_running();
+    bool sd_usable = storage_stats().accepting && instance.isCardReady();
 
     if (sd_usable) {
         // Re-enable interaction; don't touch the checked state — the user

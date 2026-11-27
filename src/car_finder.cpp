@@ -1,6 +1,7 @@
 #include "car_finder.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -21,6 +22,8 @@ static double s_lon    = 0;
 
 static void load_once()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (s_loaded) return;
     if (!instance.isCardReady()) return;    // try again once the card is up
     s_loaded = true;
@@ -44,6 +47,8 @@ static void load_once()
 bool car_finder_save(double lat, double lon)
 {
     s_lat = lat; s_lon = lon; s_has = true; s_loaded = true;   // cache immediately
+    StorageAccess sd_access;
+    if (!sd_access) return false;
     if (!instance.isCardReady()) return false;                 // in RAM only, not persisted
     File f = SD.open(kCarPath, FILE_WRITE);                     // FILE_WRITE truncates → single line
     if (!f) return false;
@@ -55,6 +60,8 @@ bool car_finder_save(double lat, double lon)
 bool car_finder_clear()
 {
     s_has = false; s_lat = 0; s_lon = 0; s_loaded = true;
+    StorageAccess sd_access;
+    if (!sd_access) return true; // RAM cleared; card is unavailable
     if (instance.isCardReady() && SD.exists(kCarPath)) SD.remove(kCarPath);
     return true;
 }

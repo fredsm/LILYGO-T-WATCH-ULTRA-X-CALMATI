@@ -8,6 +8,7 @@
 #include <lvgl.h>
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <Arduino.h>
 #include <math.h>
 #include <stdio.h>
@@ -93,6 +94,8 @@ static void pet_wifi_cb(const WifiBeacon *b)
 
 static void load_xp()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     s_xp_loaded = true;
     if (!instance.isCardReady()) return;
     File f = SD.open("/pwn/pet.txt", FILE_READ);
@@ -105,6 +108,8 @@ static void load_xp()
 
 static void save_xp()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (!instance.isCardReady()) return;
     if (!SD.exists("/pwn")) SD.mkdir("/pwn");
     File f = SD.open("/pwn/pet.txt", FILE_WRITE);
@@ -119,6 +124,8 @@ static void save_xp()
 // raw little-endian RGB565 FISH_W x FISH_H frame; count.txt holds how many.
 static void load_fish_frames()
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return; }
     if (s_loaded) return;
     s_loaded = true;                 // one attempt; falls back to the still on miss
     if (!instance.isCardReady()) return;

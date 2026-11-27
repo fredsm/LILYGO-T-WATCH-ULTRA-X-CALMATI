@@ -2,6 +2,7 @@
 #include "diagnostics_manager.h"
 #include "event_manager.h"
 #include "gps_service.h"
+#include "storage_manager.h"
 #include "task_manager.h"
 #include <lvgl.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@ lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
 void refresh() {
     const auto d=diagnostics_snapshot();
     const auto events=event_stats();
+    const auto sd=storage_stats();
     lv_label_set_text_fmt(status,"%s%s | Uptime %lu s\nReset: %s",
         d.simulated?"SIMULATED | ":"",!d.ready?"Monitor unavailable":d.paused?"Paused":d.stalled?"STALLED":"Monitoring",
         (unsigned long)(d.uptime_ms/1000),d.reset_reason);
@@ -30,11 +32,13 @@ void refresh() {
     if (d.core1<0) snprintf(b,sizeof(b),"N/A"); else snprintf(b,sizeof(b),"%d%%",d.core1);
     lv_label_set_text_fmt(cpu,"Frequency: %lu MHz\nCore 0: %s   Core 1: %s",
         (unsigned long)d.cpu_mhz,a,b);
-    lv_label_set_text_fmt(ui,"UI handler: %lu ms\nMax UI gap: %lu ms   Stalls: %lu\nActive: %s\nEvents pending: %u | Coalesced: %lu\nBack edges merged: %lu\nGPS UART backlog peak: %lu B\nJob slice max: %lu ms | Over 4 ms: %lu",
+    lv_label_set_text_fmt(ui,"UI handler: %lu ms\nMax UI gap: %lu ms   Stalls: %lu\nActive: %s\nEvents pending: %u | Coalesced: %lu\nBack edges merged: %lu\nGPS UART backlog peak: %lu B\nJob slice max: %lu ms | Over 4 ms: %lu\nSD queue: %u | %lu KB%s\nSD done: %lu | Failed: %lu | Rejected: %lu | Cancelled: %lu\nSD merged: %lu | Max job: %lu ms",
         (unsigned long)d.last_ui_ms,(unsigned long)d.max_ui_gap_ms,(unsigned long)d.stalls,
         diagnostics_stage_name(d.active),events.pending,(unsigned long)events.replaced,
         (unsigned long)events.back_coalesced,(unsigned long)gps_service_backlog(),
-        (unsigned long)d.max_slice_ms,(unsigned long)d.slice_overruns);
+        (unsigned long)d.max_slice_ms,(unsigned long)d.slice_overruns,sd.pending,
+        (unsigned long)(sd.queued_bytes/1024),sd.active?" (working)":"",
+        (unsigned long)sd.completed,(unsigned long)sd.failed,(unsigned long)sd.rejected,(unsigned long)sd.cancelled,(unsigned long)sd.coalesced,(unsigned long)sd.max_job_ms);
     if (!d.ready || !d.memory_sample_ms) lv_label_set_text(memory,"Memory sample pending");
     else lv_label_set_text_fmt(memory,"Internal free: %lu KB\nMinimum free: %lu KB\nLargest block: %lu KB\nFree PSRAM: %lu KB\nUI stack headroom: %lu B\nMemory sample age: %lu s",
         (unsigned long)(d.heap/1024),(unsigned long)(d.min_heap/1024),

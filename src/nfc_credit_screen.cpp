@@ -1,6 +1,7 @@
 #include "nfc_credit_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <time.h>
 
 void tools_screen_show();                          // ritorno ai Tools
@@ -124,6 +125,8 @@ static bool page_nonzero(int slot, int pg)
 // Scrive lo slot su SD (+ diff se DOPO). Ritorna true se salvato.
 static bool cr_save_sd(int slot, const char *diff)
 {
+    StorageAccess sd_access;
+    if (!sd_access) { return false; }
     if (!instance.isCardReady()) return false;
     if (!SD.exists("/frantic")) SD.mkdir("/frantic");
     File f = SD.open("/frantic/verify_log.txt", FILE_APPEND);

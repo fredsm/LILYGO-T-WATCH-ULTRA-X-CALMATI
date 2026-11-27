@@ -1,6 +1,9 @@
 #include "usb_sd.h"
 #include <Arduino.h>
 #include <SD.h>
+#include "storage_manager.h"
+#include <atomic>
+#include <lvgl.h>
 #include <LilyGoLib.h>
 #include "USB.h"
 #include "USBMSC.h"
@@ -14,8 +17,13 @@
 // composite device descriptor.
 static USBMSC           s_msc;
 static bool             s_inited  = false;
-static bool             s_running = false;
-static volatile uint32_t s_last_io_ms = 0;
+static std::atomic<bool> s_running{false};
+static std::atomic<uint32_t> s_last_io_ms{0};
+
+struct UsbAccess {
+    bool held=storage_usb_acquire();
+    ~UsbAccess(){if(held)storage_usb_io_release();}
+};
 
 // MSC read/write callbacks run in the TinyUSB task. TinyUSB hands us an LBA
 // that is already block-aligned and a buffer holding a whole number of
@@ -24,6 +32,8 @@ static volatile uint32_t s_last_io_ms = 0;
 
 static int32_t on_read(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize)
 {
+    UsbAccess access;
+    if(!access.held)return -1;
     uint32_t sec = SD.sectorSize();
     if (sec == 0) return -1;
     uint32_t start = lba + offset / sec;
@@ -38,6 +48,8 @@ static int32_t on_read(uint32_t lba, uint32_t offset, void *buffer, uint32_t buf
 
 static int32_t on_write(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
 {
+    UsbAccess access;
+    if(!access.held)return -1;
     uint32_t sec = SD.sectorSize();
     if (sec == 0) return -1;
     uint32_t start = lba + offset / sec;
@@ -57,6 +69,7 @@ static bool on_start_stop(uint8_t power_condition, bool start, bool load_eject)
     if (load_eject && !start) {
         s_msc.mediaPresent(false);
         s_running = false;
+        storage_usb_release();
     }
     return true;
 }
@@ -90,15 +103,19 @@ bool usb_sd_start()
     if (!s_inited) return false;
     if (s_running) return true;
 
+    storage_release_image_cache(); // release cached map image handles
+    if (!storage_try_usb_claim()) return false;
+
     // Re-read geometry in case the card was inserted after boot.
     uint32_t sectors = SD.numSectors();
     uint16_t secsize = (uint16_t)SD.sectorSize();
-    if (!instance.isCardReady() || sectors == 0 || secsize == 0)
-        return false;
+    if (!instance.isCardReady() || sectors == 0 || secsize == 0) {
+        storage_usb_release();return false;
+    }
 
     s_msc.begin(sectors, secsize);
-    s_msc.mediaPresent(true);           // host now sees the card "inserted"
     s_running    = true;
+    s_msc.mediaPresent(true);           // host now sees the card "inserted"
     s_last_io_ms = 0;
     return true;
 }
@@ -108,13 +125,15 @@ void usb_sd_stop()
     if (!s_running) return;
     s_msc.mediaPresent(false);          // host sees the card "removed"
     s_running = false;
+    storage_usb_release();
 }
 
-bool usb_sd_is_running() { return s_running; }
+bool usb_sd_is_running() { return storage_usb_owned(); }
 
 bool usb_sd_host_active()
 {
-    return s_running && s_last_io_ms != 0 && (millis() - s_last_io_ms) < 2000;
+    uint32_t last=s_last_io_ms.load();
+    return s_running && last != 0 && (millis() - last) < 2000;
 }
 
 uint64_t usb_sd_card_bytes()

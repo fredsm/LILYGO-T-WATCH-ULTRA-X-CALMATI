@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <lvgl.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/stream_buffer.h>
@@ -24,6 +25,7 @@ static StreamBufferHandle_t s_sb   = nullptr;
 static TaskHandle_t   s_task       = nullptr;
 static lv_timer_t    *s_drain      = nullptr;
 static File           s_file;
+static bool           s_storage_lease=false;
 
 static volatile bool  s_run        = false;   // reader loop should keep going
 static volatile bool  s_task_done  = false;   // reader task has exited
@@ -124,8 +126,9 @@ static void finalize()
         wav_header(h, (uint32_t)s_bytes);
         s_file.seek(0);
         s_file.write(h, sizeof(h));
-        s_file.close();
     }
+    s_file.close();
+    if(s_storage_lease){storage_local_release();s_storage_lease=false;}
     if (s_sb) { vStreamBufferDelete(s_sb); s_sb = nullptr; }
     s_recording = false;
     s_status = s_bytes ? "saved" : "no audio";
@@ -141,8 +144,7 @@ static void drain_cb(lv_timer_t *)
         size_t n = xStreamBufferReceive(s_sb, tmp, sizeof(tmp), 0);
         if (n == 0) break;
         update_level(tmp, n);
-        if (s_file) s_file.write(tmp, n);
-        s_bytes += n;
+        if (s_file) s_bytes += s_file.write(tmp, n);
     }
     // Finalise once the reader has stopped and the buffer is fully drained.
     if (!s_run && s_task_done && xStreamBufferBytesAvailable(s_sb) == 0)
@@ -160,16 +162,18 @@ void mic_rec_start()
         return;
     }
 
+    if(!storage_local_acquire()){s_status="SD busy";return;}
+    s_storage_lease=true;
     next_path(s_path, sizeof(s_path));
     s_file = SD.open(s_path, FILE_WRITE);      // truncate/create
-    if (!s_file) { s_status = "SD open failed"; s_path[0] = '\0'; return; }
+    if (!s_file) { storage_local_release();s_storage_lease=false; s_status = "SD open failed"; s_path[0] = '\0'; return; }
 
     uint8_t h[44];
     wav_header(h, 0);                          // placeholder; patched on stop
     s_file.write(h, sizeof(h));
 
     s_sb = xStreamBufferCreate(SB_SIZE, 1);
-    if (!s_sb) { s_file.close(); s_status = "out of memory"; return; }
+    if (!s_sb) { s_file.close(); storage_local_release();s_storage_lease=false; s_status = "out of memory"; return; }
 
     s_bytes     = 0;
     s_level     = 0;
@@ -180,7 +184,8 @@ void mic_rec_start()
     s_status    = "recording";
 
     s_drain = lv_timer_create(drain_cb, 40, nullptr);
-    xTaskCreatePinnedToCore(mic_task, "micrec", 4096, nullptr, 3, &s_task, 0);
+    if(!s_drain){s_run=false;s_task_done=true;finalize();s_status="timer allocation failed";return;}
+    if(xTaskCreatePinnedToCore(mic_task, "micrec", 4096, nullptr, 3, &s_task, 0)!=pdPASS){s_run=false;s_task_done=true;finalize();s_status="task allocation failed";}
 }
 
 void mic_rec_stop()

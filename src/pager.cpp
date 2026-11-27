@@ -7,6 +7,7 @@ void clock_screen_get_local_time(struct tm *out);
 #include "gps_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
+#include "storage_text.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -148,11 +149,9 @@ static const char *func_name_for(uint8_t func)
 // (the host owns the FAT while it's mounted).
 static void sd_log_msg(const PagerMsg &m)
 {
-    if (usb_sd_is_running() || !instance.isCardReady()) return;
-    if (!SD.exists("/Pager")) SD.mkdir("/Pager");
+    if (!storage_stats().accepting) return;
 
-    File f = SD.open("/Pager/messages.txt", FILE_APPEND);
-    if (!f) return;
+    StorageText f;
 
     struct tm t;
     clock_screen_get_local_time(&t);
@@ -182,7 +181,7 @@ static void sd_log_msg(const PagerMsg &m)
     }
 
     f.print("\n");
-    f.close();
+    f.commit("/Pager/messages.txt", StorageMode::Append);
 }
 
 static void commit_msg(const PagerMsg &m)
