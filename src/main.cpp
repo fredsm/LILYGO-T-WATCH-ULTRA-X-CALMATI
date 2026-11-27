@@ -76,6 +76,7 @@
 #include "quick_controls_screen.h"
 #include "diagnostics_manager.h"
 #include "spi_bus_manager.h"
+#include "i2c_bus_manager.h"
 #include "event_manager.h"
 #include "ui_scheduler.h"
 #include "gps_service.h"
@@ -488,10 +489,14 @@ static void update_sd_indicator()
     // mounts/unmounts the card over USB-MSC.
     static bool prev_usable = false;
     bool prev_ready  = sd_was_ready;
+    if (!i2c_bus_ready(0x20)) return;
     if (sd_was_ready) {
         // Use the physical card-detect pin on XL9555 IO10 (active-LOW) for removal.
         // This is a live I2C read, unlike SD.sectorSize() which is cached at mount time.
-        if (!storage_stats().media || instance.io.digitalRead(EXPANDS_SD_DET) == HIGH) {
+        const auto before = i2c_bus_failures();
+        const bool removed = !storage_stats().media || instance.io.digitalRead(EXPANDS_SD_DET) == HIGH;
+        if (i2c_bus_failures() != before) return; // unknown, not removed
+        if (removed) {
             storage_media_removed();
             usb_sd_stop();
             wardriver_stop();
@@ -536,7 +541,10 @@ static void update_sd_indicator()
 
 static void update_nfc_indicator()
 {
+    if (!i2c_bus_ready(0x34)) return;
+    const auto before=i2c_bus_failures();
     bool on = instance.pmu.isEnableDLDO1();
+    if (i2c_bus_failures()!=before) return;
     lv_color_t color = on
         ? lv_color_make(0x00, 0xFF, 0x80)
         : lv_color_make(0x33, 0x33, 0x33);
@@ -1326,6 +1334,7 @@ void setup()
 {
     event_manager_init();
     ui_task_claim();
+    i2c_bus_init();
     power_boot_gate();
     Serial.begin(115200);
     delay(50);   // let the USB-CDC link settle so the banner isn't truncated
@@ -1918,6 +1927,7 @@ void setup()
     wifi_creds_autoconnect();
     power_note_activity(millis());
     gps_service_init();
+    i2c_bus_runtime(true);
     diagnostics_init();
 }
 
@@ -1926,6 +1936,7 @@ void loop()
     DIAG_RUN(HardwareEvents, instance.loop()); // required for power button and PMU event dispatch
     DIAG_RUN(Power, power_tick(millis(), false)); // process the hold first, inactivity after touch/Back
     if (power_shutting_down()) { delay(5); return; }
+    DIAG_RUN(Alarm, alarm_service_audio()); // PMU rail cleanup on UI, not I2S worker
     diagnostics_ui_handler(); // UI heartbeat before legacy background calls
     if (!pin_lock_active()) stealth_poll();   // 4 s long-press disarms the duress disguise
     // While the disguise is armed, pin the UI to the bare clock no matter what
@@ -2121,11 +2132,15 @@ void loop()
     // Status sampling is independent of the low-priority wardriver flush.
     if (millis() - last_update_ms >= 1000 && !transition) {
         last_update_ms = millis();
-        DIAG_RUN(RTC, status_cache_sample_clock());
+        DIAG_RUN(RTC, status_cache_poll_clock());
         update_clock();
         DIAG_RUN(Alarm, alarm_tick());
         layout_battery_indicators();
-        DIAG_RUN(Battery, status_cache_sample_battery());
+        static uint32_t last_battery_ms=0;
+        if(!last_battery_ms || uint32_t(millis()-last_battery_ms)>=5000){
+            last_battery_ms=millis();
+            DIAG_RUN(Battery, status_cache_sample_battery());
+        }
         update_battery();
         DIAG_RUN(Indicators, update_lora_indicator());
         DIAG_RUN(Indicators, update_bt_indicator());

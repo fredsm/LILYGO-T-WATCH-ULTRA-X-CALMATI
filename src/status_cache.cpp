@@ -1,5 +1,6 @@
 #include "status_cache.h"
 #include "event_manager.h"
+#include "i2c_bus_manager.h"
 #include <LilyGoLib.h>
 #ifndef TWATCH_SIMULATOR
 #include <freertos/FreeRTOS.h>
@@ -18,15 +19,26 @@ struct Guard {Guard(){portENTER_CRITICAL(&mux);}~Guard(){portEXIT_CRITICAL(&mux)
 }
 void status_cache_sample_clock(){
     if(!ui_task_is_owner())return;
+    if(!i2c_bus_ready(0x51))return;
+    const auto before=i2c_bus_failures();
     UiEvent e;e.kind=UiEventKind::Clock;instance.rtc.getDateTime(&e.utc);
+    if(i2c_bus_failures()!=before)return;
     e.generation=millis();event_publish(e);
     if(event_take(UiEventKind::Clock,e)){
         Guard guard;base=e.utc;base_at=e.generation;clock_valid=true;
     }
 }
+void status_cache_poll_clock(){
+    bool refresh;
+    {Guard guard;refresh=!clock_valid || uint32_t(millis()-base_at)>=30000;}
+    if(refresh)status_cache_sample_clock();
+}
 void status_cache_sample_battery(){
     if(!ui_task_is_owner())return;
+    if(!i2c_bus_ready(0x34))return;
+    const auto before=i2c_bus_failures();
     UiEvent e;e.kind=UiEventKind::Battery;e.value=instance.pmu.getBatteryPercent();e.first=instance.pmu.isCharging();
+    if(i2c_bus_failures()!=before)return;
     event_publish(e);
     if(event_take(UiEventKind::Battery,e)){
         Guard guard;battery=e.value;charging=e.first;battery_valid=true;

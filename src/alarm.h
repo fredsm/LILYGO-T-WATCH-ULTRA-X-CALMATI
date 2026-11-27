@@ -53,3 +53,6 @@ void     alarm_set_snooze_minutes(int minutes);
 // Calling start while the chime is already running is a no-op.
 void     alarm_play_chime_loop(uint8_t volume_override);
 void     alarm_stop_chime_loop();
+
+// UI owner services deferred audio-rail cleanup after the I2S worker exits.
+void alarm_service_audio();

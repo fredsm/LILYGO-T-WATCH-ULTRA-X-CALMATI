@@ -21,3 +21,5 @@ int alarm_get_snooze_minutes(){return snooze;}
 void alarm_set_snooze_minutes(int v){snooze=v;}
 void alarm_play_chime_loop(uint8_t){}
 void alarm_stop_chime_loop(){}
+
+void alarm_service_audio(){}

@@ -87,3 +87,87 @@ replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
 replace_once(os.path.join(src_dir, "LilyGoWatchUltra.h"),
              "new Module(LORA_CS,LORA_IRQ,LORA_RST,LORA_BUSY)",
              "new Module(LORA_CS,LORA_IRQ,LORA_RST,LORA_BUSY,SPI)")
+
+# Phase 5: IRQ handlers only set pending bits. Do not consume a pending
+# event on a failed I2C read; retry after the manager's bounded cooldown.
+ultra = os.path.join(src_dir, "LilyGoWatchUltra.cpp")
+replace_once(ultra, '#include "SensorWireHelper.h"',
+             '#include "SensorWireHelper.h"\n'
+             'extern "C" bool twatch_i2c_ready(uint16_t address);\n'
+             'extern "C" uint32_t twatch_i2c_failures();\n'
+             'static uint8_t twatch_touch_address = 0x5A;\n'
+             'static bool twatch_touch_fault = false, twatch_touch_discard = false;\n'
+             'extern "C" bool twatch_i2c_touch_failed() { return twatch_touch_fault; }')
+replace_once(ultra, '    touch.setPins(TP_RST, TP_INT);',
+             '    twatch_touch_address = touch_panel_addr;\n    touch.setPins(TP_RST, TP_INT);')
+replace_once(ultra,
+             'uint8_t LilyGoUltra::getPoint(int16_t *x_array, int16_t *y_array, uint8_t get_point )\n{',
+             'uint8_t LilyGoUltra::getPoint(int16_t *x_array, int16_t *y_array, uint8_t get_point )\n{\n'
+             '    twatch_touch_fault = false;')
+replace_once(ultra,
+             '        uint8_t tp = touch.getPoint(x_array, y_array, get_point);',
+             '        if (!twatch_i2c_ready(twatch_touch_address)) {\n'
+             '            twatch_touch_fault = twatch_touch_discard = true; return 0;\n'
+             '        }\n'
+             '        const auto before = twatch_i2c_failures();\n'
+             '        uint8_t tp = touch.getPoint(x_array, y_array, get_point);\n'
+             '        if (twatch_i2c_failures() != before) {\n'
+             '            twatch_touch_fault = twatch_touch_discard = true; return 0;\n'
+             '        }\n'
+             '        if (twatch_touch_discard) {\n'
+             '            if (tp != 0) return 0; // suppress the interrupted gesture\n'
+             '            twatch_touch_discard = false;\n'
+             '        }')
+replace_once(ultra,
+             '    if (devices_probe & HW_DRV_ONLINE) {\n        drv.setWaveform(0, _effects);',
+             '    if ((devices_probe & HW_DRV_ONLINE) && twatch_i2c_ready(0x5A)) {\n        drv.setWaveform(0, _effects);')
+replace_once(ultra,
+             '    bool batteryInsert = pmu.isBatteryConnect();\n    // Get PMU Interrupt Status Register\n    pmu.getIrqStatus();',
+             '    const auto before = twatch_i2c_failures();\n'
+             '    bool batteryInsert = pmu.isBatteryConnect();\n'
+             '    // Get PMU Interrupt Status Register\n    pmu.getIrqStatus();\n'
+             '    if (twatch_i2c_failures() != before) {\n'
+             '        xEventGroupSetBits(_event, HW_IRQ_POWER);\n'
+             '        return; // neither dispatch stale IRQ nor clear unread PMU registers\n    }')
+replace_once(ultra,
+             '    // Clear PMU Interrupt Status Register\n    pmu.clearIrqStatus();',
+             '    // Clear PMU Interrupt Status Register\n    pmu.clearIrqStatus();\n'
+             '    if (twatch_i2c_failures() != before) xEventGroupSetBits(_event, HW_IRQ_POWER);')
+replace_once(ultra,
+             '    if (bits & HW_IRQ_POWER) {\n        clearEventBits(HW_IRQ_POWER);\n        checkPowerStatus();\n    }',
+             '    if ((bits & HW_IRQ_POWER) && twatch_i2c_ready(0x34)) {\n'
+             '        clearEventBits(HW_IRQ_POWER);\n        checkPowerStatus();\n    }')
+replace_once(ultra,
+             '    if (bits & HW_IRQ_SENSOR) {\n        clearEventBits(HW_IRQ_SENSOR);\n        sensor.update();\n        sendEvent(SENSOR_EVENT);\n    }',
+             '    if ((bits & HW_IRQ_SENSOR) && twatch_i2c_ready(0x28)) {\n'
+             '        clearEventBits(HW_IRQ_SENSOR);\n'
+             '        const auto before = twatch_i2c_failures();\n'
+             '        sensor.update();\n'
+             '        if (twatch_i2c_failures() != before) xEventGroupSetBits(_event, HW_IRQ_SENSOR);\n'
+             '        else sendEvent(SENSOR_EVENT);\n    }')
+# The SDK normally uses 400 kHz after booting the BHI260; retain this on wake.
+replace_once(ultra, '    Wire.begin(SDA, SCL);\n\n    radio.standby();',
+             '    Wire.begin(SDA, SCL);\n    Wire.setClock(400000UL);\n\n    radio.standby();')
+
+# Never interpret an expander communication failure as a card insertion.
+replace_once(ultra,
+             '    io.pinMode(EXPANDS_SD_DET, INPUT);\n    if (io.digitalRead(EXPANDS_SD_DET) == HIGH) {',
+             '    const auto before = twatch_i2c_failures();\n'
+             '    io.pinMode(EXPANDS_SD_DET, INPUT);\n'
+             '    const auto detect = io.digitalRead(EXPANDS_SD_DET);\n'
+             '    if (twatch_i2c_failures() != before || detect == HIGH) {')
+
+# Cancel an interrupted LVGL gesture instead of generating a false click or
+# extending a stale press while the touch controller is unavailable.
+replace_once(os.path.join(src_dir, "LV_Helper_v9.cpp"),
+             '#ifdef USING_INPUT_DEV_TOUCHPAD\nstatic void touchpad_read',
+             '#ifdef USING_INPUT_DEV_TOUCHPAD\n#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             'extern "C" bool twatch_i2c_touch_failed();\n#endif\nstatic void touchpad_read')
+replace_once(os.path.join(src_dir, "LV_Helper_v9.cpp"),
+             '    uint8_t touched = plane->getPoint(&x, &y, 1);',
+             '    uint8_t touched = plane->getPoint(&x, &y, 1);\n'
+             '#if defined(ARDUINO_T_WATCH_S3_ULTRA)\n'
+             '    if (twatch_i2c_touch_failed()) {\n'
+             '        lv_indev_reset(drv, nullptr);\n'
+             '        data->state = LV_INDEV_STATE_REL;\n'
+             '        return;\n    }\n#endif')

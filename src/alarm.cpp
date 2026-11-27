@@ -1,3 +1,5 @@
+#include <atomic>
+#include "i2c_bus_manager.h"
 #include "alarm.h"
 #include "usb_sd.h"
 #include <LilyGoLib.h>
@@ -207,8 +209,9 @@ void alarm_set(int hour, int minute, bool enabled)
 // current low. The task generates a doorbell-style two-tone pattern in 16-bit
 // PCM at 16 kHz mono and writes it to I2S until s_chime_active goes false.
 
-static volatile bool s_chime_active = false;
-static TaskHandle_t  s_chime_task   = nullptr;
+static std::atomic<bool> s_chime_active{false};
+static std::atomic<bool> s_chime_done{true};
+static bool s_amp_powered=false; // UI-owned PMU rail
 // Volume override used while a borrowed chime (e.g. timer expiry) is
 // playing. 0 = no override → fall back to the user's saved alarm volume.
 // Read on every PCM chunk by chime_write_tone() so a caller can change it
@@ -250,7 +253,6 @@ static void chime_write_tone(uint32_t freq_hz, uint32_t duration_ms,
 
 static void chime_task(void *)
 {
-    instance.powerControl(POWER_SPEAK, true);
     vTaskDelay(pdMS_TO_TICKS(20));   // let the amp settle
     i2s_set_clk(I2S_NUM_1, CHIME_SAMPLE_RATE, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
 
@@ -268,24 +270,39 @@ static void chime_task(void *)
         chime_write_tone(0,    900, chunk, CHIME_CHUNK_SAMPLES, &phase);
     }
 
-    instance.powerControl(POWER_SPEAK, false);
-    s_chime_task = nullptr;
+    s_chime_done.store(true); // UI can now switch off the amp rail
     vTaskDelete(NULL);
 }
 
 static void stop_chime()
 {
-    // The task exits on its next iteration check; the amp power-off happens
-    // there too so we never disable BLDO2 while a write is still queued.
+    // The UI turns off BLDO2 once the worker has finished its I2S write.
     s_chime_active = false;
+}
+
+void alarm_service_audio()
+{
+    if (!s_amp_powered || !s_chime_done.load() || !i2c_bus_ready(0x34)) return;
+    const auto before=i2c_bus_failures();
+    instance.powerControl(POWER_SPEAK, false);
+    if(i2c_bus_failures()==before)s_amp_powered=false;
 }
 
 static void start_chime()
 {
-    if (s_chime_task) return;        // already running
-    s_chime_active = true;
-    xTaskCreatePinnedToCore(chime_task, "alarm_chime", 4096, NULL, 1,
-                            &s_chime_task, 0);
+    if (!s_chime_done.load()) return;
+    if (!i2c_bus_ready(0x34)) return;
+    const auto before=i2c_bus_failures();
+    instance.powerControl(POWER_SPEAK, true);
+    // Even a partial write may have enabled the rail; keep cleanup pending.
+    s_amp_powered=true;
+    if(i2c_bus_failures()!=before)return;
+    s_chime_active=true;
+    s_chime_done=false;
+    if(xTaskCreatePinnedToCore(chime_task, "alarm_chime", 4096, NULL, 1,
+                            nullptr, 0)!=pdPASS){
+        s_chime_active=false;s_chime_done=true;alarm_service_audio();
+    }
 }
 
 // ---- shared-chime API ------------------------------------------------------

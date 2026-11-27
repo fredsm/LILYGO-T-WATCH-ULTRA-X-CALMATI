@@ -30,6 +30,8 @@
 #include "wardriver_screen.h"
 #include "tpms.h"
 #include "mifare.h"
+#include "i2c_bus_manager.h"
+#include "alarm.h"
 #include "settings_screen.h"
 #else
 #include "sim/screens.hpp"
@@ -399,11 +401,14 @@ void lightsleep() {
         diagnostics_resume();
         return;
     }
+    alarm_stop_chime_loop();
     tpms_stop();
     mifare_dict_stop();
     pin_lock_on_screenoff();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+    i2c_bus_runtime(false); // vendor lifecycle operations must not be skipped
     instance.lightSleep(WAKEUP_SRC_POWER_KEY);
+    i2c_bus_runtime(true);
     if(instance.isCardReady())storage_media_inserted();
     else storage_media_removed();
     power_init();
@@ -456,6 +461,7 @@ void deepsleep() {
         while(storage_stats().pending || storage_stats().active)delay(10);
         wardriver_bg_tick();
     }
+    alarm_stop_chime_loop();
     tpms_stop();
     mifare_dict_stop();
     // Drain accepted immutable work before the SDK powers down SPI/SD.
@@ -473,6 +479,7 @@ void deepsleep() {
     // panel, touch, peripheral rails, SD/SPI/I2C and ESP deep sleep.
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     deep_wake_cookie = deep_wake_magic;
+    i2c_bus_runtime(false);
     instance.sleep(WAKEUP_SRC_POWER_KEY, false); // patched SDK arms key edges, retain RTC backup
     // A valid power-key wake configuration must never return.
     ESP.restart();

@@ -4,13 +4,14 @@
 #include "gps_service.h"
 #include "storage_manager.h"
 #include "spi_bus_manager.h"
+#include "i2c_bus_manager.h"
 #include "task_manager.h"
 #include <lvgl.h>
 #include <stdio.h>
 
 namespace {
 lv_obj_t *screen=nullptr, *status=nullptr, *cpu=nullptr, *ui=nullptr, *memory=nullptr,
-         *timings=nullptr, *history=nullptr, *spi=nullptr;
+         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr;
 lv_timer_t* timer=nullptr;
 lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
     auto* obj=lv_label_create(parent);
@@ -55,6 +56,25 @@ void refresh() {
         pos+=size_t(n);
     }
     lv_label_set_text(spi,bus_text);
+    const auto wire=i2c_bus_stats();
+    static char wire_text[1024];
+    bytes=snprintf(wire_text,sizeof(wire_text),
+        "%s | Failures: %lu\nRecovery: %s | Resumed: %lu\nAdmission timeouts: %lu | Active: %lu us",
+        wire.cooling?"Cooldown":wire.active?i2c_client_name(i2c_client(wire.address)):"Idle",
+        (unsigned long)wire.failures,wire.recovering?"Pending":"OK",(unsigned long)wire.recoveries,
+        (unsigned long)wire.admission_timeouts,(unsigned long)wire.active_us);
+    pos=bytes>0?size_t(bytes):0;
+    for(unsigned i=0;i<static_cast<unsigned>(I2cClient::Count) && pos<sizeof(wire_text);++i){
+        const auto& c=wire.clients[i];
+        const int n=snprintf(wire_text+pos,sizeof(wire_text)-pos,
+            "\n%s: %lu tx | %lu NACK | %lu timeout\n%lu other err | %lu deferred\nMax wait: %lu us | Transfer: %lu us",
+            i2c_client_name(static_cast<I2cClient>(i)),(unsigned long)c.transactions,
+            (unsigned long)c.nacks,(unsigned long)c.timeouts,(unsigned long)c.errors,(unsigned long)c.deferred,
+            (unsigned long)c.max_wait_us,(unsigned long)c.max_transfer_us);
+        if(n<0 || size_t(n)>=sizeof(wire_text)-pos)break;
+        pos+=size_t(n);
+    }
+    lv_label_set_text(i2c,wire_text);
     if (!d.ready || !d.memory_sample_ms) lv_label_set_text(memory,"Memory sample pending");
     else lv_label_set_text_fmt(memory,"Internal free: %lu KB\nMinimum free: %lu KB\nLargest block: %lu KB\nFree PSRAM: %lu KB\nUI stack headroom: %lu B\nMemory sample age: %lu s",
         (unsigned long)(d.heap/1024),(unsigned long)(d.min_heap/1024),
@@ -106,6 +126,7 @@ void create() {
     label(body,"CPU",true);cpu=label(body,"");
     label(body,"RESPONSIVENESS",true);ui=label(body,"");
     label(body,"SHARED SPI BUS",true);spi=label(body,"");
+    label(body,"SHARED I2C BUS",true);i2c=label(body,"");
     label(body,"MEMORY",true);memory=label(body,"");
     label(body,"SLOWEST OPERATIONS",true);timings=label(body,"");
     label(body,"RECENT UI STALLS",true);history=label(body,"");
