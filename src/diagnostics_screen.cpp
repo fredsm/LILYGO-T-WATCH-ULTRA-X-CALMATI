@@ -3,13 +3,14 @@
 #include "event_manager.h"
 #include "gps_service.h"
 #include "storage_manager.h"
+#include "spi_bus_manager.h"
 #include "task_manager.h"
 #include <lvgl.h>
 #include <stdio.h>
 
 namespace {
 lv_obj_t *screen=nullptr, *status=nullptr, *cpu=nullptr, *ui=nullptr, *memory=nullptr,
-         *timings=nullptr, *history=nullptr;
+         *timings=nullptr, *history=nullptr, *spi=nullptr;
 lv_timer_t* timer=nullptr;
 lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
     auto* obj=lv_label_create(parent);
@@ -39,6 +40,21 @@ void refresh() {
         (unsigned long)d.max_slice_ms,(unsigned long)d.slice_overruns,sd.pending,
         (unsigned long)(sd.queued_bytes/1024),sd.active?" (working)":"",
         (unsigned long)sd.completed,(unsigned long)sd.failed,(unsigned long)sd.rejected,(unsigned long)sd.cancelled,(unsigned long)sd.coalesced,(unsigned long)sd.max_job_ms);
+    const auto bus=spi_bus_stats();
+    char bus_text[480];
+    int bytes=snprintf(bus_text,sizeof(bus_text),"Owner: %s | Waiting: %lu\nActive: %lu us",
+        bus.active?spi_bus_client_name(bus.owner):"Idle",(unsigned long)bus.waiters,(unsigned long)bus.active_us);
+    size_t pos=bytes>0?size_t(bytes):0;
+    for(unsigned i=0;i<static_cast<unsigned>(SpiClient::Count) && pos<sizeof(bus_text);++i) {
+        const auto& c=bus.clients[i];
+        const int n=snprintf(bus_text+pos,sizeof(bus_text)-pos,
+            "\n%s: %lu tx | %lu contended | %lu deferred\nMax wait: %lu us | Hold: %lu us",
+            spi_bus_client_name(static_cast<SpiClient>(i)),(unsigned long)c.transactions,
+            (unsigned long)c.contended,(unsigned long)c.deferred,(unsigned long)c.max_wait_us,(unsigned long)c.max_hold_us);
+        if(n<0 || size_t(n)>=sizeof(bus_text)-pos)break;
+        pos+=size_t(n);
+    }
+    lv_label_set_text(spi,bus_text);
     if (!d.ready || !d.memory_sample_ms) lv_label_set_text(memory,"Memory sample pending");
     else lv_label_set_text_fmt(memory,"Internal free: %lu KB\nMinimum free: %lu KB\nLargest block: %lu KB\nFree PSRAM: %lu KB\nUI stack headroom: %lu B\nMemory sample age: %lu s",
         (unsigned long)(d.heap/1024),(unsigned long)(d.min_heap/1024),
@@ -89,10 +105,11 @@ void create() {
     status=label(body,"");
     label(body,"CPU",true);cpu=label(body,"");
     label(body,"RESPONSIVENESS",true);ui=label(body,"");
+    label(body,"SHARED SPI BUS",true);spi=label(body,"");
     label(body,"MEMORY",true);memory=label(body,"");
     label(body,"SLOWEST OPERATIONS",true);timings=label(body,"");
     label(body,"RECENT UI STALLS",true);history=label(body,"");
-    label(body,"Operation timings include driver calls and waiting, not raw bus transactions. History is held in RAM.");
+    label(body,"Operation timings include driver calls and waiting, not raw bus transactions. SPI timings cover bus transactions only. History is held in RAM.");
     timer=lv_timer_create([](lv_timer_t*){if(diagnostics_screen_is_active())refresh();},1000,nullptr);
 }
 }

@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "aprs.h"
 
 void clock_screen_get_local_time(struct tm *out);
@@ -303,6 +304,7 @@ static void do_transmit()
 void aprs_bg_tick()
 {
     if (!s_running) return;
+    if (!spi_bus_ui_ready(SpiClient::LoRa)) return;
 
     // Drain a received packet first, before any radio mode change.
     if (s_pkt_flag) {

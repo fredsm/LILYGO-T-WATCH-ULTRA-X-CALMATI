@@ -75,6 +75,7 @@
 #include "time_screen.h"
 #include "quick_controls_screen.h"
 #include "diagnostics_manager.h"
+#include "spi_bus_manager.h"
 #include "event_manager.h"
 #include "ui_scheduler.h"
 #include "gps_service.h"
@@ -1355,6 +1356,7 @@ void setup()
                       (unsigned)ESP.getMaxAllocHeap());
     }
 
+    spi_bus_init();
     instance.begin();
     instance.powerControl(POWER_NFC, false); // ensure NFC is off on boot
     beginLvglHelper(instance);

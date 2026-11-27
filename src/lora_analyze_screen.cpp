@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "lora_analyze_screen.h"
 #include "bt_analyze_screen.h"
 #include "lora_screen.h"
@@ -315,7 +316,8 @@ static void update_legend()
 
 static void on_timer(lv_timer_t *)
 {
-    if (s_running && (millis() - s_hop_start_ms >= HOP_MS)) {
+    if (s_running && (millis() - s_hop_start_ms >= HOP_MS) &&
+        spi_bus_ui_ready(SpiClient::LoRa)) {
         s_hop_start_ms = millis();
         hop_one();
     }

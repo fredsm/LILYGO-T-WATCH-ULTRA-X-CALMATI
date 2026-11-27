@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "nfc_screen.h"
 #include "nfc_write_screen.h"
 #include <LilyGoLib.h>
@@ -330,6 +331,7 @@ void nfc_screen_worker()
     // Pause while the user is on another screen, but keep the read state
     // so returning to the NFC screen resumes the scan with the "Stop" button
     if (!nfc_screen_is_active()) return;
+    if (!spi_bus_ui_ready(SpiClient::Nfc)) return;
 
     NFCReader.rfalNfcWorker();
 

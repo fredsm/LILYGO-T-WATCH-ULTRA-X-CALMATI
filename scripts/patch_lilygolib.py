@@ -81,3 +81,9 @@ replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
 replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
              '        log_d("Enable power button from wakeup source.");\n        pmu.enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ);',
              '        log_d("Enable power button from wakeup source.");\n        pmu.enableIRQ(XPOWERS_AXP2101_PKEY_NEGATIVE_IRQ | XPOWERS_AXP2101_PKEY_POSITIVE_IRQ);')
+
+# The Ultra owns and initializes global SPI. RadioLib must not reinitialize
+# or end the bus shared with the SD and NFC drivers.
+replace_once(os.path.join(src_dir, "LilyGoWatchUltra.h"),
+             "new Module(LORA_CS,LORA_IRQ,LORA_RST,LORA_BUSY)",
+             "new Module(LORA_CS,LORA_IRQ,LORA_RST,LORA_BUSY,SPI)")

@@ -1,4 +1,6 @@
 #include "mifare.h"
+#include "spi_bus_manager.h"
+#include <atomic>
 #include <LilyGoLib.h>
 #include <string.h>
 #include <stdio.h>
@@ -14,7 +16,8 @@ static bool         s_scanning = false;
 static volatile bool s_card_ready = false;
 static bool         s_have_card = false;
 static MifareCard   s_card;
-static volatile bool s_dict_running = false;   // dict task owns the RFAL while set
+static std::atomic<bool> s_dict_running{false};
+static std::atomic<bool> s_dict_done{true}; // RFAL stays owned until completion
 
 // Called from within NFCReader.rfalNfcWorker() when a device is activated.
 static void on_rfal_notify(rfalNfcState st)
@@ -84,6 +87,7 @@ void mifare_reader_start()
 
 void mifare_reader_stop()
 {
+    mifare_dict_stop();
     if (s_scanning) {
         NFCReader.rfalNfcDeactivate(false);
         s_scanning = false;
@@ -97,8 +101,9 @@ void mifare_reader_stop()
 
 void mifare_reader_worker()
 {
-    if (s_dict_running) return;    // the dict task drives the RFAL exclusively
+    if (!s_dict_done.load()) return; // worker still owns RFAL
     if (!s_powered || !s_scanning) return;
+    if (!spi_bus_ui_ready(SpiClient::Nfc)) return;
     NFCReader.rfalNfcWorker();
 
     if (s_card_ready) {
@@ -152,7 +157,7 @@ static uint8_t      s_sec_key[40][6];
 static volatile int s_dict_sector = 0;
 static volatile int s_dict_total  = 16;
 static volatile int s_dict_found  = 0;
-static TaskHandle_t s_dict_task = nullptr;
+
 
 static inline uint32_t be32(const uint8_t *p) {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
@@ -267,30 +272,31 @@ static void dict_task(void *) {
     }
     NFCReader.rfalNfcDeactivate(false);
     s_dict_running = false;
-    s_dict_task = nullptr;
+    s_dict_done.store(true);
     vTaskDelete(nullptr);
 }
 
 bool mifare_dict_start() {
-    if (s_dict_running) return true;
+    if (!s_dict_done.load()) return s_dict_running.load();
     if (!s_have_card || !s_card.is_classic) return false;
     s_dict_sector = 0; s_dict_found = 0; s_dict_total = s_card.sectors;
     memset(s_sec_done, 0, sizeof(s_sec_done));
     s_dict_running = true;
-    if (xTaskCreatePinnedToCore(dict_task, "mfdict", 4096, nullptr, 1, &s_dict_task, 0) != pdPASS) {
+    s_dict_done = false;
+    if (xTaskCreatePinnedToCore(dict_task, "mfdict", 4096, nullptr, 1, nullptr, 0) != pdPASS) {
         s_dict_running = false;
+        s_dict_done = true;
         return false;
     }
     return true;
 }
 
 void mifare_dict_stop() {
-    if (!s_dict_running) return;
     s_dict_running = false;
-    for (int i = 0; i < 100 && s_dict_task; i++) delay(5);
+    while (!s_dict_done.load()) vTaskDelay(1);
 }
 
-bool mifare_dict_running() { return s_dict_running; }
+bool mifare_dict_running() { return !s_dict_done.load(); }
 int  mifare_dict_found()   { return s_dict_found; }
 int  mifare_dict_total()   { return s_dict_total; }
 int  mifare_dict_progress() {

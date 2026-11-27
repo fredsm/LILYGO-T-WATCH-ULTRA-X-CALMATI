@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "pager.h"
 
 void clock_screen_get_local_time(struct tm *out);
@@ -551,6 +552,7 @@ void pager_clear_msgs()
 void pager_bg_tick()
 {
     if (!s_running) return;
+    if (!spi_bus_ui_ready(SpiClient::LoRa)) return;
 
     if (s_rx_flag) {
         s_rx_flag = false;      // clear before readData() to avoid missing a back-to-back packet

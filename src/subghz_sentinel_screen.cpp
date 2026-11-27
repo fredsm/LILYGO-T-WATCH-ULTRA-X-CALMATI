@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "subghz_sentinel_screen.h"
 #include <LilyGoLib.h>          // provides the global RadioLib `radio` (SX1262)
 #include "meshtastic.h"         // meshtastic_set_active() to release the radio
@@ -39,6 +40,7 @@ static void sentinel_begin()
 static void on_refresh(lv_timer_t *)
 {
     if (lv_scr_act() != s_scr) return;
+    if (!spi_bus_ui_ready(SpiClient::LoRa)) return;
     if (s_pending) { s_pending = false; sentinel_begin(); }
     if (!s_radio_ok) { lv_label_set_text(status_label, "Radio not ready"); return; }
 

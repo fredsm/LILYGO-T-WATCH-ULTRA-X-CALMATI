@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "nfc_credit_screen.h"
 #include <LilyGoLib.h>
 #include <SD.h>
@@ -337,6 +338,7 @@ void nfc_credit_screen_worker()
 {
     if (cr_state == CR_IDLE) return;
     if (!nfc_credit_screen_is_active()) return;
+    if (!spi_bus_ui_ready(SpiClient::Nfc)) return;
 
     NFCReader.rfalNfcWorker();
 

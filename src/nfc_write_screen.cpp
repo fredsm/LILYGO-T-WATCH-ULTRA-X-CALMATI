@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "nfc_write_screen.h"
 #include <LilyGoLib.h>
 #include <string.h>
@@ -362,6 +363,7 @@ bool nfc_write_screen_is_active()
 void nfc_write_screen_worker()
 {
     if (s_wr_state == WR_IDLE) return;
+    if (!spi_bus_ui_ready(SpiClient::Nfc)) return;
 
     // Cancel a pending write if the user navigated away
     if (!nfc_write_screen_is_active()) {

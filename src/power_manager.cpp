@@ -28,6 +28,8 @@
 #include "mic_rec.h"
 #include "wake_word.h"
 #include "wardriver_screen.h"
+#include "tpms.h"
+#include "mifare.h"
 #include "settings_screen.h"
 #else
 #include "sim/screens.hpp"
@@ -397,6 +399,8 @@ void lightsleep() {
         diagnostics_resume();
         return;
     }
+    tpms_stop();
+    mifare_dict_stop();
     pin_lock_on_screenoff();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     instance.lightSleep(WAKEUP_SRC_POWER_KEY);
@@ -452,6 +456,8 @@ void deepsleep() {
         while(storage_stats().pending || storage_stats().active)delay(10);
         wardriver_bg_tick();
     }
+    tpms_stop();
+    mifare_dict_stop();
     // Drain accepted immutable work before the SDK powers down SPI/SD.
     // Do not force an unmount during a hung in-flight operation.
     storage_release_image_cache();

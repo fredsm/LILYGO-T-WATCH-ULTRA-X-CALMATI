@@ -1,3 +1,4 @@
+#include "spi_bus_manager.h"
 #include "status_cache.h"
 #include "meshtastic.h"
 #include "tracker_rep.h"
@@ -1623,6 +1624,7 @@ void meshtastic_set_active(bool active)
 void meshtastic_bg_tick()
 {
     if (!s_active) return;
+    if (!spi_bus_ui_ready(SpiClient::LoRa)) return;
 
     // Process any received packet — do this first, before any radio mode changes
     if (s_pkt_flag) {

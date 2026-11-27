@@ -1,3 +1,5 @@
+#include "spi_bus_manager.h"
+#include <atomic>
 #include "tpms.h"
 #include "lora_screen.h"
 #include "aprs.h"
@@ -35,7 +37,8 @@
 #define TPMS_DATA_MAX     10
 #define OOK_BUF_SCHRADER  256
 
-static bool            s_running    = false;
+static std::atomic<bool> s_running{false};
+static std::atomic<bool> s_ook_done{true};
 static bool            s_freq_433   = true;
 static TpmsFormat      s_format     = TPMS_FORMAT_FSK;
 static int16_t         s_last_error = 0;
@@ -313,7 +316,7 @@ static void ook_task(void *param)
     // spikes read as 1, breaking Manchester decode (man stays 0). A strong
     // local transmitter sits tens of dB above noise, so +10 dB is safe.
     float noise_sum = 0;
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 64 && s_running; i++) {
         noise_sum += radio.getRSSI(false);
         vTaskDelay(2);
     }
@@ -324,18 +327,14 @@ static void ook_task(void *param)
     bool capturing = false;
     int  silence   = 0;
 
-    while (true) {
-        if (!s_running) {
-            // Signal exit and block; tpms_stop() will force-delete us.
-            vTaskSuspend(nullptr);
-        }
+    while (s_running) {
         if (!capturing) {
             // Yield core 0 for ~1 ms so the Arduino loop on core 1
             // (instance.loop, LVGL, touch) gets uncontested SPI access.
             // Then poll RSSI 8 times in a tight burst to catch preamble onset.
             vTaskDelay(pdMS_TO_TICKS(1));
             bool hit = false;
-            for (int k = 0; k < 8 && !hit; k++) {
+            for (int k = 0; k < 8 && !hit && s_running; k++) {
                 if (radio.getRSSI(false) > threshold) { hit = true; break; }
                 delayMicroseconds(40);
             }
@@ -389,8 +388,9 @@ static void ook_task(void *param)
         }
     }
 
-    // Never reached — loop exits only via vTaskSuspend above, then
-    // tpms_stop() force-deletes the task handle.
+    // Publish completion only after the last radio transaction has ended.
+    s_ook_done.store(true);
+    vTaskDelete(nullptr);
 }
 
 // ---- public API ------------------------------------------------------------
@@ -453,8 +453,17 @@ bool tpms_start(bool freq_433, TpmsFormat fmt)
         // watchdog after ~5 s. Suppress core-0 IDLE monitoring for the
         // duration; tpms_stop() re-enables it.
         disableCore0WDT();
-        xTaskCreatePinnedToCore(ook_task, "ook_rx", 4096, nullptr,
-                                5, &s_ook_task_handle, 0);
+        s_running=true;
+        s_ook_done=false;
+        if (xTaskCreatePinnedToCore(ook_task, "ook_rx", 4096, nullptr,
+                                5, &s_ook_task_handle, 0) != pdPASS) {
+            s_running=false;
+            s_ook_done=true;
+            s_ook_task_handle=nullptr;
+            enableCore0WDT();
+            radio.standby();
+            return false;
+        }
     }
 
     s_running = true;
@@ -467,7 +476,8 @@ void tpms_stop()
     s_running    = false;
 
     if (s_ook_task_handle) {
-        vTaskDelete(s_ook_task_handle);
+        // Never delete a task while it may own an SPI transaction.
+        while (!s_ook_done.load()) vTaskDelay(1);
         s_ook_task_handle = nullptr;
         enableCore0WDT();  // restore IDLE_0 watchdog now that the task is gone
     }
@@ -491,6 +501,7 @@ const TpmsSensor* tpms_get_sensor(TpmsPos pos)
 void tpms_bg_tick()
 {
     if (!s_running || !s_rx_flag) return;
+    if (!spi_bus_ui_ready(SpiClient::LoRa)) return;
     s_rx_flag = false;
     s_isr_count++;
 
