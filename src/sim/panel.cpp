@@ -1,4 +1,5 @@
 #include "panel.hpp"
+#include "../power_manager.h"
 #include <algorithm>
 namespace sim {
 bool HardwarePanel::open(lv_display_t* watch_display){
@@ -41,7 +42,7 @@ bool HardwarePanel::open(lv_display_t* watch_display){
     charging=checkbox("Charging");display_on=checkbox("Watch display on");
     gps=checkbox("GPS fix available");sd=checkbox("SD card present (virtual)");
     auto* reset=lv_button_create(root);lv_label_set_text(lv_label_create(reset),"Reset simulated inputs");
-    lv_obj_add_event_cb(reset,[](lv_event_t* e){hardware.reset_inputs();static_cast<HardwarePanel*>(lv_event_get_user_data(e))->sync();},LV_EVENT_CLICKED,this);
+    lv_obj_add_event_cb(reset,[](lv_event_t* e){hardware.reset_inputs();if(power_screen_off())hardware.watch.set_display_on(false);static_cast<HardwarePanel*>(lv_event_get_user_data(e))->sync();},LV_EVENT_CLICKED,this);
     auto* note=lv_label_create(root);lv_obj_set_width(note,370);lv_label_set_long_mode(note,LV_LABEL_LONG_WRAP);
     lv_label_set_text(note,"GPS/SD changes appear when the original UI refreshes or reopens. No real devices, files or radio traffic. Close hides this panel; F6 reopens it.");
     sync();lv_display_set_default(watch_display);return true;
@@ -53,7 +54,7 @@ void HardwarePanel::changed(lv_event_t* e){
     if(target==p->satellites)hardware.satellites=lv_slider_get_value(target);
     bool checked=lv_obj_has_state(target,LV_STATE_CHECKED);
     if(target==p->charging)hardware.watch.set_charging(checked);
-    if(target==p->display_on)hardware.watch.set_display_on(checked);
+    if(target==p->display_on)hardware.watch.set_display_on(checked&&!power_screen_off());
     if(target==p->gps)hardware.gps_fix=checked;
     if(target==p->sd)hardware.sd_ready=checked;
 }

@@ -57,3 +57,7 @@ The existing Back-from-home Settings shortcut remains available.
 Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens
 Time. Back or a rightward/downward swipe from Time returns to the screen that
 opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
+
+Full power-off: hold Power (or F2) for five seconds until the watch blanks,
+then release. Only another Power press wakes it, showing a simulated boot.
+The hardware panel and F5 cannot wake a powered-off watch.

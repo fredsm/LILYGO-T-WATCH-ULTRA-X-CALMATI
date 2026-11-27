@@ -10,6 +10,7 @@
 #include "clock.hpp"
 #include "pointer.hpp"
 #include "keyboard.hpp"
+#include "../power_manager.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -139,9 +140,24 @@ int main(int argc,char** argv) {
     uint32_t pointer_event_at=last,held_read_at=last;
     auto dispatch_pointer=[&](){pointer_event_at=SDL_GetTicks();sim::dispatch_pointer(input,pressed);};
     bool contact=false;int captured_button=-1;
+    bool power_contact=false, waking=false;
+    auto power_down=[&](){
+        if(power_contact || sim::startup_active())return;
+        power_contact=true;waking=power_is_asleep();
+        if(waking)power_sim_wake();else power_button_down(lv_tick_get());
+    };
+    auto power_up=[&](bool clicked){
+        if(!power_contact)return;
+        power_contact=false;
+        if(!waking){
+            if(clicked){power_button_up(lv_tick_get());if(!power_shutting_down())sim::power_button_click();}
+            else power_cancel_press();
+        }
+        waking=false;
+    };
     auto route_pointer=[&](int x,int y,bool down){
         int hit=(y>=H+8 && y<H+52 && x>=10 && x<400)?(x<195?0:(x>=215?1:-1)):-1;
-        if(down && !contact){contact=true;captured_button=y>=H?(hit>=0?hit:-2):-1;}
+        if(down && !contact){contact=true;captured_button=y>=H?(hit>=0?hit:-2):-1;if(captured_button==0)power_down();}
         // A tap in the control-bar margin must not reach the watch underneath.
         if(captured_button==-2){if(!down){contact=false;captured_button=-1;}return;}
         if(captured_button>=0){
@@ -149,12 +165,14 @@ int main(int argc,char** argv) {
             if(down && hit==captured_button)lv_obj_add_state(button,LV_STATE_PRESSED);
             else lv_obj_remove_state(button,LV_STATE_PRESSED);
             if(!down){
-                if(hit==captured_button && !sim::startup_active()){if(captured_button==0)sim::power_button_click();else sim::back_button_click();}
+                if(captured_button==0)power_up(hit==0);
+                else if(hit==captured_button && !sim::startup_active() && !power_screen_locked())sim::back_button_click();
                 captured_button=-1;contact=false;
             }
             return;
         }
         if(!contact && y>=H)return;
+        if(power_screen_locked()){pressed=false;if(!down)contact=false;return;}
         pointer.x=std::clamp(x,0,W-1);pointer.y=std::clamp(y,0,H-1);
         pressed=down;dispatch_pointer();if(!down)contact=false;
     };
@@ -188,22 +206,25 @@ int main(int argc,char** argv) {
                 if(e.type==SDL_FINGERUP)touching=false;
             }
             if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
+                power_up(false);
                 pressed=false;touching=false;contact=false;captured_button=-1;
-                for(auto* b:watch_buttons)lv_obj_remove_state(b,LV_STATE_PRESSED);dispatch_pointer();
+                for(auto* b:watch_buttons)lv_obj_remove_state(b,LV_STATE_PRESSED);if(!power_screen_locked())dispatch_pointer();
             }
-            if(e.type==SDL_TEXTINPUT)sim::text_input(e.text.text);
+            if(e.type==SDL_KEYUP && (e.key.keysym.sym==SDLK_F2 || e.key.keysym.sym==SDLK_p))power_up(true);
+            if(e.type==SDL_TEXTINPUT && !power_screen_locked())sim::text_input(e.text.text);
             if(e.type==SDL_KEYDOWN) {
                 const auto key=e.key.keysym.sym;const bool ctrl=(e.key.keysym.mod&KMOD_CTRL)!=0;
                 if(ctrl && key==SDLK_q){running=false;continue;}
-                if(sim::text_input_active()){
+                if(!power_screen_locked() && sim::text_input_active()){
                     if(ctrl && key==SDLK_v){char* text=SDL_GetClipboardText();if(text){sim::text_input(text);SDL_free(text);}continue;}
                     if(auto edit=editing_key(key)){sim::edit_key(edit);continue;}
                 }
                 if(e.key.repeat)continue;
                 if(key==SDLK_F6){panel.show();continue;}
                 if(sim::startup_active())continue;
-                const bool editing=sim::text_input_active();
-                if(key==SDLK_F2 || (!editing && key==SDLK_p))sim::power_button_click();
+                const bool editing=!power_screen_locked() && sim::text_input_active();
+                if(key==SDLK_F2 || (!editing && key==SDLK_p)){power_down();continue;}
+                if(power_screen_locked())continue;
                 if(key==SDLK_F3 || (!editing && (key==SDLK_b || key==SDLK_ESCAPE)))sim::back_button_click();
                 if(key==SDLK_F4)sim::show_home();
                 if(key==SDLK_F5)watch.set_display_on(!watch.display_on());
@@ -212,9 +233,10 @@ int main(int argc,char** argv) {
             }
         }
         auto now=SDL_GetTicks(); auto delta=(smoke||self_test)?20u:now-last; last=now;
-        watch.advance(delta); lv_tick_inc(delta); sim::tick();sim::tick_boot();
+        watch.advance(delta); lv_tick_inc(delta); power_tick(lv_tick_get());
+        if(!power_screen_locked()){sim::tick();sim::tick_boot();}
         // Stationary holds still need reads for original long-press callbacks.
-        if(pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
+        if(!power_screen_locked() && pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
             sim::dispatch_pointer(input,pressed);held_read_at=now;
         }
         lv_timer_handler();
@@ -222,7 +244,7 @@ int main(int argc,char** argv) {
         while(watch.pop_button(event)) std::printf("button %d %s\n",static_cast<int>(event.button),event.pressed?"down":"up");
         SDL_UpdateTexture(texture,nullptr,pixels.data(),W*sizeof(uint16_t));
         SDL_SetRenderDrawColor(renderer,0,0,0,255); SDL_RenderClear(renderer);
-        if(watch.display_on()) {
+        if(watch.display_on() && !power_screen_off()) {
             auto level=static_cast<uint8_t>(watch.brightness());
             SDL_SetTextureColorMod(texture,level,level,level);
             SDL_Rect face{0,0,W,H};SDL_RenderCopy(renderer,texture,&face,&face);

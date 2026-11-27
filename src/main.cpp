@@ -1786,6 +1786,8 @@ void setup()
     lv_obj_del(boot_splash);
     s_last_activity_ms = millis();
 
+    power_init();
+
     // Power button short press cycles forward through screens:
     //   - clock -> GPS -> LoRa -> WiFi -> Bluetooth -> NFC
     //   - meshtastic -> nodes -> send_message -> map (when tiles exist)
@@ -1794,7 +1796,10 @@ void setup()
     //     buttons or gestures interchangeably)
     //   - settings -> clock
     instance.onEvent([](DeviceEvent_t event, void *params, void *user_data) {
-        if (instance.getPMUEventType(params) == PMU_EVENT_KEY_CLICKED) {
+        const auto type = instance.getPMUEventType(params);
+        if (type == PMU_EVENT_KEY_DOWN) power_button_down(millis());
+        if (type == PMU_EVENT_KEY_UP) power_button_up(millis());
+        if (type == PMU_EVENT_KEY_CLICKED && !power_shutting_down()) {
             dim_reset_activity();
             if (clock_vibrate) instance.vibrator();
             if (lv_screen_active() == clock_screen)
@@ -1875,6 +1880,8 @@ void setup()
 void loop()
 {
     instance.loop(); // required for power button and PMU event dispatch
+    power_tick(millis());
+    if (power_shutting_down()) { delay(5); return; }
     motion_wake_poll();   // accel-driven wake; no-op when toggle is off
     scan_radio_tick();    // unified Scanner: switch WiFi/BLE slices; no-op when idle
     evil_portal_tick();   // Evil Twin captive portal: serve DNS+HTTP; no-op when idle

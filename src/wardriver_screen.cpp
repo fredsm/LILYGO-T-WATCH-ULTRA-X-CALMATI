@@ -393,7 +393,7 @@ static bool start_wardriving() {
     return true;
 }
 
-static void stop_wardriving() {
+void wardriver_stop() {
     if (!is_running) return;
     is_running = false;
 
@@ -442,7 +442,7 @@ static void on_start_stop(lv_event_t *) {
             lv_obj_clear_state(bt_toggle_sw,   LV_STATE_DISABLED);
         }
     } else {
-        stop_wardriving();
+        wardriver_stop();
         lv_obj_clear_state(wifi_toggle_sw, LV_STATE_DISABLED);
         lv_obj_clear_state(bt_toggle_sw,   LV_STATE_DISABLED);
         bool gps_ok = gps_screen_has_lock();
@@ -593,7 +593,7 @@ void wardriver_bg_tick()
     // and existing rows keep their captured fix - so dropping GPS lock
     // is no reason to tear the whole session down.
     if (!instance.isCardReady()) {
-        stop_wardriving();
+        wardriver_stop();
         lv_obj_clear_state(wifi_toggle_sw, LV_STATE_DISABLED);
         lv_obj_clear_state(bt_toggle_sw,   LV_STATE_DISABLED);
         return;

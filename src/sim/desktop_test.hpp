@@ -1,5 +1,6 @@
 #pragma once
 #include "panel.hpp"
+#include "../power_manager.h"
 #include "clock.hpp"
 #include "navigation.hpp"
 #include "../gps_screen.h"
@@ -28,7 +29,7 @@ class DesktopTest {
     }
     void wait(int n=3){while(n--)steps.push_back([]{});}
     void check(std::function<bool()> condition,const char* name){steps.push_back([this,condition,name]{bool pass=condition();std::printf("SDL %s: %s\n",name,pass?"PASS":"FAIL");std::fflush(stdout);ok&=pass;});}
-    void key(SDL_Keycode code,Uint32 id){steps.push_back([=]{SDL_Event e{};e.type=SDL_KEYDOWN;e.key.windowID=id;e.key.keysym.sym=code;SDL_PushEvent(&e);});wait();}
+    void key(SDL_Keycode code,Uint32 id){for(auto type:{SDL_KEYDOWN,SDL_KEYUP})steps.push_back([=]{SDL_Event e{};e.type=type;e.key.windowID=id;e.key.keysym.sym=code;SDL_PushEvent(&e);});wait();}
     void sample(Uint32 id,int x,int y,int type){steps.push_back([=]{SDL_Event e{};e.type=type;if(type==SDL_MOUSEMOTION){e.motion.windowID=id;e.motion.x=x;e.motion.y=y;}else{e.button.windowID=id;e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;}SDL_PushEvent(&e);});}
     void swipe(int x,int y,int dx,int dy){sample(watch_id,x,y,SDL_MOUSEBUTTONDOWN);for(int i=1;i<=8;++i)sample(watch_id,x+dx*i/8,y+dy*i/8,SDL_MOUSEMOTION);sample(watch_id,x+dx,y+dy,SDL_MOUSEBUTTONUP);wait(16);}
     void tap_panel(lv_obj_t* object){
@@ -81,6 +82,17 @@ public:
         check([]{auto* a=find(lv_screen_active(),&lv_textarea_class);return a&&!std::strcmp(lv_textarea_get_text(a),"pbM caf");},"SDL Backspace edits text");
         key(SDLK_ESCAPE,watch_id);check([]{return !text_input_active()&&send_message_screen_is_active();},"Escape cancels editor without quitting");
         key(SDLK_F4,watch_id);check(home,"final return to clock");
+        // Real SDL mouse hold with deterministic 20 ms frames.
+        sample(watch_id,90,530,SDL_MOUSEBUTTONDOWN);wait(240);
+        check([]{return !power_screen_off();},"less than five seconds stays on");
+        wait(15);check([]{return power_screen_locked()&&power_screen_off()&&!power_is_asleep();},"five seconds locks and blanks before release");
+        sample(watch_id,90,530,SDL_MOUSEBUTTONUP);wait();
+        check(power_is_asleep,"release enters deep sleep");
+        key(SDLK_F3,watch_id);key(SDLK_F4,watch_id);key(SDLK_F5,watch_id);
+        swipe(205,330,0,-240);tap_panel(panel.display_on);
+        check(power_is_asleep,"back, touch and panel cannot wake power-off");
+        key(SDLK_F2,watch_id);wait(85);
+        check([home]{return !power_is_asleep()&&!power_screen_locked()&&!power_screen_off()&&home();},"power button alone reboots to clock");
     }
     bool tick(){if(position==steps.size()||!ok)return false;steps[position++]();return true;}
     bool complete()const{return ok&&position==steps.size();}

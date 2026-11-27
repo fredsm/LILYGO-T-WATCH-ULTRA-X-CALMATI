@@ -55,3 +55,27 @@ on-device checks are still required; host tests cannot verify radio hardware.
 Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens
 Time. Back or a rightward/downward swipe from Time returns to the screen that
 opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
+
+## Full power-off (phase 1)
+
+- Hold the physical Power/crown button for five seconds. The display goes
+  black and touch navigation is locked; release to complete deep sleep.
+- Touch, Back, motion, timers and USB insertion are not configured as wake
+  sources. A new short press of Power boots the watch. Check on battery and
+  when connected to USB, and verify the RTC retains time.
+- Short Power clicks still use the original screen routes. The PMIC emergency
+  hardware cutoff is configured for ten seconds (release after the five-second
+  blanking threshold for normal deep sleep).
+- Eject USB mass storage on the computer before powering off to avoid losing
+  host-cached writes. The watch stops local recording and logging before SD
+  unmount. The library's hardware shutdown sequence may take a few seconds.
+- On desktop, hold F2 (or the onscreen Power button) for five seconds, release,
+  and press Power again to see a simulated boot. F3/F4/F5, touch and the debug
+  hardware display toggle cannot wake deep sleep. The desktop models the UI
+  and wake policy, not physical current draw or a complete MCU memory reset.
+- `power_button_hold` tests timing boundaries, repeat edges and timer wrap;
+  `power_manager_shutdown` tests shared state transitions. The SDL end-to-end
+  test also holds the simulated physical button and verifies power-only wake.
+
+Idle light sleep, an independent timed screen-off policy, locked-screen UX,
+and normal display wake are deliberately not wired up in this phase.

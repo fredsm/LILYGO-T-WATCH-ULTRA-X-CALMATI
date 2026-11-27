@@ -49,3 +49,28 @@ def set_define(path, name, value):
 
 for fname, name, value in PATCHES:
     set_define(os.path.join(src_dir, fname), name, value)
+
+
+# The Ultra PMU driver reads and clears edge IRQs but only publishes click/long
+# click events. Publish both edges separately, preserving the existing event.
+# Fail loudly if the pinned upstream source changes; never silently lose hold.
+def replace_once(path, old, new):
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
+    if new in src:
+        return
+    if src.count(old) != 1:
+        raise RuntimeError("[patch_lilygolib] unexpected power edge anchor in " + path)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(src.replace(old, new, 1))
+
+
+replace_once(os.path.join(src_dir, "LilyGoEventManage.h"),
+             "    PMU_EVENT_BAT_FET_OVER_CURRENT,\n",
+             "    PMU_EVENT_BAT_FET_OVER_CURRENT,\n    PMU_EVENT_KEY_DOWN,\n    PMU_EVENT_KEY_UP,\n")
+replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
+             "    if (pmu.isPekeyNegativeIrq()) {\n        log_d(\"isPekeyNegative\");\n    }\n    if (pmu.isPekeyPositiveIrq()) {\n        log_d(\"isPekeyPositive\");\n    }",
+             "    const bool power_key_down = pmu.isPekeyNegativeIrq();\n    const bool power_key_up = pmu.isPekeyPositiveIrq();")
+replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
+             "    if (event != PMU_EVENT_NONE) {\n        sendEvent(POWER_EVENT, &event);\n    }",
+             "    if (power_key_down) {\n        PMUEventType_t edge = PMU_EVENT_KEY_DOWN;\n        sendEvent(POWER_EVENT, &edge);\n    }\n    if (power_key_up) {\n        PMUEventType_t edge = PMU_EVENT_KEY_UP;\n        sendEvent(POWER_EVENT, &edge);\n    }\n    if (event != PMU_EVENT_NONE) {\n        sendEvent(POWER_EVENT, &event);\n    }")
