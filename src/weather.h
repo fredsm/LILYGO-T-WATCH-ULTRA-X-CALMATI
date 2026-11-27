@@ -30,6 +30,8 @@ struct WeatherSample {
 // Load the last-known sample from NVS. Called once at boot from setup().
 // After this, weather_get() returns whatever we had persisted.
 void weather_init();
+// Apply the latest copied worker result on the UI owner.
+void weather_bg_tick();
 
 // Async fetch — non-blocking. Spawns a task on core 0 that turns WiFi on
 // briefly, calls Open-Meteo with the current GPS fix, updates NVS, and

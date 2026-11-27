@@ -267,7 +267,8 @@ void console_serial_tick()
     static char line[128];
     static size_t len = 0;
 
-    while (Serial.available()) {
+    // Bound input work; execute at most one complete command per UI slice.
+    for (unsigned n = 0; n < 128 && Serial.available(); ++n) {
         char c = (char)Serial.read();
         if (c == '\n' || c == '\r') {
             if (len == 0) continue;
@@ -276,6 +277,7 @@ void console_serial_tick()
             console_exec(line, out);
             Serial.print(out);
             len = 0;
+            break;
         } else if (len < sizeof(line) - 1) {
             line[len++] = c;
         }

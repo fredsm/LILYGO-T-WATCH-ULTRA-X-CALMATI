@@ -108,7 +108,9 @@ static void update_status()
 
 static void on_toggle(lv_event_t *e)
 {
-    gps_powered = lv_obj_has_state(toggle_sw, LV_STATE_CHECKED);
+    const bool want = lv_obj_has_state(toggle_sw, LV_STATE_CHECKED);
+    if(want==gps_powered)return;
+    gps_powered=want;
     // powerControl(POWER_GPS,false) gpio_reset_pin()s the UART pins but never
     // calls Serial1.end(), so the Serial1.begin() it runs on the next enable
     // re-inits a stale driver and RX stays detached → no NMEA, never locks.
@@ -117,6 +119,7 @@ static void on_toggle(lv_event_t *e)
         Serial1.end();
         instance.powerControl(POWER_GPS, true);  // enableBLDO1 + Serial1.begin
     } else {
+        gps_service_session(false);
         instance.powerControl(POWER_GPS, false); // disableBLDO1 + reset pins
         Serial1.end();
     }
@@ -148,9 +151,9 @@ void gps_screen_power_off()
 {
     if (!gps_powered) return;
     gps_powered = false;
+    gps_service_session(false);
     instance.powerControl(POWER_GPS, false);
     Serial1.end();
-    gps_service_session(false);
     clock_screen_set_gps_active(false);
     rtc_synced = false;
     if (toggle_sw) {

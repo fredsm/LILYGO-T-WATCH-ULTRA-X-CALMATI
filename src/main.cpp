@@ -76,6 +76,7 @@
 #include "quick_controls_screen.h"
 #include "diagnostics_manager.h"
 #include "event_manager.h"
+#include "ui_scheduler.h"
 #include "gps_service.h"
 #include "status_cache.h"
 #include "diagnostics_screen.h"
@@ -650,8 +651,7 @@ static lv_obj_t *build_clock_icon(lv_obj_t *parent, bool wide_cap,
     return icon;
 }
 
-static volatile bool back_btn_pressed = false;
-static void IRAM_ATTR on_back_btn_isr() { back_btn_pressed = true; }
+static void IRAM_ATTR on_back_btn_isr() { event_back_from_isr(); }
 
 static void update_wardriver_indicator()
 {
@@ -1903,16 +1903,6 @@ void loop()
     DIAG_RUN(Power, power_tick(millis(), false)); // process the hold first, inactivity after touch/Back
     if (power_shutting_down()) { delay(5); return; }
     diagnostics_ui_handler(); // UI heartbeat before legacy background calls
-    DIAG_RUN(Motion, motion_wake_poll());   // accel-driven wake; no-op when toggle is off
-    DIAG_RUN(ScanRadio, scan_radio_tick());    // unified Scanner: switch WiFi/BLE slices; no-op when idle
-    DIAG_RUN(CaptivePortal, evil_portal_tick());   // Evil Twin captive portal: serve DNS+HTTP; no-op when idle
-    DIAG_RUN(Web, webpanel_tick());      // web control panel: serve HTTP; no-op when idle
-    DIAG_RUN(Console, console_serial_tick());// USB-serial command console
-    DIAG_RUN(Network, timezone_bg_tick());   // apply background WiFi NTP/geolocation results
-    DIAG_RUN(Network, onboarding_bg_tick()); // send the one-time install ping once WiFi is available
-    // Cheap on every iteration (an indev_state read + a millis() compare);
-    // only crosses into the heavy capture+SD-write path on the 3 s edge.
-    if (!pin_lock_active()) DIAG_RUN(ScreenshotSD, screenshot_poll());
     if (!pin_lock_active()) stealth_poll();   // 4 s long-press disarms the duress disguise
     // While the disguise is armed, pin the UI to the bare clock no matter what
     // navigation tried to fire — the tooling stays out of sight.
@@ -1923,9 +1913,8 @@ void loop()
     // 250 ms debounce: mechanical bounce on GPIO0 can fire several FALLING
     // edges per press, which would skip multiple screens in one tap.
     static uint32_t last_back_ms = 0;
-    if (back_btn_pressed) {
+    if (event_take_back()) {
         DiagScope diag_buttons(DiagStage::Buttons);
-        back_btn_pressed = false;
         uint32_t now = millis();
         if (now - last_back_ms < 250) {
             // ignore bounce
@@ -2046,79 +2035,10 @@ void loop()
         }
     }
 
-    // Feed NMEA bytes to TinyGPSPlus while the GPS radio is on
+    // Feed NMEA results to the UI-owned TinyGPSPlus fields while GPS is on
     if (gps_screen_is_powered()) {
         DIAG_RUN(GPS, gps_service_tick());
     }
-
-    // When a screen transition was just requested, skip all the heavy
-    // bg_ticks for a few iterations. With wardriver running, a single
-    // loop iteration can take hundreds of ms (SD writes per detector
-    // hit, drain_queue, etc) - enough that the LVGL refresh can't keep
-    // up with the screen change and the user sees the old screen
-    // "frozen" until the next loop iteration finally renders the new
-    // one. This window gives LVGL ~12 fast iterations to fully redraw.
-    // Queues continue to fill in the callbacks; we just defer the
-    // draining for a few ms while the UI catches up.
-    bool lvgl_priority = s_lvgl_priority_cycles > 0;
-    {
-        // Pause the matrix-rain animation while LVGL is trying to complete
-        // a screen transition. Without this, the 120 ms rain timer keeps
-        // invalidating 22 recolored labels, forcing a full clock-screen
-        // re-render every refresh tick.
-        static bool s_matrix_paused_by_us = false;
-        if (lvgl_priority && !s_matrix_paused_by_us) {
-            matrix_bg_set_paused(true);
-            s_matrix_paused_by_us = true;
-        } else if (!lvgl_priority && s_matrix_paused_by_us) {
-            matrix_bg_set_paused(false);
-            s_matrix_paused_by_us = false;
-        }
-    }
-    if (lvgl_priority) s_lvgl_priority_cycles--;
-
-
-    if (!lvgl_priority) {
-        DIAG_RUN(Meshtastic, meshtastic_bg_tick());
-        // While the SD card is mounted over USB, the host owns the filesystem —
-        // suspend the background loggers so the two sides never write at once.
-        if (!usb_sd_is_running()) {
-            DIAG_RUN(AirTagSD, airtag_bg_tick());
-            DIAG_RUN(FlipperSD, flipper_bg_tick());
-            DIAG_RUN(SkimmerSD, skimmer_bg_tick());
-            DIAG_RUN(EvilTwinSD, evil_twin_bg_tick());
-            DIAG_RUN(FlockSD, flock_bg_tick());
-            DIAG_RUN(ThreatRadarSD, threatradar_bg_tick());  // correlate detector hits into follow-scores
-            DIAG_RUN(HandshakeSD, handshake_bg_tick());    // drain captured EAPOL frames to /pwn/*.pcap
-        }
-        // Outside the USB-SD gate: only reads the radar store + GATT posts,
-        // never touches the filesystem — the phone keeps updating either way.
-        DIAG_RUN(Phone, phone_link_bg_tick());
-        // ESP-NOW out-of-mesh link: drains RX frames, ages peers, and emits the
-        // presence beacon. No-op unless the link is switched on; never touches
-        // the filesystem, so it stays outside the USB-SD gate.
-        DIAG_RUN(EspNow, esp_now_link_bg_tick());
-    }
-    // Yield to LVGL between SD-heavy batches. The display uses partial
-    // refresh with ~6 tiles per screen, one tile per lv_task_handler call;
-    // without these extra passes, a single loop iteration with several
-    // detector SD writes can stall screen transitions visibly (new screen
-    // draws tile-by-tile on top of the old one for hundreds of ms).
-    diagnostics_ui_handler();
-    if (!lvgl_priority) {
-        DIAG_RUN(TPMS, tpms_bg_tick());
-        DIAG_RUN(Pager, pager_bg_tick());
-        DIAG_RUN(APRS, aprs_bg_tick());   // RX drain + queued TX; SD logging self-gates on USB SD
-        DIAG_RUN(ScanResultsSD, pingsweep_poll()); // writes /PingSweeps/ once a sweep finishes
-        DIAG_RUN(ScanResultsSD, portscan_poll());  // writes /PingSweeps/portscan_* once a scan finishes
-        DIAG_RUN(NFC, nfc_screen_worker());
-        DIAG_RUN(NFCWrite, nfc_write_screen_worker());
-        DIAG_RUN(NFCCredit, nfc_credit_screen_worker());
-        DIAG_RUN(MIFARE, mifare_screen_worker());
-    }
-    pin_lock_enforce();
-    diagnostics_ui_handler();
-    pin_lock_enforce();
 
     // Any touchscreen press resets the dim timer; rising edge also triggers vibration
     {
@@ -2144,6 +2064,7 @@ void loop()
     }
 
     DIAG_RUN(Power, power_tick(millis())); // inactivity evaluated after this frame's input
+    if (power_shutting_down()) { delay(5); return; }
 
     // Dim timer: check every loop iteration for low latency
     if (!power_screen_off() && s_dim_timeout_ms > 0 && !s_is_dimmed) {
@@ -2153,17 +2074,33 @@ void loop()
         }
     }
 
-    // 1Hz block also skipped during LVGL priority window - it contains
-    // I2C-heavy status updates plus wardriver_bg_tick (drain_queue +
-    // periodic flush_to_sd, the latter iterating all 32768 ap_table
-    // buckets which can block for seconds with a populated session).
-    // Missing one 1Hz tick during a screen transition is invisible.
-    if (millis() - last_update_ms >= 1000 && !lvgl_priority) {
+    // Input, power and rendering are serviced before any cooperative job.
+    // Keep shared buses on this task until their dedicated managers exist.
+    // A slow job can still stall this task, but cannot be compounded by an
+    // entire batch of other slow jobs before input is checked again.
+    const bool transition = s_lvgl_priority_cycles > 0;
+    static bool matrix_paused = false;
+    if (transition != matrix_paused) {
+        matrix_bg_set_paused(transition);
+        matrix_paused = transition;
+    }
+    if (transition) --s_lvgl_priority_cycles;
+    pin_lock_enforce();
+    diagnostics_ui_handler();
+    if (power_shutting_down()) return;
+    DIAG_RUN(Motion, motion_wake_poll());
+    DIAG_RUN(Network, timezone_bg_tick());
+    DIAG_RUN(Network, onboarding_bg_tick());
+    weather_bg_tick();
+    if (power_shutting_down()) return;
+
+    // Status sampling is independent of the low-priority wardriver flush.
+    if (millis() - last_update_ms >= 1000 && !transition) {
         last_update_ms = millis();
         DIAG_RUN(RTC, status_cache_sample_clock());
         update_clock();
-        DIAG_RUN(Alarm, alarm_tick());              // fires the alarm at the set time
-        layout_battery_indicators(); // pack alarm/stopwatch/timer icons R→L
+        DIAG_RUN(Alarm, alarm_tick());
+        layout_battery_indicators();
         DIAG_RUN(Battery, status_cache_sample_battery());
         update_battery();
         DIAG_RUN(Indicators, update_lora_indicator());
@@ -2172,23 +2109,71 @@ void loop()
         DIAG_RUN(SDDetect, update_sd_indicator());
         DIAG_RUN(Indicators, update_nfc_indicator());
         DIAG_RUN(Indicators, update_scan_indicators());
-        if (!usb_sd_is_running())   // host owns the SD card while mounted
-            DIAG_RUN(WardriverSD, wardriver_bg_tick());
         DIAG_RUN(Indicators, update_wardriver_indicator());
-        if (wardriver_screen_is_active())
-            DIAG_RUN(WardriverSD, wardriver_screen_update());
         if (configuration_screen_is_active())
             DIAG_RUN(Indicators, configuration_screen_update());
     }
-    // Multiple LVGL passes per loop iteration. Each lv_task_handler call
-    // renders at most one partial-refresh tile, and the watch panel needs
-    // ~6 tiles for a full screen. When wardriver is dumping detector hits
-    // into SD writes between iterations, having only one pass per loop
-    // means a single screen transition takes 6+ loop iterations to fully
-    // redraw - long enough that the user sees the old screen "freeze".
+
+    enum Job : unsigned {
+        ScanRadio, Portal, Web, Console, Screenshot, Mesh, AirTag, Flipper,
+        Skimmer, EvilTwin, Flock, ThreatRadar, Handshake, Phone, EspNow,
+        Tpms, Pager, Aprs, Ping, Port, Nfc, NfcWrite, NfcCredit, Mifare,
+        Wardriver, JobCount
+    };
+    static UiScheduler scheduler;
+    static uint32_t wardriver_at = 0;
+    // A short time budget between UI passes. This is cooperative, not a
+    // deadline guarantee: once a synchronous driver is entered it may block.
+    const uint32_t slice_start = millis();
+    if (!transition && !s_lvgl_priority_cycles) {
+        uint32_t visited = 0;
+        static_assert(JobCount <= 32, "job mask too small");
+        for (unsigned n = 0; n < JobCount; ++n) {
+            int job = scheduler.next(JobCount, [&](unsigned i) {
+                if (visited & (1UL << i)) return false;
+                if (i >= AirTag && i <= Handshake && usb_sd_is_running()) return false;
+                if (i == Screenshot && pin_lock_active()) return false;
+                if (i == Wardriver && millis() - wardriver_at < 1000) return false;
+                return true;
+            });
+            if (job < 0) break;
+            visited |= 1UL << job;
+            switch (job) {
+                case ScanRadio: DIAG_RUN(ScanRadio, scan_radio_tick()); break;
+                case Portal: DIAG_RUN(CaptivePortal, evil_portal_tick()); break;
+                case Web: DIAG_RUN(Web, webpanel_tick()); break;
+                case Console: DIAG_RUN(Console, console_serial_tick()); break;
+                case Screenshot: DIAG_RUN(ScreenshotSD, screenshot_poll()); break;
+                case Mesh: DIAG_RUN(Meshtastic, meshtastic_bg_tick()); break;
+                case AirTag: DIAG_RUN(AirTagSD, airtag_bg_tick()); break;
+                case Flipper: DIAG_RUN(FlipperSD, flipper_bg_tick()); break;
+                case Skimmer: DIAG_RUN(SkimmerSD, skimmer_bg_tick()); break;
+                case EvilTwin: DIAG_RUN(EvilTwinSD, evil_twin_bg_tick()); break;
+                case Flock: DIAG_RUN(FlockSD, flock_bg_tick()); break;
+                case ThreatRadar: DIAG_RUN(ThreatRadarSD, threatradar_bg_tick()); break;
+                case Handshake: DIAG_RUN(HandshakeSD, handshake_bg_tick()); break;
+                case Phone: DIAG_RUN(Phone, phone_link_bg_tick()); break;
+                case EspNow: DIAG_RUN(EspNow, esp_now_link_bg_tick()); break;
+                case Tpms: DIAG_RUN(TPMS, tpms_bg_tick()); break;
+                case Pager: DIAG_RUN(Pager, pager_bg_tick()); break;
+                case Aprs: DIAG_RUN(APRS, aprs_bg_tick()); break;
+                case Ping: DIAG_RUN(ScanResultsSD, pingsweep_poll()); break;
+                case Port: DIAG_RUN(ScanResultsSD, portscan_poll()); break;
+                case Nfc: DIAG_RUN(NFC, nfc_screen_worker()); break;
+                case NfcWrite: DIAG_RUN(NFCWrite, nfc_write_screen_worker()); break;
+                case NfcCredit: DIAG_RUN(NFCCredit, nfc_credit_screen_worker()); break;
+                case Mifare: DIAG_RUN(MIFARE, mifare_screen_worker()); break;
+                case Wardriver:
+                    wardriver_at = millis();
+                    if (!usb_sd_is_running()) DIAG_RUN(WardriverSD, wardriver_bg_tick());
+                    if (wardriver_screen_is_active()) DIAG_RUN(WardriverSD, wardriver_screen_update());
+                    break;
+            }
+            if (millis() - slice_start >= 4 || s_lvgl_priority_cycles || power_shutting_down()) break;
+        }
+        diagnostics_scheduler_slice(millis()-slice_start);
+    }
+    pin_lock_enforce();
     diagnostics_ui_handler();
-    delay(2);
-    diagnostics_ui_handler();
-    delay(2);
-    diagnostics_ui_handler();
+    delay(2); // let the idle task and same-core SDK tasks run
 }

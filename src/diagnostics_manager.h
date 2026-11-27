@@ -20,6 +20,7 @@ struct DiagSnapshot {
     DiagStage active = DiagStage::Idle;
     uint32_t active_ms = 0, ui_gap_ms = 0, max_ui_gap_ms = 0, stalls = 0, uptime_ms = 0;
     uint32_t last_ui_ms = 0, memory_sample_ms = 0;
+    uint32_t max_slice_ms = 0, slice_overruns = 0, slices = 0;
     int core0 = -1, core1 = -1;
     uint32_t cpu_mhz = 0, heap = 0, min_heap = 0, largest = 0, psram = 0, ui_stack = 0;
     const char* reset_reason = "Unknown";
@@ -35,6 +36,7 @@ DiagSnapshot diagnostics_snapshot();
 struct DiagToken { DiagStage previous; uint32_t since; };
 DiagToken diagnostics_enter(DiagStage stage);
 void diagnostics_exit(DiagToken token);
+void diagnostics_scheduler_slice(uint32_t elapsed_ms);
 void diagnostics_ui_handler(); // replaces lv_task_handler at main-loop boundaries
 #ifdef TWATCH_SIMULATOR
 void diagnostics_sim_tick();

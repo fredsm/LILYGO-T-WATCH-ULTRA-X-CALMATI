@@ -41,8 +41,11 @@ int main(){
     finish();snap=diagnostics_snapshot();
     CHECK(!snap.stalled&&snap.history[0].recovered&&snap.max_ui_gap_ms>=30000);
     CHECK(snap.timings[static_cast<unsigned>(DiagStage::WardriverSD)].maximum==30000);
+    diagnostics_scheduler_slice(3);diagnostics_scheduler_slice(4);diagnostics_scheduler_slice(17);
+    snap=diagnostics_snapshot();
+    CHECK(snap.slices==3&&snap.max_slice_ms==17&&snap.slice_overruns==1);
     // Intentional sleep or shutdown does not produce false stalls.
-    diagnostics_pause();step(90000);finish();CHECK(diagnostics_snapshot().stalls==1);
+    diagnostics_pause();step(90000);diagnostics_scheduler_slice(90000);finish();CHECK(diagnostics_snapshot().stalls==1&&diagnostics_snapshot().max_slice_ms==17);
     diagnostics_resume();finish();CHECK(diagnostics_snapshot().stalls==1);
     // A stall spanning multiple operations must be attributed to the longest,
     // rather than only the first operation that happened to cross 100 ms.

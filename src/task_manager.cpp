@@ -99,7 +99,9 @@ static void radios_off(lv_event_t *)
     esp_wifi_stop();                            // WiFi controller down
     radio.standby();                            // SX1262 LoRa -> idle (recoverable)
     instance.powerControl(POWER_NFC, false);    // NFC rail (DLDO1) off
-    instance.powerControl(POWER_GPS, false);    // GPS rail off
+    // Stop UART ingestion before touching the GPS rail.
+    gps_screen_power_off();
+    instance.powerControl(POWER_GPS, false); // also enforce rail off if already marked off
 
     refresh();
 }

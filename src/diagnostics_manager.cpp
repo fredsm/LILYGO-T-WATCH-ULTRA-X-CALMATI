@@ -268,6 +268,13 @@ void diagnostics_exit(DiagToken token) {
     state.active=token.previous;
     stage_since=token.since;
 }
+void diagnostics_scheduler_slice(uint32_t elapsed_ms) {
+    Guard lock;
+    if(!state.ready || state.paused)return;
+    ++state.slices;
+    if(elapsed_ms>state.max_slice_ms)state.max_slice_ms=elapsed_ms;
+    if(elapsed_ms>4)++state.slice_overruns;
+}
 void diagnostics_ui_handler() {
     if(!ui_task_is_owner())return;
     uint32_t start=now_ms();
