@@ -1,4 +1,6 @@
 #include "adsb.h"
+#include "radio_manager.h"
+#include <atomic>
 #include "wifi_creds.h"
 #include <Arduino.h>
 #include <LilyGoLib.h>
@@ -33,9 +35,8 @@ static volatile uint32_t   s_seq     = 0;
 static float        s_clat = 0, s_clon = 0;
 static bool         s_have_center = false;
 
-static volatile bool s_run = false;
-static TaskHandle_t  s_task = nullptr;
-static wifi_mode_t   s_prev_mode = WIFI_MODE_NULL;
+static std::atomic<bool> s_run{false}, s_worker_active{false};
+static char s_ssid[33],s_pass[65];
 
 // ---- small helpers ---------------------------------------------------------
 
@@ -187,6 +188,7 @@ static bool do_fetch(float clat, float clon)
     WiFiClientSecure cli;
     cli.setInsecure();                 // public read-only data; no cert pinning
     HTTPClient http;
+    http.setConnectTimeout(4000);
     http.setTimeout(9000);
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     if (!http.begin(cli, url)) return false;
@@ -204,29 +206,28 @@ static bool do_fetch(float clat, float clon)
 
 static void adsb_task(void *)
 {
-    // Bring WiFi up in station mode using the stored credentials.
-    char ssid[33] = {0}, pass[65] = {0};
-    if (!wifi_creds_get(ssid, sizeof(ssid), pass, sizeof(pass))) {
-        s_status = ADSB_ERR_WIFI;
-        s_run = false;
-        s_task = nullptr;
-        vTaskDelete(nullptr);
-        return;
+    if(!radio_job_begin(RadioJob::Adsb)){
+        s_status=ADSB_RADIO_BUSY;s_run=false;s_worker_active=false;
+        vTaskDelete(nullptr);return;
     }
-
-    s_prev_mode = WiFi.getMode();
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, pass);
-    s_status = ADSB_WIFI;
+    const bool owned=WiFi.getMode()==WIFI_OFF;
+    if((owned && (!s_ssid[0] || !WiFi.mode(WIFI_STA)))
+        || (!owned && WiFi.status()!=WL_CONNECTED)){
+        if(owned)WiFi.mode(WIFI_OFF);
+        radio_job_end(RadioJob::Adsb);
+        s_status=ADSB_ERR_WIFI;s_run=false;s_worker_active=false;
+        vTaskDelete(nullptr);return;
+    }
+    if(owned)WiFi.begin(s_ssid,s_pass);
+    s_status=ADSB_WIFI;
 
     uint32_t wifi_since = millis();
-    while (s_run) {
+    while (s_run && !radio_manager_stats().suspended) {
         if (WiFi.status() != WL_CONNECTED) {
             s_status = ADSB_WIFI;
             if (millis() - wifi_since > ADSB_WIFI_TMO) {
                 s_status = ADSB_ERR_WIFI;
-                WiFi.disconnect();
-                WiFi.begin(ssid, pass);       // retry association
+                if(owned){WiFi.disconnect();WiFi.begin(s_ssid,s_pass);}
                 wifi_since = millis();
             }
             vTaskDelay(pdMS_TO_TICKS(400));
@@ -253,15 +254,11 @@ static void adsb_task(void *)
             vTaskDelay(pdMS_TO_TICKS(100));
     }
 
-    // Restore the WiFi mode we found (scanners want it off/promiscuous).
-    if (s_prev_mode == WIFI_MODE_NULL || s_prev_mode == WIFI_OFF) {
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
-    } else {
-        WiFi.mode(s_prev_mode);
-    }
+    if(owned){WiFi.disconnect(true);WiFi.mode(WIFI_OFF);}
+    radio_job_end(RadioJob::Adsb);
     s_status = ADSB_IDLE;
-    s_task = nullptr;
+    s_run = false;
+    s_worker_active = false;
     vTaskDelete(nullptr);
 }
 
@@ -270,10 +267,16 @@ static void adsb_task(void *)
 void adsb_start()
 {
     if (!s_mtx) s_mtx = xSemaphoreCreateMutex();
-    if (s_run || s_task) return;
+    if (!s_mtx || s_worker_active.exchange(true)) return;
+    s_ssid[0]=s_pass[0]=0;
+    if(WiFi.status()!=WL_CONNECTED && !wifi_creds_get(s_ssid,sizeof(s_ssid),s_pass,sizeof(s_pass))){
+        s_status=ADSB_ERR_WIFI;s_worker_active=false;return;
+    }
     s_run = true;
     s_status = ADSB_WIFI;
-    xTaskCreatePinnedToCore(adsb_task, "adsb", 8192, nullptr, 1, &s_task, 0);
+    if(xTaskCreatePinnedToCore(adsb_task, "adsb", 8192, nullptr, 1, nullptr, 0)!=pdPASS){
+        s_status=ADSB_ERR_WIFI;s_run=false;s_worker_active=false;
+    }
 }
 
 void adsb_stop()
@@ -313,6 +316,7 @@ const char *adsb_status_text()
         case ADSB_OK:       return "live";
         case ADSB_ERR_WIFI: return "no WiFi (check /wifi.txt)";
         case ADSB_ERR_HTTP: return "API error";
+        case ADSB_RADIO_BUSY:return "radio busy - try again";
         default:            return "idle";
     }
 }

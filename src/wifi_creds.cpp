@@ -1,3 +1,4 @@
+#include "radio_manager.h"
 #include "wifi_creds.h"
 #include <WiFi.h>
 #include <SD.h>
@@ -122,7 +123,7 @@ void wifi_creds_set_autoconnect(bool on)
     p.begin(WC_NS, false);
     p.putBool("auto", on);
     p.end();
-    if (!on) WiFi.disconnect(false);       // dropping association frees the radio now
+    if (!on && !radio_job_busy()) WiFi.disconnect(false);       // dropping association frees the radio now
 }
 
 bool wifi_creds_autoconnect()
@@ -131,7 +132,8 @@ bool wifi_creds_autoconnect()
     if (WiFi.status() == WL_CONNECTED) return true;
     char ssid[33], pass[64];
     if (!wifi_creds_get(ssid, sizeof(ssid), pass, sizeof(pass))) return false;
-    WiFi.mode(WIFI_STA);
+    RadioTransition transition;
+    if(!transition || radio_job_busy() || !WiFi.mode(WIFI_STA))return false;
     WiFi.setAutoReconnect(true);
     if (pass[0]) WiFi.begin(ssid, pass);
     else         WiFi.begin(ssid);

@@ -21,7 +21,8 @@ enum AdsbStatus {
     ADSB_FETCH,        // request in flight
     ADSB_OK,           // last fetch succeeded
     ADSB_ERR_WIFI,     // couldn't associate / no creds
-    ADSB_ERR_HTTP      // WiFi up but the API call failed
+    ADSB_ERR_HTTP,     // WiFi up but the API call failed
+    ADSB_RADIO_BUSY
 };
 
 struct AdsbAircraft {

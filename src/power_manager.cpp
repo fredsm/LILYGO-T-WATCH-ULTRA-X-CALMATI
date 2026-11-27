@@ -32,6 +32,8 @@
 #include "mifare.h"
 #include "i2c_bus_manager.h"
 #include "qspi_display.h"
+#include "radio_manager.h"
+#include "adsb.h"
 #include "alarm.h"
 #include "settings_screen.h"
 #else
@@ -411,6 +413,9 @@ void lightsleep() {
     // Do not invoke from the idle timer until peripheral ownership/resume
     // policy is implemented. The vendor routine shuts down several rails.
     if (power_shutting_down()) return;
+#ifndef TWATCH_SIMULATOR
+    if(radio_job_busy())return;
+#endif
     diagnostics_pause();
     gps_service_session(false);
     pause_cpu_governor();
@@ -481,6 +486,12 @@ void deepsleep() {
 #ifndef TWATCH_SIMULATOR
     if(panel_transition_pending || !qspi_display_idle()){
         requested=true; // power_tick retries instead of freeing active DMA
+        return;
+    }
+    radio_manager_suspend(true);
+    adsb_stop();
+    if(radio_job_busy()){
+        requested=true; // let the worker release its network resources first
         return;
     }
 #endif

@@ -1,3 +1,4 @@
+#include "radio_manager.h"
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <LV_Helper.h>
@@ -1333,6 +1334,7 @@ static void update_clock()
 
 void setup()
 {
+    radio_manager_init();
     event_manager_init();
     ui_task_claim();
     i2c_bus_init();

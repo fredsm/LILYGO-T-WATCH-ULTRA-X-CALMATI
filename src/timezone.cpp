@@ -1,4 +1,5 @@
 #include "timezone.h"
+#include "radio_manager.h"
 #include "event_manager.h"
 #include "status_cache.h"
 #include <Arduino.h>
@@ -99,7 +100,8 @@ static void tz_worker(void *)
 {
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        if (WiFi.status() != WL_CONNECTED) continue;
+        if (WiFi.status() != WL_CONNECTED || !radio_job_begin(RadioJob::TimeSync)) continue;
+        if(WiFi.status()!=WL_CONNECTED){radio_job_end(RadioJob::TimeSync);continue;}
 
         bool      got_time = false, got_off = false;
         int       off_h = 0;
@@ -110,7 +112,8 @@ static void tz_worker(void *)
         if (getLocalTime(&tmutc, 8000)) got_time = true;
 
         // IP geolocation -> current UTC offset.
-        if (http_get_offset(&off_h)) got_off = true;
+        if (!radio_manager_stats().suspended && http_get_offset(&off_h)) got_off = true;
+        radio_job_end(RadioJob::TimeSync);
 
         UiEvent result;
         result.kind=UiEventKind::Timezone;

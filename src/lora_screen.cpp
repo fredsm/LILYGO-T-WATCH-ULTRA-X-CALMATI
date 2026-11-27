@@ -36,6 +36,7 @@ static void update_status()
 // attiva in modo affidabile e l'indicatore a schermo resta coerente.
 void lora_screen_force_on()
 {
+    if(lora_analyze_is_running())lora_analyze_screen_stop();
     pager_stop();
     tpms_stop();
     aprs_stop();
@@ -120,7 +121,15 @@ static void on_lora_update(lv_timer_t *timer)
 
 static void on_toggle(lv_event_t *e)
 {
-    lora_powered = lv_obj_has_state(toggle_sw, LV_STATE_CHECKED);
+    const bool wanted=lv_obj_has_state(toggle_sw,LV_STATE_CHECKED);
+    if(!wanted && (pager_is_running() || tpms_is_running() || aprs_is_running() || lora_analyze_is_running())){
+        // The mesh toggle is not permission to cut another consumer's rail.
+        if(lora_powered)lv_obj_add_state(toggle_sw,LV_STATE_CHECKED);
+        else lv_obj_clear_state(toggle_sw,LV_STATE_CHECKED);
+        update_status();return;
+    }
+    if(wanted && lora_analyze_is_running())lora_analyze_screen_stop();
+    lora_powered = wanted;
     if (lora_powered) {
         // The SX1262 is shared. Stop any FSK scanner before LoRa claims the
         // radio, otherwise its background tick keeps polling and steals

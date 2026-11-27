@@ -1,3 +1,4 @@
+#include "radio_manager.h"
 #include "wifi_screen.h"
 #include "pingsweep.h"
 #include "hostresolve.h"
@@ -39,6 +40,8 @@ static lv_obj_t *list_box;
 static lv_obj_t *keyboard;
 
 static WifiState s_state = WST_IDLE;
+static uint32_t s_radio_notice_at=0;
+static bool s_radio_notice=false;
 static ScanNet   s_nets[24];
 static int       s_net_count = 0;
 static int       s_pending   = -1;   // network index awaiting a password
@@ -270,6 +273,9 @@ static void update_status()
         }
         break;
     }
+    if(s_radio_notice && uint32_t(millis()-s_radio_notice_at)<3000){
+        txt="Radio busy - try again";col=lv_color_make(0xFF,0xCC,0x00);
+    }else s_radio_notice=false;
     lv_label_set_text(status_label, txt);
     lv_obj_set_style_text_color(status_label, col, LV_PART_MAIN);
 }
@@ -330,14 +336,18 @@ static void exit_password_mode()
 static char s_conn_ssid[33] = {0};
 static char s_conn_pass[64] = {0};
 
+static void busy_notice(){s_radio_notice=true;s_radio_notice_at=millis();}
 static void begin_connect(const char *ssid, const char *pass)
 {
+    RadioTransition transition;
+    if(!transition || radio_job_busy() || !WiFi.mode(WIFI_STA)){
+        busy_notice();s_state=WST_LIST;return;
+    }
     strncpy(s_conn_ssid, ssid ? ssid : "", sizeof(s_conn_ssid) - 1);
     s_conn_ssid[sizeof(s_conn_ssid) - 1] = '\0';
     strncpy(s_conn_pass, pass ? pass : "", sizeof(s_conn_pass) - 1);
     s_conn_pass[sizeof(s_conn_pass) - 1] = '\0';
 
-    WiFi.mode(WIFI_STA);
     if (pass && pass[0]) WiFi.begin(ssid, pass);
     else                 WiFi.begin(ssid);
     s_connect_start = millis();
@@ -377,9 +387,12 @@ static void on_kb_event(lv_event_t *e)
 
 static void start_scan()
 {
-    WiFi.mode(WIFI_STA);
+    RadioTransition transition;
+    if(!transition || radio_job_busy() || !WiFi.mode(WIFI_STA)){
+        busy_notice();return;
+    }
     WiFi.scanDelete();
-    WiFi.scanNetworks(true);   // async
+    if(WiFi.scanNetworks(true)==WIFI_SCAN_FAILED){busy_notice();return;}
     s_state = WST_SCANNING;
 }
 
@@ -399,6 +412,8 @@ static void on_btn1(lv_event_t *)
 
 static void on_btn2(lv_event_t *)   // DISCONNECT
 {
+    RadioTransition transition;
+    if(!transition || radio_job_busy()){busy_notice();update_status();return;}
     pingsweep_stop();
     WiFi.disconnect(true);
     s_state = (s_net_count > 0) ? WST_LIST : WST_IDLE;

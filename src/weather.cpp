@@ -1,4 +1,5 @@
 #include "weather.h"
+#include "radio_manager.h"
 #include "event_manager.h"
 #include "wifi_creds.h"
 #include "gps_screen.h"
@@ -100,14 +101,14 @@ static bool find_number(const String &body, const char *key, float *out)
 // ---- fetch task -----------------------------------------------------------
 //
 // Runs on core 0 (WiFi core), so we don't have to hop cores on every http
-// call. Bounded lifetime: turns WiFi on, does one HTTP GET with a 6 s cap,
-// turns WiFi off, exits.
+// call. A single request borrows an existing station or owns a temporary
+// connection, then releases its lease before exiting.
 
 struct FetchArgs {
     float lat, lon;
     char ssid[33], pass[65];
 };
-enum WeatherStatus { WifiUp, Fetching, Timeout, HttpError, ParseError, Success };
+enum WeatherStatus { WifiUp, Fetching, Timeout, Busy, HttpError, ParseError, Success };
 static void post(WeatherStatus status, bool done, int http_code=0)
 {
     UiEvent e;e.kind=UiEventKind::Weather;e.weather.status=status;
@@ -118,14 +119,21 @@ static void fetch_task(void *arg)
     // All request inputs are immutable copies from the UI task.
     FetchArgs a = *static_cast<FetchArgs*>(arg);
     delete static_cast<FetchArgs*>(arg);
+    if(!radio_job_begin(RadioJob::Weather)){
+        post(Busy,true);vTaskDelete(nullptr);return;
+    }
+    const bool owned=WiFi.getMode()==WIFI_OFF;
+    if(!owned && WiFi.status()!=WL_CONNECTED){
+        radio_job_end(RadioJob::Weather);post(Busy,true);vTaskDelete(nullptr);return;
+    }
     post(WifiUp,false);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(a.ssid,a.pass);
+    if(owned && a.ssid[0] && WiFi.mode(WIFI_STA)) WiFi.begin(a.ssid,a.pass);
     uint32_t t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 6000)
+    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 6000 && !radio_manager_stats().suspended)
         vTaskDelay(pdMS_TO_TICKS(120));
-    if (WiFi.status() != WL_CONNECTED) {
-        WiFi.disconnect(true,false);WiFi.mode(WIFI_OFF);
+    if (WiFi.status() != WL_CONNECTED || radio_manager_stats().suspended) {
+        if(owned){WiFi.disconnect(true,false);WiFi.mode(WIFI_OFF);}
+        radio_job_end(RadioJob::Weather);
         post(Timeout,true);
         vTaskDelete(NULL);return;
     }
@@ -164,7 +172,8 @@ static void fetch_task(void *arg)
         }
         http.end();
     } // release HTTP objects before deleting this task
-    WiFi.disconnect(true,false);WiFi.mode(WIFI_OFF);
+    if(owned){WiFi.disconnect(true,false);WiFi.mode(WIFI_OFF);}
+    radio_job_end(RadioJob::Weather);
     // Final result comes only after radio teardown and persistence complete.
     event_publish(e);
     vTaskDelete(NULL);
@@ -176,6 +185,7 @@ void weather_bg_tick(){
         case WifiUp:s_status="wifi up...";break;
         case Fetching:s_status="fetching...";break;
         case Timeout:s_status="wifi timeout";break;
+        case Busy:s_status="radio busy";break;
         case HttpError:
             snprintf(s_http_status,sizeof(s_http_status),"http %d",e.value);
             s_status=s_http_status;break;
@@ -195,6 +205,7 @@ bool weather_is_fetching() { return s_fetching; }
 bool weather_fetch_async()
 {
     if (s_fetching) return false;
+    if(radio_job_busy()){s_status="radio busy";return false;}
     // Need a GPS fix so we can send lat/lon. The clock face taps the
     // widget; if the user has no fix yet, that's a clean "—" state.
     if (!gps_screen_has_lock() ||
@@ -206,7 +217,7 @@ bool weather_fetch_async()
     // Credential fallback may read SD; keep that on its existing owner.
     FetchArgs *a = new(std::nothrow) FetchArgs{};
     if(!a){s_status="out of memory";return false;}
-    if(!wifi_creds_get(a->ssid,sizeof(a->ssid),a->pass,sizeof(a->pass))){
+    if(WiFi.status()!=WL_CONNECTED && !wifi_creds_get(a->ssid,sizeof(a->ssid),a->pass,sizeof(a->pass))){
         delete a;s_status="no wifi creds";return false;
     }
     a->lat = (float)instance.gps.location.lat();

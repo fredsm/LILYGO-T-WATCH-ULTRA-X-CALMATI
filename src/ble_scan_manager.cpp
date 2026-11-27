@@ -1,3 +1,4 @@
+#include "radio_manager.h"
 #include "ble_scan_manager.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
@@ -52,6 +53,9 @@ static void gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 // GATT-only user doesn't burn power sweeping channels it never reads.
 static bool stack_up()
 {
+    RadioTransition transition;
+    if(!transition || radio_job_busy() || radio_manager_stats().suspended)return false;
+    const bool controller_was_idle=esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_IDLE;
     // This watch cannot run WiFi and Bluedroid at the same time (see the rule in
     // scan_radio.cpp): bringing BLE up while WiFi is on hard-freezes the whole
     // UI, and WiFi also holds ~50 KB of RAM the BT controller needs. So force the
@@ -116,7 +120,16 @@ static bool stack_up()
         ok = (esp_bluedroid_enable() == ESP_OK);
         Serial.printf("[BLE] bluedroid_enable ok=%d\n", ok);
     }
-    if (!ok) { Serial.println("[BLE] stack_up FAILED"); return false; }
+    if (!ok) {
+        // Roll back partially initialized resources only if we started them.
+        if(controller_was_idle){
+            if(esp_bluedroid_get_status()==ESP_BLUEDROID_STATUS_ENABLED)esp_bluedroid_disable();
+            if(esp_bluedroid_get_status()==ESP_BLUEDROID_STATUS_INITIALIZED)esp_bluedroid_deinit();
+            if(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_ENABLED)esp_bt_controller_disable();
+            if(esp_bt_controller_get_status()==ESP_BT_CONTROLLER_STATUS_INITED)esp_bt_controller_deinit();
+        }
+        Serial.println("[BLE] stack_up FAILED"); return false;
+    }
 
     esp_ble_gap_register_callback(gap_cb);
     Serial.println("[BLE] stack_up OK");

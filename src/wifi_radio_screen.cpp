@@ -1,3 +1,4 @@
+#include "radio_manager.h"
 #include "wifi_radio_screen.h"
 #include <LilyGoLib.h>
 #include <WiFi.h>
@@ -49,7 +50,9 @@ static bool radio_is_on()
 
 static void update_status()
 {
-    lv_label_set_text(status_label, radio_is_on() ? "Radio: ON" : "Radio: OFF");
+    if(radio_job_busy()){
+        lv_label_set_text_fmt(status_label,"Radio busy: %s",radio_job_name(radio_manager_stats().job));
+    }else lv_label_set_text(status_label, radio_is_on() ? "Radio: ON" : "Radio: OFF");
 }
 
 // Build one label-on-the-left / value-on-the-right row inside the data
@@ -166,6 +169,13 @@ static void on_wifi_update(lv_timer_t *)
 
 static void on_toggle(lv_event_t *)
 {
+    RadioTransition transition;
+    if(!transition || radio_job_busy()){
+        wifi_powered=radio_is_on();
+        if(wifi_powered)lv_obj_add_state(toggle_sw,LV_STATE_CHECKED);
+        else lv_obj_clear_state(toggle_sw,LV_STATE_CHECKED);
+        update_status();return;
+    }
     wifi_powered = lv_obj_has_state(toggle_sw, LV_STATE_CHECKED);
     if (wifi_powered) {
         // STA is the default mode — scanning, evil twin, etc. transition
@@ -178,6 +188,9 @@ static void on_toggle(lv_event_t *)
         WiFi.disconnect(true, false);
         WiFi.mode(WIFI_OFF);
     }
+    wifi_powered=radio_is_on();
+    if(wifi_powered)lv_obj_add_state(toggle_sw,LV_STATE_CHECKED);
+    else lv_obj_clear_state(toggle_sw,LV_STATE_CHECKED);
     update_status();
 }
 

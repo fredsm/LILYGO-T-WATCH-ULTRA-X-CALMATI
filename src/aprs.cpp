@@ -3,6 +3,7 @@
 
 void clock_screen_get_local_time(struct tm *out);
 #include "lora_screen.h"
+#include "lora_analyze_screen.h"
 #include "pager.h"
 #include "tpms.h"
 #include "gps_screen.h"
@@ -98,7 +99,7 @@ bool aprs_start()
 
     // The SX1262 is shared and can only be in one mode. Refuse if Meshtastic
     // holds it; stop the FSK scanners so they can't steal IRQs.
-    if (lora_screen_is_powered()) { s_last_error = 0; return false; }
+    if (lora_screen_is_powered() || lora_analyze_is_running()) { s_last_error = 0; return false; }
     pager_stop();
     tpms_stop();
 
