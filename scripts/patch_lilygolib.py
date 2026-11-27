@@ -74,3 +74,10 @@ replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
 replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
              "    if (event != PMU_EVENT_NONE) {\n        sendEvent(POWER_EVENT, &event);\n    }",
              "    if (power_key_down) {\n        PMUEventType_t edge = PMU_EVENT_KEY_DOWN;\n        sendEvent(POWER_EVENT, &edge);\n    }\n    if (power_key_up) {\n        PMUEventType_t edge = PMU_EVENT_KEY_UP;\n        sendEvent(POWER_EVENT, &edge);\n    }\n    if (event != PMU_EVENT_NONE) {\n        sendEvent(POWER_EVENT, &event);\n    }")
+
+# The deep-sleep boot gate must see a press edge immediately and the release
+# edge even if the user taps before the CPU has booted. The light-sleep
+# routine keeps the SDK's normal short-click wake source.
+replace_once(os.path.join(src_dir, "LilyGoWatchUltra.cpp"),
+             '        log_d("Enable power button from wakeup source.");\n        pmu.enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ);',
+             '        log_d("Enable power button from wakeup source.");\n        pmu.enableIRQ(XPOWERS_AXP2101_PKEY_NEGATIVE_IRQ | XPOWERS_AXP2101_PKEY_POSITIVE_IRQ);')

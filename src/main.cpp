@@ -927,13 +927,13 @@ void clock_screen_set_dim_brightness(uint8_t level)
 {
     s_dim_brightness = level;
     // If already dimmed, apply new level immediately
-    if (s_is_dimmed) instance.setBrightness(s_dim_brightness);
+    if (s_is_dimmed && !power_screen_off()) instance.setBrightness(s_dim_brightness);
 }
 
 static void dim_reset_activity()
 {
     s_last_activity_ms = millis();
-    if (s_is_dimmed) {
+    if (s_is_dimmed && !power_screen_off()) {
         s_is_dimmed = false;
         instance.setBrightness(settings_get_brightness());
     }
@@ -1295,6 +1295,7 @@ static void update_clock()
 
 void setup()
 {
+    power_boot_gate();
     Serial.begin(115200);
     delay(50);   // let the USB-CDC link settle so the banner isn't truncated
     Serial.printf("\n%s firmware v%s  (T-Watch Ultra)  build %s %s\n",
@@ -1798,9 +1799,13 @@ void setup()
     //   - settings -> clock
     instance.onEvent([](DeviceEvent_t event, void *params, void *user_data) {
         const auto type = instance.getPMUEventType(params);
-        if (type == PMU_EVENT_KEY_DOWN) power_button_down(millis());
+        if (type == PMU_EVENT_KEY_DOWN) {
+            power_button_down(millis());
+            if (!power_screen_off()) dim_reset_activity();
+        }
         if (type == PMU_EVENT_KEY_UP) power_button_up(millis());
-        if (type == PMU_EVENT_KEY_CLICKED && !power_shutting_down()) {
+        if (type == PMU_EVENT_KEY_CLICKED && power_allow_click()) {
+            power_note_activity(millis());
             dim_reset_activity();
             if (clock_vibrate) instance.vibrator();
             if (lv_screen_active() == clock_screen)
@@ -1876,12 +1881,13 @@ void setup()
     // Auto-connect to a remembered WiFi (or one seeded from /wifi.txt on the SD),
     // so NTP + geolocation come up without ever touching the tiny keyboard.
     wifi_creds_autoconnect();
+    power_note_activity(millis());
 }
 
 void loop()
 {
     instance.loop(); // required for power button and PMU event dispatch
-    power_tick(millis());
+    power_tick(millis(), false); // process the hold first, inactivity after touch/Back
     if (power_shutting_down()) { delay(5); return; }
     motion_wake_poll();   // accel-driven wake; no-op when toggle is off
     scan_radio_tick();    // unified Scanner: switch WiFi/BLE slices; no-op when idle
@@ -1907,8 +1913,9 @@ void loop()
         uint32_t now = millis();
         if (now - last_back_ms < 250) {
             // ignore bounce
-        } else {
+        } else if (!power_screen_off()) {
             last_back_ms = now;
+            power_note_activity(now);
             dim_reset_activity();
             if (clock_vibrate) instance.vibrator();
             if (settings_screen_is_active()) {
@@ -2099,11 +2106,14 @@ void loop()
         while (indev) {
             if (lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER) {
                 lv_indev_state_t state = lv_indev_get_state(indev);
-                if (state == LV_INDEV_STATE_PRESSED) {
+                if (!power_screen_off() && state == LV_INDEV_STATE_PRESSED) {
+                    power_note_activity(millis());
                     dim_reset_activity();
                     if (clock_vibrate && prev_touch == LV_INDEV_STATE_RELEASED)
                         instance.vibrator();
                 }
+                if (!power_screen_off() && prev_touch == LV_INDEV_STATE_PRESSED && state == LV_INDEV_STATE_RELEASED)
+                    power_note_activity(millis());
                 prev_touch = state;
                 break;
             }
@@ -2111,8 +2121,10 @@ void loop()
         }
     }
 
+    power_tick(millis()); // inactivity evaluated after this frame's input
+
     // Dim timer: check every loop iteration for low latency
-    if (s_dim_timeout_ms > 0 && !s_is_dimmed) {
+    if (!power_screen_off() && s_dim_timeout_ms > 0 && !s_is_dimmed) {
         if (millis() - s_last_activity_ms >= s_dim_timeout_ms) {
             s_is_dimmed = true;
             instance.setBrightness(s_dim_brightness);

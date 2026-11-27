@@ -82,6 +82,17 @@ public:
         check([]{auto* a=find(lv_screen_active(),&lv_textarea_class);return a&&!std::strcmp(lv_textarea_get_text(a),"pbM caf");},"SDL Backspace edits text");
         key(SDLK_ESCAPE,watch_id);check([]{return !text_input_active()&&send_message_screen_is_active();},"Escape cancels editor without quitting");
         key(SDLK_F4,watch_id);check(home,"final return to clock");
+        steps.push_back([]{settings_screen_show();});wait();
+        check([]{auto* l=find(lv_screen_active(),&lv_label_class,"ScreenOff Timer");if(!l)return false;auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);return d&&lv_dropdown_get_selected(d)==1&&power_get_screenoff_timeout()==60000;},"ScreenOff Timer default 60 seconds");
+        steps.push_back([this]{auto* l=find(lv_screen_active(),&lv_label_class,"ScreenOff Timer");if(!l){ok=false;return;}auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);lv_dropdown_set_selected(d,2);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
+        check([]{return power_get_screenoff_timeout()==3000000;},"3000 seconds is 50 minutes");
+        steps.push_back([this]{auto* d=find(lv_obj_get_parent(find(lv_screen_active(),&lv_label_class,"ScreenOff Timer")),&lv_dropdown_class);lv_dropdown_set_selected(d,0);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
+        check([]{return power_get_screenoff_timeout()==0;},"Off disables timer");
+        steps.push_back([]{auto* d=find(lv_obj_get_parent(find(lv_screen_active(),&lv_label_class,"ScreenOff Timer")),&lv_dropdown_class);lv_dropdown_set_selected(d,1);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);power_note_activity(lv_tick_get()-60000);});wait();
+        check([]{return power_screen_off()&&!power_is_asleep();},"inactive screen off without deep sleep");
+        key(SDLK_F3,watch_id);check(power_screen_off,"Back cannot wake screen");
+        key(SDLK_F2,watch_id);check([]{return !power_screen_off()&&settings_screen_is_active();},"Power wakes screen without changing page");
+        key(SDLK_F4,watch_id);
         // Real SDL mouse hold with deterministic 20 ms frames.
         sample(watch_id,90,530,SDL_MOUSEBUTTONDOWN);wait(240);
         check([]{return !power_screen_off();},"less than five seconds stays on");
@@ -91,7 +102,10 @@ public:
         key(SDLK_F3,watch_id);key(SDLK_F4,watch_id);key(SDLK_F5,watch_id);
         swipe(205,330,0,-240);tap_panel(panel.display_on);
         check(power_is_asleep,"back, touch and panel cannot wake power-off");
-        key(SDLK_F2,watch_id);wait(85);
+        key(SDLK_F2,watch_id);check(power_is_asleep,"short Power press cannot wake deep sleep");
+        sample(watch_id,90,530,SDL_MOUSEBUTTONDOWN);wait(240);
+        check(power_is_asleep,"deep sleep wake requires five seconds");
+        wait(15);sample(watch_id,90,530,SDL_MOUSEBUTTONUP);wait(85);
         check([home]{return !power_is_asleep()&&!power_screen_locked()&&!power_screen_off()&&home();},"power button alone reboots to clock");
     }
     bool tick(){if(position==steps.size()||!ok)return false;steps[position++]();return true;}

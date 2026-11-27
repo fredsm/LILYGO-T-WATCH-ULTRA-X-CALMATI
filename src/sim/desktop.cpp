@@ -140,20 +140,18 @@ int main(int argc,char** argv) {
     uint32_t pointer_event_at=last,held_read_at=last;
     auto dispatch_pointer=[&](){pointer_event_at=SDL_GetTicks();sim::dispatch_pointer(input,pressed);};
     bool contact=false;int captured_button=-1;
-    bool power_contact=false, waking=false;
+    bool power_contact=false;
+    power_init();
+    auto input_blocked=[](){return power_screen_locked() || power_screen_off();};
     auto power_down=[&](){
         if(power_contact || sim::startup_active())return;
-        power_contact=true;waking=power_is_asleep();
-        if(waking)power_sim_wake();else power_button_down(lv_tick_get());
+        power_contact=true;power_button_down(lv_tick_get());
     };
     auto power_up=[&](bool clicked){
         if(!power_contact)return;
         power_contact=false;
-        if(!waking){
-            if(clicked){power_button_up(lv_tick_get());if(!power_shutting_down())sim::power_button_click();}
-            else power_cancel_press();
-        }
-        waking=false;
+        if(clicked){power_button_up(lv_tick_get());if(power_allow_click() && !sim::startup_active())sim::power_button_click();}
+        else power_cancel_press();
     };
     auto route_pointer=[&](int x,int y,bool down){
         int hit=(y>=H+8 && y<H+52 && x>=10 && x<400)?(x<195?0:(x>=215?1:-1)):-1;
@@ -166,14 +164,15 @@ int main(int argc,char** argv) {
             else lv_obj_remove_state(button,LV_STATE_PRESSED);
             if(!down){
                 if(captured_button==0)power_up(hit==0);
-                else if(hit==captured_button && !sim::startup_active() && !power_screen_locked())sim::back_button_click();
+                else if(hit==captured_button && !sim::startup_active() && !input_blocked()){power_note_activity(lv_tick_get());sim::back_button_click();}
                 captured_button=-1;contact=false;
             }
             return;
         }
         if(!contact && y>=H)return;
-        if(power_screen_locked()){pressed=false;if(!down)contact=false;return;}
+        if(input_blocked()){pressed=false;if(!down)contact=false;return;}
         pointer.x=std::clamp(x,0,W-1);pointer.y=std::clamp(y,0,H-1);
+        if(down || pressed)power_note_activity(lv_tick_get());
         pressed=down;dispatch_pointer();if(!down)contact=false;
     };
     std::unique_ptr<sim::DesktopTest> scenario;
@@ -208,23 +207,25 @@ int main(int argc,char** argv) {
             if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {
                 power_up(false);
                 pressed=false;touching=false;contact=false;captured_button=-1;
-                for(auto* b:watch_buttons)lv_obj_remove_state(b,LV_STATE_PRESSED);if(!power_screen_locked())dispatch_pointer();
+                for(auto* b:watch_buttons)lv_obj_remove_state(b,LV_STATE_PRESSED);if(!input_blocked())dispatch_pointer();
             }
             if(e.type==SDL_KEYUP && (e.key.keysym.sym==SDLK_F2 || e.key.keysym.sym==SDLK_p))power_up(true);
-            if(e.type==SDL_TEXTINPUT && !power_screen_locked())sim::text_input(e.text.text);
+            if(e.type==SDL_TEXTINPUT && !input_blocked()){power_note_activity(lv_tick_get());sim::text_input(e.text.text);}
             if(e.type==SDL_KEYDOWN) {
                 const auto key=e.key.keysym.sym;const bool ctrl=(e.key.keysym.mod&KMOD_CTRL)!=0;
                 if(ctrl && key==SDLK_q){running=false;continue;}
-                if(!power_screen_locked() && sim::text_input_active()){
+                if(!input_blocked() && sim::text_input_active()){
+                    power_note_activity(lv_tick_get());
                     if(ctrl && key==SDLK_v){char* text=SDL_GetClipboardText();if(text){sim::text_input(text);SDL_free(text);}continue;}
                     if(auto edit=editing_key(key)){sim::edit_key(edit);continue;}
                 }
                 if(e.key.repeat)continue;
                 if(key==SDLK_F6){panel.show();continue;}
                 if(sim::startup_active())continue;
-                const bool editing=!power_screen_locked() && sim::text_input_active();
+                const bool editing=!input_blocked() && sim::text_input_active();
                 if(key==SDLK_F2 || (!editing && key==SDLK_p)){power_down();continue;}
-                if(power_screen_locked())continue;
+                if(input_blocked())continue;
+                power_note_activity(lv_tick_get());
                 if(key==SDLK_F3 || (!editing && (key==SDLK_b || key==SDLK_ESCAPE)))sim::back_button_click();
                 if(key==SDLK_F4)sim::show_home();
                 if(key==SDLK_F5)watch.set_display_on(!watch.display_on());
@@ -233,10 +234,12 @@ int main(int argc,char** argv) {
             }
         }
         auto now=SDL_GetTicks(); auto delta=(smoke||self_test)?20u:now-last; last=now;
-        watch.advance(delta); lv_tick_inc(delta); power_tick(lv_tick_get());
+        watch.advance(delta); lv_tick_inc(delta);
+        if(sim::startup_active() || (pressed && !input_blocked()))power_note_activity(lv_tick_get());
+        power_tick(lv_tick_get());
         if(!power_screen_locked()){sim::tick();sim::tick_boot();}
         // Stationary holds still need reads for original long-press callbacks.
-        if(!power_screen_locked() && pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
+        if(!input_blocked() && pressed && now-pointer_event_at>=100 && now-held_read_at>=30){
             sim::dispatch_pointer(input,pressed);held_read_at=now;
         }
         lv_timer_handler();

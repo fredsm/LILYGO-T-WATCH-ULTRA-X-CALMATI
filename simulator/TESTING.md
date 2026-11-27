@@ -56,12 +56,12 @@ Wardriver is the second Tools tile, after Time. Home swipe right-to-left opens
 Time. Back or a rightward/downward swipe from Time returns to the screen that
 opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
 
-## Full power-off (phase 1)
+## Power-off and wake
 
 - Hold the physical Power/crown button for five seconds. The display goes
   black and touch navigation is locked; release to complete deep sleep.
 - Touch, Back, motion, timers and USB insertion are not configured as wake
-  sources. A new short press of Power boots the watch. Check on battery and
+  sources. A new five-second hold of Power boots the watch; shorter taps remain off. Check on battery and
   when connected to USB, and verify the RTC retains time.
 - Short Power clicks still use the original screen routes. The PMIC emergency
   hardware cutoff is configured for ten seconds (release after the five-second
@@ -70,12 +70,23 @@ opened it (home or Tools). Wardriver Back/right swipe returns to Tools.
   host-cached writes. The watch stops local recording and logging before SD
   unmount. The library's hardware shutdown sequence may take a few seconds.
 - On desktop, hold F2 (or the onscreen Power button) for five seconds, release,
-  and press Power again to see a simulated boot. F3/F4/F5, touch and the debug
+  and hold Power for five seconds again to see a simulated boot. F3/F4/F5, touch and the debug
   hardware display toggle cannot wake deep sleep. The desktop models the UI
   and wake policy, not physical current draw or a complete MCU memory reset.
 - `power_button_hold` tests timing boundaries, repeat edges and timer wrap;
   `power_manager_shutdown` tests shared state transitions. The SDL end-to-end
   test also holds the simulated physical button and verifies power-only wake.
 
-Idle light sleep, an independent timed screen-off policy, locked-screen UX,
-and normal display wake are deliberately not wired up in this phase.
+## Screen-off timer and wake
+- Settings > ScreenOff Timer: Off, 60 secs (default), or 3000 secs (50 minutes).
+  The selection is saved with other settings on a writable SD card.
+- Touch or button activity resets the independent inactivity timer. Motion still
+  resets only the dim timer. With the panel off, touch and Back cannot navigate.
+- A short Power press wakes the panel at the configured brightness, preserving
+  the active screen; the wake press is not also a navigation click.
+- The screen-off timer does not suspend background services. The reusable
+  lightsleep() path also wakes on Power; automatic light-sleep scheduling and
+  a dedicated lock-screen UI are not enabled yet.
+- Verify physical five-second wake qualification on battery and USB: the PMIC
+  wakes the MCU on the press edge, but the screen stays dark until the hold
+  qualifies. A short tap returns to deep sleep without normal boot.

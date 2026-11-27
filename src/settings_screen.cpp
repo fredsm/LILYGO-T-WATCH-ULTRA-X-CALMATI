@@ -1,5 +1,6 @@
 #include "settings_screen.h"
 #include "usb_sd.h"
+#include "power_manager.h"
 #include <LilyGoLib.h>
 #include <SD.h>
 #include <time.h>
@@ -37,6 +38,7 @@ static lv_obj_t *hour_format_val_label;
 static lv_obj_t *matrix_switch;
 static lv_obj_t *matrix_val_label;
 static lv_obj_t *dim_dropdown;
+static lv_obj_t *screenoff_dropdown;
 static lv_obj_t *dim_brightness_slider;
 static lv_obj_t *dim_brightness_val_label;
 static int32_t   s_dim_brightness = DEVICE_MAX_BRIGHTNESS_LEVEL / 4;
@@ -79,15 +81,15 @@ static bool g_loading = false;
 // blank space. Toggling back to digital re-applies the base Y.
 #define FACE_HIDDEN_SHIFT  (3 * 48)
 // Manual-time-only content (hint + 5 rollers + SET TIME button) spans
-// y=900..y=1106 in design coords. When the Manual Time switch is off the
+// y=948..y=1154 in design coords. When the Manual Time switch is off the
 // rows below — the screenshot section separator + toggle + hint — close
 // the gap by shifting up this much, leaving a normal row-to-row gap below
-// manual_row (the switch row itself stays visible at y=852).
+// manual_row (the switch row itself stays visible at y=900).
 #define MANUAL_HIDDEN_SHIFT (230)
 // First Y offset that belongs to the manual-time editor (the hint line).
 // register_shiftable entries with base_y >= this also pick up the
 // MANUAL_HIDDEN_SHIFT when the switch is off.
-#define MANUAL_SECTION_TOP  (900)
+#define MANUAL_SECTION_TOP  (948)
 #define MAX_SHIFTABLE      32
 
 struct ShiftableRow { lv_obj_t *obj; int base_x; int base_y; };
@@ -203,6 +205,16 @@ static void on_dim_timeout_changed(lv_event_t *e)
 {
     uint32_t idx = lv_dropdown_get_selected(dim_dropdown);
     clock_screen_set_dim_timeout(DIM_TIMEOUT_MS[idx]);
+    settings_save_to_sd();
+}
+
+static const uint32_t SCREENOFF_TIMEOUT_MS[] = {0, 60000, 3000000};
+
+static void on_screenoff_timeout_changed(lv_event_t *)
+{
+    uint32_t idx = lv_dropdown_get_selected(screenoff_dropdown);
+    if (idx >= 3) idx = 1;
+    power_set_screenoff_timeout(SCREENOFF_TIMEOUT_MS[idx], millis());
     settings_save_to_sd();
 }
 
@@ -733,6 +745,40 @@ void settings_screen_create()
     lv_obj_add_event_cb(dim_brightness_slider, on_dim_brightness_changed, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(dim_brightness_slider, on_slider_released,         LV_EVENT_RELEASED,      NULL);
 
+    // ScreenOff Timer row: label on left, dropdown on right
+    lv_obj_t *screenoff_row = lv_obj_create(settings_screen);
+    lv_obj_set_size(screenoff_row, 380, 40);
+    lv_obj_set_style_bg_opa(screenoff_row, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(screenoff_row, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(screenoff_row, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(screenoff_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(screenoff_row, LV_ALIGN_TOP_MID, 0, 778);
+    register_shiftable(screenoff_row, 778);
+
+    lv_obj_t *screenoff_lbl = lv_label_create(screenoff_row);
+    lv_obj_set_style_text_color(screenoff_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_text_font(screenoff_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_label_set_text(screenoff_lbl, "ScreenOff Timer");
+    lv_obj_align(screenoff_lbl, LV_ALIGN_LEFT_MID, 0, 0);
+
+    screenoff_dropdown = lv_dropdown_create(screenoff_row);
+    lv_dropdown_set_options(screenoff_dropdown, "Off\n60 secs\n3000 secs");
+    lv_dropdown_set_selected(screenoff_dropdown, 1);
+    lv_obj_set_size(screenoff_dropdown, 185, 34);
+    lv_obj_set_style_text_font(screenoff_dropdown, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(screenoff_dropdown, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(screenoff_dropdown, lv_color_make(0x00, 0xFF, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_border_color(screenoff_dropdown, lv_color_make(0x00, 0x55, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_border_width(screenoff_dropdown, 1, LV_PART_MAIN);
+    // Style the drop-down list
+    lv_obj_t *screenoff_list = lv_dropdown_get_list(screenoff_dropdown);
+    lv_obj_set_style_bg_color(screenoff_list, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(screenoff_list, lv_color_make(0x00, 0xFF, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_text_font(screenoff_list, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_border_color(screenoff_list, lv_color_make(0x00, 0x55, 0x00), LV_PART_MAIN);
+    lv_obj_add_event_cb(screenoff_dropdown, on_screenoff_timeout_changed, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_align(screenoff_dropdown, LV_ALIGN_RIGHT_MID, 0, 0);
+
     // Motion-wake row — sits between the Dimmed slider and the Manual Time
     // section. When on, any wrist movement detected by the BHI260AP resets
     // the dim timer (same effect as a tap or button press).
@@ -742,8 +788,8 @@ void settings_screen_create()
     lv_obj_set_style_border_width(motion_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(motion_row, 0, LV_PART_MAIN);
     lv_obj_clear_flag(motion_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(motion_row, LV_ALIGN_TOP_MID, 0, 778);
-    register_shiftable(motion_row, 778);
+    lv_obj_align(motion_row, LV_ALIGN_TOP_MID, 0, 826);
+    register_shiftable(motion_row, 826);
 
     lv_obj_t *motion_lbl = lv_label_create(motion_row);
     lv_obj_set_style_text_color(motion_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
@@ -778,8 +824,8 @@ void settings_screen_create()
     lv_obj_set_style_bg_opa(sep3, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(sep3, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(sep3, 0, LV_PART_MAIN);
-    lv_obj_align(sep3, LV_ALIGN_TOP_MID, 0, 838);
-    register_shiftable(sep3, 838);
+    lv_obj_align(sep3, LV_ALIGN_TOP_MID, 0, 886);
+    register_shiftable(sep3, 886);
 
     // Manual Time row: label left, state label + override toggle right
     lv_obj_t *manual_row = lv_obj_create(settings_screen);
@@ -788,8 +834,8 @@ void settings_screen_create()
     lv_obj_set_style_border_width(manual_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(manual_row, 0, LV_PART_MAIN);
     lv_obj_clear_flag(manual_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(manual_row, LV_ALIGN_TOP_MID, 0, 852);
-    register_shiftable(manual_row, 852);
+    lv_obj_align(manual_row, LV_ALIGN_TOP_MID, 0, 900);
+    register_shiftable(manual_row, 900);
 
     lv_obj_t *manual_lbl = lv_label_create(manual_row);
     lv_obj_set_style_text_color(manual_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
@@ -816,8 +862,8 @@ void settings_screen_create()
     lv_obj_set_style_text_color(manual_hint, lv_color_make(0x00, 0x77, 0x00), LV_PART_MAIN);
     lv_obj_set_style_text_font(manual_hint, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_label_set_text(manual_hint, "Set the date & time below, then press SET");
-    lv_obj_align(manual_hint, LV_ALIGN_TOP_MID, 0, 900);
-    register_shiftable(manual_hint, 900);
+    lv_obj_align(manual_hint, LV_ALIGN_TOP_MID, 0, 948);
+    register_shiftable(manual_hint, 948);
     register_manual_obj(manual_hint);
 
     // Date / time rollers — Year, Month, Day, Hour, Minute.
@@ -825,15 +871,15 @@ void settings_screen_create()
     char opts[256];
     build_num_opts(opts, sizeof(opts), MANUAL_YEAR_BASE,
                    MANUAL_YEAR_BASE + MANUAL_YEAR_COUNT - 1, 4);
-    year_roller   = make_time_roller("Year",  opts, -148, 924, 84);
+    year_roller   = make_time_roller("Year",  opts, -148, 972, 84);
     build_num_opts(opts, sizeof(opts), 1, 12, 2);
-    month_roller  = make_time_roller("Month", opts,  -64, 924, 64);
+    month_roller  = make_time_roller("Month", opts,  -64, 972, 64);
     build_num_opts(opts, sizeof(opts), 1, 31, 2);
-    day_roller    = make_time_roller("Day",   opts,   10, 924, 64);
+    day_roller    = make_time_roller("Day",   opts,   10, 972, 64);
     build_num_opts(opts, sizeof(opts), 0, 23, 2);
-    hour_roller   = make_time_roller("Hour",  opts,   84, 924, 64);
+    hour_roller   = make_time_roller("Hour",  opts,   84, 972, 64);
     build_num_opts(opts, sizeof(opts), 0, 59, 2);
-    minute_roller = make_time_roller("Min",   opts,  158, 924, 64);
+    minute_roller = make_time_roller("Min",   opts,  158, 972, 64);
 
     // SET TIME button
     lv_obj_t *set_btn = lv_obj_create(settings_screen);
@@ -845,16 +891,9 @@ void settings_screen_create()
     lv_obj_set_style_pad_all(set_btn, 0, LV_PART_MAIN);
     lv_obj_clear_flag(set_btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(set_btn, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align(set_btn, LV_ALIGN_TOP_MID, 0, 1054);
-    register_shiftable(set_btn, 1054);
+    lv_obj_align(set_btn, LV_ALIGN_TOP_MID, 0, 1102);
+    register_shiftable(set_btn, 1102);
     register_manual_obj(set_btn);
-
-    // Apply the layout once now that all the rows are registered. The
-    // switches default to off, so the editor controls start hidden and
-    // the screenshot section below the manual row sits flush against it.
-    // The settings-load path will call apply_layout again with the saved
-    // states once /Settings/settings.txt is read.
-    apply_layout();
 
     lv_obj_t *set_lbl = lv_label_create(set_btn);
     lv_label_set_text(set_lbl, "SET TIME");
@@ -878,8 +917,8 @@ void settings_screen_create()
     lv_obj_set_style_bg_opa(sep_ss, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(sep_ss, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(sep_ss, 0, LV_PART_MAIN);
-    lv_obj_align(sep_ss, LV_ALIGN_TOP_MID, 0, 1130);
-    register_shiftable(sep_ss, 1130);
+    lv_obj_align(sep_ss, LV_ALIGN_TOP_MID, 0, 1178);
+    register_shiftable(sep_ss, 1178);
 
     screenshot_row = lv_obj_create(settings_screen);
     lv_obj_set_size(screenshot_row, 380, 40);
@@ -887,8 +926,8 @@ void settings_screen_create()
     lv_obj_set_style_border_width(screenshot_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(screenshot_row, 0, LV_PART_MAIN);
     lv_obj_clear_flag(screenshot_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(screenshot_row, LV_ALIGN_TOP_MID, 0, 1144);
-    register_shiftable(screenshot_row, 1144);
+    lv_obj_align(screenshot_row, LV_ALIGN_TOP_MID, 0, 1192);
+    register_shiftable(screenshot_row, 1192);
 
     lv_obj_t *ss_lbl = lv_label_create(screenshot_row);
     lv_obj_set_style_text_color(ss_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
@@ -919,13 +958,15 @@ void settings_screen_create()
     lv_label_set_text(screenshot_hint,
         "Hold any point for 3 seconds to save a screenshot to "
         "/Screenshots on the SD card. Requires a mounted SD.");
-    lv_obj_align(screenshot_hint, LV_ALIGN_TOP_MID, 0, 1190);
-    register_shiftable(screenshot_hint, 1190);
+    lv_obj_align(screenshot_hint, LV_ALIGN_TOP_MID, 0, 1238);
+    register_shiftable(screenshot_hint, 1238);
 
     // Reflect the current SD state in the row's interactability + checked
     // state. Boot order matters here — instance.isCardReady() may flip
     // later, but settings_screen_apply_sd_state() is also called from
     // main.cpp on every SD-state edge so the row stays in sync.
+    // Collapse hidden face/manual editor rows after all rows are registered.
+    apply_layout();
     settings_screen_apply_sd_state();
 }
 
@@ -984,6 +1025,7 @@ static void settings_save_to_sd()
     f.printf("show_date=%d\n",       lv_obj_has_state(show_date_switch,   LV_STATE_CHECKED) ? 1 : 0);
     f.printf("vibrate=%d\n",         lv_obj_has_state(vibrate_switch,     LV_STATE_CHECKED) ? 1 : 0);
     f.printf("dim_timeout_idx=%lu\n",(unsigned long)lv_dropdown_get_selected(dim_dropdown));
+    f.printf("screenoff_timeout_idx=%lu\n",(unsigned long)lv_dropdown_get_selected(screenoff_dropdown));
     f.printf("dim_brightness=%d\n",  (int)s_dim_brightness);
     f.printf("motion_wake=%d\n",     lv_obj_has_state(motion_wake_switch, LV_STATE_CHECKED) ? 1 : 0);
     f.printf("manual_time=%d\n",     lv_obj_has_state(manual_time_switch, LV_STATE_CHECKED) ? 1 : 0);
@@ -1060,6 +1102,11 @@ void settings_screen_load()
             if (idx >= (sizeof(DIM_TIMEOUT_MS)/sizeof(DIM_TIMEOUT_MS[0]))) idx = 0;
             lv_dropdown_set_selected(dim_dropdown, idx);
             clock_screen_set_dim_timeout(DIM_TIMEOUT_MS[idx]);
+        } else if (key == "screenoff_timeout_idx") {
+            uint32_t idx = (uint32_t)v;
+            if (idx >= 3) idx = 1;
+            lv_dropdown_set_selected(screenoff_dropdown, idx);
+            power_set_screenoff_timeout(SCREENOFF_TIMEOUT_MS[idx], millis());
         } else if (key == "dim_brightness") {
             if (v < 1) v = 1;
             if (v > DEVICE_MAX_BRIGHTNESS_LEVEL) v = DEVICE_MAX_BRIGHTNESS_LEVEL;
