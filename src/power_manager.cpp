@@ -93,7 +93,7 @@ void governor_sample(int core0, int core1, uint32_t elapsed_ms) {
     if(core0<0 || core0>100 || core1<0 || core1>100 ||
         elapsed_ms<CpuGovernor::min_window_ms || elapsed_ms>CpuGovernor::max_window_ms){
         cpu_load[0]=cpu_load[1]=-1;
-        apply_governor_target(current,governor.invalid(current));
+        governor.invalid(current); // Hold: never invoke the clock driver on bad samples.
         return;
     }
     cpu_load[0]=core0;cpu_load[1]=core1;

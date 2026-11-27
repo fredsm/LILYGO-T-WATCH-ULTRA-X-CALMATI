@@ -30,10 +30,15 @@ int main(){
     CHECK(g.evaluate(240,15,0)==240);
     CHECK(g.evaluate(240,15,0,1001)==240);
     CHECK(g.stats().lower_ms==0);
-    CHECK(g.evaluate(80,101,0)==240); // second invalid window
+    CHECK(g.evaluate(80,101,0)==80); // second invalid window: hold, never upshift
+    for(uint32_t tier=80;tier<=240;tier+=80){
+        for(unsigned i=0;i<20;++i)CHECK(g.invalid(tier)==tier);
+        CHECK(g.stats().safe_target==tier&&g.stats().lower_ms==0);
+    }
+    CHECK(g.stats().consecutive_invalid==62);
+    CHECK(g.evaluate(80,0,81)==240&&g.stats().consecutive_invalid==0);
     g.record_change(80,240,true,3);
-    CHECK(g.stats().failsafe_upshifts==1&&g.stats().max_change_ms==3);
-    CHECK(g.evaluate(240,0,0)==240&&g.stats().consecutive_invalid==0);
+    CHECK(g.stats().upshifts==1&&g.stats().max_change_ms==3);
     // Verify tick coverage, exact boundaries, integer rounding and wrapping.
     CHECK(cpu_window_load({0,0},{500,250},500,1000)==50);
     CHECK(cpu_window_load({0,0},{500,251},500,1000)==51);

@@ -42,9 +42,10 @@ stability change affects Auto only.
 
 ## 10C — Invalid samples, sleep and failures
 
-An invalid window can never cause a downshift. Two consecutive bad
-windows request 240 MHz as a responsiveness fail-safe. Once good
-windows return, normal five-second downshift qualification restarts.
+An invalid window never changes the current frequency, regardless of
+how many consecutive windows are bad. It clears any pending downshift.
+Once good windows return, the usual immediate upshift policy applies
+and normal five-second downshift qualification restarts.
 A rejected clock transition is counted; automatic requests are
 reevaluated on the next window. No tight retry loop. Manual choices
 are not overridden by missing CPU samples.
@@ -59,7 +60,7 @@ governor operation for background work.
 Tools > Task Mgr > Diagnostics CPU shows the current frequency/mode,
 per-core utilization, raw and safe targets, downshift dwell, valid and
 invalid windows, guarded windows, successful up/down transitions,
-fail-safe upshifts, rejected clock changes and maximum automatic
+consecutive invalid samples, rejected clock changes and maximum automatic
 clock-change duration. Sampled seconds by frequency count **valid Auto
 windows only**, not all wall time, interrupts or deep sleep. Cumulative
 counters survive an Auto pause/manual selection but reset at boot.
@@ -70,7 +71,7 @@ ownership and bus/worker diagnostics remain available.
 
 Host checks exercise both-core thresholds, projected load stability,
 five-second dwell, boundary rounding, counter wrap, bad tick coverage,
-stale windows, fail-high recovery, rejected clock changes, preference
+stale windows, hold-on-invalid recovery, rejected clock changes, preference
 persistence, screen-off and sleep/resume behavior. Mock load injection
 represents per-core utilization at the current clock, not actual host
 CPU usage. The simulator does not model electrical/thermal or radio

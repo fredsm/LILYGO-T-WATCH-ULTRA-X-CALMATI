@@ -4,7 +4,7 @@
 struct CpuGovernorStats {
     bool running=false; // populated by the power manager snapshot
     uint32_t valid_windows=0, invalid_windows=0, consecutive_invalid=0;
-    uint32_t guarded_windows=0, upshifts=0, downshifts=0, failsafe_upshifts=0, failed_changes=0;
+    uint32_t guarded_windows=0, upshifts=0, downshifts=0, failed_changes=0;
     uint32_t raw_target=0, safe_target=0, candidate=0, lower_ms=0;
     uint32_t max_change_ms=0, sampled_ms[3]={};
 };
@@ -17,7 +17,6 @@ public:
     static constexpr uint32_t min_window_ms = 400;
     static constexpr uint32_t max_window_ms = 1000;
     static constexpr uint32_t downshift_ms = 5000;
-    static constexpr uint32_t invalid_limit = 2;
     static uint32_t target(uint32_t core0, uint32_t core1) {
         const uint32_t load = core0 > core1 ? core0 : core1;
         return load > 80 ? 240 : load > 50 ? 160 : 80;
@@ -60,18 +59,16 @@ public:
     uint32_t invalid(uint32_t current) {
         clear_dwell();
         ++stats_.invalid_windows;
-        if(stats_.consecutive_invalid<invalid_limit)++stats_.consecutive_invalid;
+        if(stats_.consecutive_invalid<UINT32_MAX)++stats_.consecutive_invalid;
         stats_.raw_target=0;
-        stats_.safe_target=stats_.consecutive_invalid>=invalid_limit?240:current;
+        stats_.safe_target=current; // Invalid data is never a reason to change the clock.
         return stats_.safe_target;
     }
     void record_change(uint32_t from,uint32_t to,bool ok,uint32_t elapsed_ms) {
         if(elapsed_ms>stats_.max_change_ms)stats_.max_change_ms=elapsed_ms;
         if(!ok){++stats_.failed_changes;clear_dwell();return;}
-        if(to>from){
-            ++stats_.upshifts;
-            if(stats_.consecutive_invalid>=invalid_limit)++stats_.failsafe_upshifts;
-        }else if(to<from)++stats_.downshifts;
+        if(to>from)++stats_.upshifts;
+        else if(to<from)++stats_.downshifts;
     }
     CpuGovernorStats stats() const { return stats_; }
 private:

@@ -66,10 +66,20 @@ int main() {
     load(0,22);windows(10);CHECK(getCpuFrequency()==80);
     load(100,0);windows(1);CHECK(getCpuFrequency()==240); // direct 80->240
     load(0,0);windows(10);CHECK(getCpuFrequency()==80); // direct 240->80
-    // Delayed timer windows do not count as idle; two invalid windows fail high.
-    lv_tick_inc(2000);lv_timer_handler();CHECK(getCpuFrequency()==80 && getCpuLoad(0)==-1);
-    lv_tick_inc(2000);lv_timer_handler();CHECK(getCpuFrequency()==240&&cpu_governor_stats().failsafe_upshifts==1);
-    load(0,0);windows(10);CHECK(getCpuFrequency()==80);
+    // Delayed timer windows never change the clock, even under high injected demand.
+    const auto before=cpu_governor_stats();
+    load(100,100);
+    for(unsigned i=0;i<5;++i){
+        lv_tick_inc(2000);lv_timer_handler();
+        CHECK(getCpuFrequency()==80&&getCpuLoad(0)==-1);
+    }
+    CHECK(cpu_governor_stats().consecutive_invalid==5);
+    CHECK(cpu_governor_stats().upshifts==before.upshifts&&cpu_governor_stats().downshifts==before.downshifts);
+    windows(1);CHECK(getCpuFrequency()==240&&cpu_governor_stats().consecutive_invalid==0);
+    load(0,0);windows(9);CHECK(getCpuFrequency()==240);
+    lv_tick_inc(2000);lv_timer_handler();CHECK(getCpuFrequency()==240);
+    windows(9);CHECK(getCpuFrequency()==240); // invalid sample cleared dwell
+    windows(1);CHECK(getCpuFrequency()==80);
     // Transient HAL error leaves clock unchanged and is visible; next high window retries.
     sim::hardware.watch.fail_next_cpu_change();
     load(100,0);windows(1);CHECK(getCpuFrequency()==80&&cpu_governor_stats().failed_changes==1);
