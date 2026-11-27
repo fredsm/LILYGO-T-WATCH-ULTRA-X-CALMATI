@@ -1,4 +1,5 @@
 #include "settings_screen.h"
+#include "layout_config.h"
 #include "usb_sd.h"
 #include "power_manager.h"
 #include <LilyGoLib.h>
@@ -406,6 +407,91 @@ static void on_set_time_clicked(lv_event_t *e)
     settings_save_to_sd();
 }
 
+namespace {
+lv_obj_t* layout_section=nullptr;
+lv_obj_t* layout_message=nullptr;
+lv_obj_t* layout_init_button=nullptr;
+enum class LayoutAction { Import, Export, ExportDefault, Restore, Initialize };
+LayoutAction confirm_action=LayoutAction::Import;
+bool confirm_pending=false;
+uint32_t confirm_at=0;
+void layout_refresh_status(const char* detail=nullptr){
+    const auto state=layout_status();
+    const char* source=state.source==LayoutSource::Internal?"Internal custom":
+        state.source==LayoutSource::Backup?"Internal backup":"Firmware default";
+    lv_label_set_text_fmt(layout_message,"%s%s%s%s",source,
+        state.flash_ready?"":" | Storage unavailable",
+        detail?"\n":"",detail?detail:"");
+    if(state.flash_ready)lv_obj_add_flag(layout_init_button,LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_clear_flag(layout_init_button,LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_height(layout_section,state.flash_ready?322:374);
+}
+void layout_action_cb(lv_event_t* e){
+    const auto action=static_cast<LayoutAction>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(e)));
+    if(action==LayoutAction::Restore||action==LayoutAction::Initialize){
+        const uint32_t now=lv_tick_get();
+        if(!confirm_pending||confirm_action!=action||uint32_t(now-confirm_at)>15000){
+            confirm_pending=true;confirm_action=action;confirm_at=now;
+            layout_refresh_status(action==LayoutAction::Restore?
+                "Tap Restore again to remove custom layout.":"Tap Initialize again to format internal FAT. All internal FAT files may be erased.");
+            return;
+        }
+    }
+    confirm_pending=false;
+    LayoutResult result=LayoutResult::WriteFailed;
+    const char* success=nullptr;
+    switch(action){
+        case LayoutAction::Import:result=layout_import_sd();success="Imported and applied";break;
+        case LayoutAction::Export:result=layout_export_sd(false);success="Exported /Settings/layout.txt";break;
+        case LayoutAction::ExportDefault:result=layout_export_sd(true);success="Exported layout_default.txt";break;
+        case LayoutAction::Restore:result=layout_restore_defaults();success="Default restored and applied";break;
+        case LayoutAction::Initialize:
+            result=layout_initialize_flash()?LayoutResult::Ok:LayoutResult::FlashUnavailable;
+            success="Internal storage ready";break;
+    }
+    layout_refresh_status(result==LayoutResult::Ok?success:layout_result_message(result));
+}
+lv_obj_t* layout_button(const char* name,int y,LayoutAction action){
+    auto* button=lv_button_create(layout_section);
+    lv_obj_set_size(button,350,42);
+    lv_obj_align(button,LV_ALIGN_TOP_MID,0,y);
+    lv_obj_set_style_radius(button,8,0);
+    lv_obj_set_style_bg_color(button,lv_color_hex(0x174035),0);
+    auto* label=lv_label_create(button);lv_label_set_text(label,name);
+    lv_obj_set_style_text_font(label,&lv_font_montserrat_16,0);
+    lv_obj_center(label);
+    lv_obj_add_event_cb(button,layout_action_cb,LV_EVENT_CLICKED,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(action)));
+    return button;
+}
+void create_layout_manager(){
+    layout_section=lv_obj_create(settings_screen);
+    lv_obj_set_size(layout_section,380,374);
+    lv_obj_set_style_bg_color(layout_section,lv_color_hex(0x101a18),0);
+    lv_obj_set_style_border_color(layout_section,lv_color_hex(0x225548),0);
+    lv_obj_set_style_pad_all(layout_section,6,0);
+    lv_obj_clear_flag(layout_section,LV_OBJ_FLAG_SCROLLABLE);
+    register_shiftable(layout_section,1360);
+    auto* title=lv_label_create(layout_section);
+    lv_label_set_text(title,"Layout Manager");
+    lv_obj_set_style_text_font(title,&lv_font_montserrat_20,0);
+    lv_obj_set_style_text_color(title,lv_color_hex(0x00cc88),0);
+    lv_obj_align(title,LV_ALIGN_TOP_MID,0,2);
+    layout_message=lv_label_create(layout_section);
+    lv_obj_set_width(layout_message,345);
+    lv_obj_set_style_text_font(layout_message,&lv_font_montserrat_14,0);
+    lv_obj_set_style_text_color(layout_message,lv_color_white(),0);
+    lv_obj_set_style_text_align(layout_message,LV_TEXT_ALIGN_CENTER,0);
+    lv_label_set_long_mode(layout_message,LV_LABEL_LONG_WRAP);
+    lv_obj_align(layout_message,LV_ALIGN_TOP_MID,0,34);
+    layout_button("Import layout from SD",102,LayoutAction::Import);
+    layout_button("Export current layout to SD",154,LayoutAction::Export);
+    layout_button("Export default layout to SD",206,LayoutAction::ExportDefault);
+    layout_button("Restore default layout",258,LayoutAction::Restore);
+    layout_init_button=layout_button("Initialize internal storage",310,LayoutAction::Initialize);
+    layout_refresh_status();
+}
+}
 void settings_screen_create()
 {
     settings_screen = lv_obj_create(NULL);
@@ -1023,6 +1109,7 @@ void settings_screen_create()
     // state. Boot order matters here — instance.isCardReady() may flip
     // later, but settings_screen_apply_sd_state() is also called from
     // main.cpp on every SD-state edge so the row stays in sync.
+    create_layout_manager();
     // Collapse hidden face/manual editor rows after all rows are registered.
     apply_layout();
     settings_screen_apply_sd_state();
@@ -1037,6 +1124,8 @@ void settings_screen_show()
 {
     main_loop_request_lvgl_priority(12);
     refresh_cpu_selection();
+    confirm_pending=false;
+    layout_refresh_status();
     // Refresh percentage label to match current slider position
     int pct = (int)s_brightness * 100 / (int)DEVICE_MAX_BRIGHTNESS_LEVEL;
     lv_label_set_text_fmt(brightness_val_label, "%d%%", pct);

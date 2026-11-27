@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class LayoutInventoryTests(unittest.TestCase):
     def test_default_inventory(self):
-        lines = (ROOT / "sd/Settings/layout_default.txt").read_text().splitlines()
+        lines = (ROOT / "config/layout_default.txt").read_text().splitlines()
         fields = dict(tuple(part.strip() for part in line.split("=", 1))
                       for line in lines if line.strip() and not line.startswith("#"))
         screens = [name.strip() for name in fields["available-screens"].split(",")]

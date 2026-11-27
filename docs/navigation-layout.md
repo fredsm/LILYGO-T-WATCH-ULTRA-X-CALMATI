@@ -4,30 +4,56 @@ This is a presentation layer for **already compiled, built-in screens**, not an
 add-on loader or user-defined tool engine. It does not install or execute code,
 start services at boot, or change the existing behavior of any tool.
 
-## Configuration file
+## Configuration storage
 
-Copy [sd/Settings/layout_default.txt](../sd/Settings/layout_default.txt) to
-`/Settings/layout_default.txt` on the SD card. Copy it to `/Settings/layout.txt`
-if you want to customize your watch. Both are optional.
+There are two active layout sources:
 
-Boot loads the tiers in this order (each valid file overrides the preceding
-tier):
+| Location | File | Role |
+|---|---|---|
+| Firmware application flash | embedded `layout_default.txt` | Factory default |
+| Internal FFat | `/Settings/layout.txt` | Customized layout |
 
-1. Embedded copy of the canonical `layout_default.txt`, generated at build time.
-2. SD `/Settings/layout_default.txt`.
-3. SD `/Settings/layout.txt` (custom layout).
+[config/layout_default.txt](../config/layout_default.txt) is the single
+canonical default; PlatformIO and CMake embed it at build time. On boot the
+watch reads the internal layout, falls back to the last valid internal backup
+if the primary is missing/corrupted, and otherwise uses the embedded default.
+Missing keys in a custom layout inherit from the embedded default. SD files
+are **never** consulted on boot; external SD is only a transfer workspace.
 
-Missing keys inherit from the previous tier. A malformed file is rejected as a
-whole; it does not discard a valid earlier tier. The canonical repository file
-is the single source of truth for the standard layout; PlatformIO and CMake
-regenerate the same embedded header when it changes. There is no second
-hardcoded normal layout. A minimal Settings/Tools recovery mapping exists only
-in case a malformed canonical file was built; the simulator regression test
-requires the embedded file to parse successfully.
+### Settings > Layout Manager
 
-The firmware reads the files once after storage initialization, before
-constructing the menus. Edit them on a PC and restart the watch. No firmware
-rebuild is required for SD edits.
+- **Export current layout to SD** writes the active internal layout (or the
+  embedded default if no custom layout is active) to SD `/Settings/layout.txt`.
+- **Export default layout to SD** writes the canonical firmware default to SD
+  `/Settings/layout_default.txt`.
+- **Import layout from SD** reads SD `/Settings/layout.txt`, validates it
+  against the embedded default, verifies an internal temporary file and saves
+  it to FFat. Successful import immediately applies the layout and persists
+  across reboots and deep sleep. SD `layout_default.txt` is a reference only;
+  rename/copy it to `layout.txt` before import.
+- **Restore default layout** requires two taps and removes only the layout
+  manager's internal primary/backup/temp files. It immediately applies the
+  embedded default. It does not erase SD or other internal files.
+
+Export stages and verifies the new file before publication; an existing SD
+editing copy is preserved as `layout_export.bak` (or `layout_default.bak`).
+Keep your own backups before overwriting these paths. Eject the USB SD drive
+before importing or exporting; the normal SD ownership guard refuses transfers
+when USB owns the card.
+
+FFat mounts without automatic formatting. If unformatted/unmountable, the
+watch remains usable with the embedded default. Settings shows **Initialize
+internal storage** only when FFat is unavailable. This retries the mount;
+after explicit two-tap confirmation it may format the internal FAT partition.
+**Formatting can erase all internal FAT files**, so only confirm after backup
+or on a new/unformatted device. The application, NVS, SD and voice-model
+partitions are not formatted by this action. The legacy vendor MSC startup is
+disabled because it can auto-format and expose FFat; the firmware's existing
+SD-only USB reader remains enabled.
+
+Only small, bounded files are read/written; import/export/initialization are
+explicit synchronous UI actions rather than background polling. Native storage
+latency (especially formatting) is not bounded by the byte limit.
 
 ```ini
 home.swipe_left = time
@@ -100,11 +126,11 @@ not configurable.
 
 - `tools.order`: exact, case-sensitive existing tile labels, comma separated.
   Listed items move to the front of the two-column grid. All unlisted built-in
-  tools are appended at the end in the previous tier’s relative order, even
+  tools are appended at the end in the embedded default’s relative order, even
   when new built-in tools are added to the firmware. Only tools explicitly
   hidden by `tools.hide` are not shown. This lets a short list act as favorites.
 - `tools.hide`: exact existing tile labels to hide from this grid. Does not
-  disable a service or remove its implementation. An empty value clears inherited hiding and hides none.
+  disable a service or remove its implementation. An empty value hides none.
 - `quick.controls`: exact order of visible large tiles. Available IDs:
   `wifi, bluetooth, gps, lora, nfc, brightness`. Unlisted tiles are hidden.
 - `quick.actions`: exact order of visible bottom buttons: `settings, lock`.
@@ -118,39 +144,40 @@ this is not an access-control mechanism.
 ## Validation and recovery
 
 The file is limited to 4096 bytes and accepts blank lines, spaces, comments
-starting with `#`, CRLF/LF and a UTF-8 BOM. Missing keys inherit from the previous tier.
-Invalid keys, destinations, duplicate keys or list entries, unknown tile labels,
-malformed syntax, read failures and unsafe Settings reachability reject the
-entire affected file. If both SD files are missing or invalid, the watch uses
-the embedded canonical defaults. No writeback to SD occurs. Diagnostics reports
-the effective source (Custom SD, Default SD, Embedded defaults) and any rejected
-files.
+starting with `#`, CRLF/LF and a UTF-8 BOM. Missing keys inherit from the
+embedded default. Invalid keys, destinations, duplicate keys or list entries,
+unknown tile labels, malformed syntax, read failures and unsafe Settings
+reachability reject the entire candidate. Import never publishes an invalid
+file. Internal saves use a verified temporary file plus a previous-good
+backup; boot ignores an unfinished temporary file. If both internal files are
+missing/invalid, embedded defaults remain usable.
 
-To restore the SD default layout, remove or rename the custom layout.txt and
-reboot. To restore the embedded default, remove or rename both SD layout files. No changes are applied on
-card insertion, removal or while the UI is running.
+Diagnostics reports effective source (Internal flash, Internal backup or
+Embedded defaults), mount availability and invalid internal file recovery.
+No layout is reloaded on SD insertion/removal or USB eject. Use explicit
+import after editing, or Restore default layout to clear the internal override.
 
 ## Desktop simulator
 
-The simulator reads the same parser and applies the same layout code.
-Launch the packaged desktop executable with:
+The same parser, Layout Manager and persistence logic run against separate
+virtual SD and internal FAT filesystems. Launch with an explicitly supplied
+desktop fixture for testing:
 
 ```
 twatch_desktop.exe --layout layout.txt
-twatch_desktop.exe --layout-default layout_default.txt --layout layout.txt
 ```
 
-The explicitly supplied local files are copied to the simulator's virtual SD
-and read during simulated boot (real files are not used as watch SD storage).
-Without arguments, embedded defaults apply. A simulated deep reboot reloads
-the virtual files and restores menu positions; light sleep retains the current
-layout. The simulator's screen catalog remains a developer/testing interface
-independent of the configured watch menu.
+This validates and saves the file into virtual internal flash, not virtual SD.
+Internal state survives simulated deep reboot and is session-only; the simulator
+does not write to host files. The catalog remains a developer/testing
+interface independent of the configured watch layout.
 
 ## Hardware acceptance
 
-Check both a missing file and a valid custom file; verify each Home direction
-and both short presses, reorder/hide Tools and Quick Controls, exercise PIN
-lock/wake/long-press shutdown, and verify existing screen exit behavior.
-Test malformed file recovery and card removal/reboot. The actual SD and
-touch/button timing still require watch testing.
+On the actual watch, check mounting FFat without auto-format; only initialize if
+appropriate. Export the current or default layout, edit the SD copy on a PC,
+eject USB SD, import and verify the layout changes immediately. Remove SD and
+reboot/deep sleep; the custom layout should remain. Verify invalid import and
+interrupted-write recovery, restore defaults, and confirm USB storage exposes
+only SD, not internal flash. Real FFat/USB timing and failure behavior remain
+physical-watch validation items.

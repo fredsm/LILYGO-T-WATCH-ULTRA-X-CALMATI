@@ -7,8 +7,10 @@ constexpr const char* LAYOUT_PATH="/Settings/layout.txt";
 constexpr const char* LAYOUT_DEFAULT_PATH="/Settings/layout_default.txt";
 constexpr size_t LAYOUT_MAX_BYTES=4096;
 enum class HomeInput:uint8_t { SwipeLeft, SwipeRight, SwipeUp, SwipeDown, Back, Power, Count };
-enum class LayoutSource:uint8_t { Embedded, DefaultFile, CustomFile };
-struct LayoutStatus { LayoutSource source; bool invalid_default, invalid_custom; };
+enum class LayoutSource:uint8_t { Embedded, Internal, Backup };
+struct LayoutStatus { LayoutSource source; bool flash_ready, invalid_internal; };
+enum class LayoutResult:uint8_t { Ok, NoSd, MissingFile, InvalidFile, FlashUnavailable, WriteFailed };
+
 enum class HomeTarget:uint8_t {
     None, Time, Meshtastic, Tools, QuickControls, Settings, Gps, LoRa,
     WifiRadio, Bluetooth, Nfc, Calendar, Stopwatch, Timer, Alarm, Diagnostics, TaskManager
@@ -29,8 +31,16 @@ bool layout_parse(char* text,size_t length,LayoutConfig& output);
 // Overlay a valid file on a previously validated base; otherwise leave output alone.
 bool layout_parse_overlay(char* text,size_t length,const LayoutConfig& base,LayoutConfig& output);
 bool layout_embedded_valid();
+const char* layout_embedded_data(size_t& size);
 const char* layout_tool_name(unsigned id);
 const LayoutConfig& layout_config();
 LayoutStatus layout_status();
-void layout_load(); // once after SD storage initialization, before screen creation
+void layout_load(); // boot: internal flash only, independent of SD
+LayoutResult layout_save_text(const char* text,size_t length); // validate, persist, apply
+LayoutResult layout_import_sd(); // explicit transfer; never called during firmware boot
+LayoutResult layout_export_sd(bool defaults);
+LayoutResult layout_restore_defaults();
+bool layout_initialize_flash(); // explicit destructive confirmation required by UI
+const char* layout_result_message(LayoutResult result);
+
 void layout_open_home(HomeInput input);

@@ -3,6 +3,8 @@
 #include "../../src/sim/clock.hpp"
 #include "../../src/sim/pointer.hpp"
 #include "../../src/sim/mock/SD.h"
+#include "../../src/sim/mock/FFat.h"
+#include "../../src/storage_manager.h"
 #include "../../src/quick_controls_screen.h"
 #include "../../src/tools_screen.h"
 #include "../../src/settings_screen.h"
@@ -80,10 +82,19 @@ int main(){
     input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(input,[](lv_indev_t*,lv_indev_data_t* data){data->point=point;data->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;});
     lv_indev_set_mode(input,LV_INDEV_MODE_EVENT);lv_indev_set_scroll_limit(input,35);
+    // SD edits must not influence initial boot.
     save("home.power=timer\n",LAYOUT_DEFAULT_PATH);
     save(custom);
     auto* home=sim::create_clock();sim::initialize_screens(home);power_init();pump();
-    CHECK(layout_status().source==LayoutSource::CustomFile);
+    CHECK(layout_status().source==LayoutSource::Embedded&&layout_status().flash_ready);
+    CHECK(layout_config().home[5]==HomeTarget::Gps);
+    // Import using the actual Settings button; apply only after validation/persistence.
+    settings_screen_show();pump();
+    auto* import=label(lv_screen_active(),"Import layout from SD");CHECK(import);
+    lv_obj_send_event(lv_obj_get_parent(import),LV_EVENT_CLICKED,nullptr);
+    CHECK(layout_status().source==LayoutSource::Internal);
+    CHECK(FFat.exists(LAYOUT_PATH));
+    sim::show_home();pump();
     swipe(330,250,-240,0);CHECK(tools_screen_is_active());
     auto* first=label(lv_screen_active(),"Task Mgr");CHECK(first&&lv_obj_get_index(lv_obj_get_parent(first))==0);
     auto* time=label(lv_screen_active(),"Time");CHECK(time&&lv_obj_get_index(lv_obj_get_parent(time))==1);
@@ -99,43 +110,63 @@ int main(){
     sim::show_home();pump();swipe(205,100,0,240);CHECK(gps_screen_is_active());
     sim::show_home();pump();sim::back_button_click();CHECK(calendar_screen_is_active());
     sim::show_home();pump();sim::power_button_click();CHECK(settings_screen_is_active());
-    // Edits are boot-only; changing the SD file does not move live controls.
-    save("home.power=bad");CHECK(layout_status().source==LayoutSource::CustomFile);
+    // Editing SD after import cannot change the active layout or boot.
+    save("home.power=bad");CHECK(layout_status().source==LayoutSource::Internal);
+    CHECK(layout_import_sd()==LayoutResult::InvalidFile);
     sim::show_home();pump();sim::power_button_click();CHECK(settings_screen_is_active());
     sim::show_home();pin_lock_activate();layout_open_home(HomeInput::Power);
     CHECK(lv_screen_active()==home);
-    // Deep reboot restores the SD default for a malformed custom file.
     deepsleep();CHECK(power_is_asleep());power_button_down(10000);
     power_tick(15000);power_button_up(15100);
-    CHECK(layout_status().source==LayoutSource::DefaultFile&&layout_status().invalid_custom);
-    CHECK(layout_config().home[5]==HomeTarget::Timer);
+    CHECK(layout_status().source==LayoutSource::Internal);
+    CHECK(layout_config().home[5]==HomeTarget::Settings);
+    CHECK(lv_obj_has_flag(lv_obj_get_parent(mouse),LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_get_index(lv_obj_get_parent(time))==1);
+    CHECK(lv_obj_has_flag(lv_obj_get_parent(bluetooth),LV_OBJ_FLAG_HIDDEN));
+
+    // A new validated file replaces internal storage, and retains previous good file.
+    save("home.power=timer\ntools.order=Time");
+    CHECK(layout_import_sd()==LayoutResult::Ok);
+    CHECK(layout_config().home[5]==HomeTarget::Timer&&FFat.exists("/Settings/layout.bak"));
     CHECK(!lv_obj_has_flag(lv_obj_get_parent(mouse),LV_OBJ_FLAG_HIDDEN));
-    CHECK(lv_obj_get_index(lv_obj_get_parent(time))==0);
-    CHECK(!lv_obj_has_flag(lv_obj_get_parent(bluetooth),LV_OBJ_FLAG_HIDDEN));
-    // Valid partial custom config inherits SD default fields and ordering.
-    save("home.back=diagnostics\ntools.order=Task Mgr\ntools.hide=Mouse",LAYOUT_DEFAULT_PATH);
-    save("home.power=settings\ntools.order=Calendar",LAYOUT_PATH);
-    layout_load();CHECK(layout_status().source==LayoutSource::DefaultFile&&layout_status().invalid_custom);
-    save("home.power=settings\ntools.order=Time\ntools.hide=",LAYOUT_PATH);
-    layout_load();CHECK(layout_status().source==LayoutSource::CustomFile&&!layout_status().invalid_custom);
-    CHECK(layout_config().home[4]==HomeTarget::Diagnostics&&layout_config().home[5]==HomeTarget::Settings);
-    CHECK(!strcmp(layout_tool_name(layout_config().tools[0]),"Time"));
-    CHECK(!strcmp(layout_tool_name(layout_config().tools[1]),"Task Mgr"));
-    for(unsigned i=0;i<LAYOUT_TOOL_COUNT;++i)CHECK(!layout_config().hidden[i]);
-    sim_sd_files.erase(LAYOUT_PATH);layout_load();
-    CHECK(layout_status().source==LayoutSource::DefaultFile&&!layout_status().invalid_custom);
-    CHECK(layout_config().home[4]==HomeTarget::Diagnostics);
-    save("home.power=settings",LAYOUT_PATH);
-    sim_sd_files.erase(LAYOUT_DEFAULT_PATH);layout_load();
-    CHECK(layout_status().source==LayoutSource::CustomFile&&!layout_status().invalid_default);
-    CHECK(layout_config().home[4]==HomeTarget::Settings);
-    save("home.power=bad",LAYOUT_DEFAULT_PATH);
-    layout_load();CHECK(layout_status().source==LayoutSource::CustomFile&&layout_status().invalid_default);
-    CHECK(layout_config().home[4]==HomeTarget::Settings);
-    save("home.power=bad",LAYOUT_PATH);
-    layout_load();CHECK(layout_status().source==LayoutSource::Embedded&&layout_status().invalid_default&&layout_status().invalid_custom);
-    CHECK(layout_config().home[5]==HomeTarget::Gps);
-    sim::hardware.sd_ready=false;layout_load();CHECK(layout_status().source==LayoutSource::Embedded);
-    CHECK(!layout_status().invalid_default&&!layout_status().invalid_custom);
+    // Inject failed writes and publication; the saved configuration must survive.
+    save("home.power=calendar");
+    sim_ffat_fail_write=true;
+    CHECK(layout_import_sd()==LayoutResult::WriteFailed&&layout_config().home[5]==HomeTarget::Timer);
+    sim_ffat_fail_publish=true;
+    CHECK(layout_import_sd()==LayoutResult::WriteFailed);
+    layout_load();CHECK(layout_config().home[5]==HomeTarget::Timer);
+    // Export current and canonical default independently. Preserve prior SD copy.
+    CHECK(layout_export_sd(false)==LayoutResult::Ok);
+    CHECK(*sim_sd_files[LAYOUT_PATH]=="home.power=timer\ntools.order=Time");
+    CHECK(*sim_sd_files["/Settings/layout_export.bak"]=="home.power=calendar");
+    CHECK(layout_export_sd(true)==LayoutResult::Ok);
+    size_t len;const auto* embedded=layout_embedded_data(len);
+    CHECK(*sim_sd_files[LAYOUT_DEFAULT_PATH]==std::string(embedded,len));
+    // SD absence and USB ownership cannot affect internal boot; transfer is refused.
+    sim::hardware.sd_ready=false;storage_media_removed();layout_load();
+    CHECK(layout_status().source==LayoutSource::Internal&&layout_config().home[5]==HomeTarget::Timer);
+    CHECK(layout_import_sd()==LayoutResult::NoSd&&layout_export_sd(false)==LayoutResult::NoSd);
+    sim::hardware.sd_ready=true;storage_media_inserted();
+    CHECK(storage_try_usb_claim());
+    CHECK(layout_import_sd()==LayoutResult::NoSd&&layout_export_sd(true)==LayoutResult::NoSd);
+    storage_usb_release();
+    // Simulate interrupted publication/corrupted internal primary; fallback to backup.
+    auto recovered=FFat.open("/Settings/layout.bak",FILE_WRITE);
+    recovered.print("home.power=calendar");recovered.close();
+    auto corrupt=FFat.open(LAYOUT_PATH,FILE_WRITE);corrupt.print("home.power=bad");corrupt.close();
+    layout_load();CHECK(layout_status().source==LayoutSource::Backup&&layout_status().invalid_internal);
+    CHECK(layout_config().home[5]==HomeTarget::Calendar);
+    CHECK(layout_restore_defaults()==LayoutResult::Ok);
+    layout_load();CHECK(layout_status().source==LayoutSource::Embedded&&layout_config().home[5]==HomeTarget::Gps);
+    CHECK(!FFat.exists(LAYOUT_PATH)&&!FFat.exists("/Settings/layout.bak"));
+    // Mount failure is non-destructive. Only explicit initialize can format.
+    sim_ffat_files["/keep.txt"]=std::make_shared<std::string>("preserve");
+    sim_ffat_available=false;layout_load();
+    CHECK(!layout_status().flash_ready&&layout_status().source==LayoutSource::Embedded);
+    CHECK(sim_ffat_files.count("/keep.txt"));
+    CHECK(layout_save_text(custom,strlen(custom))==LayoutResult::FlashUnavailable);
+    CHECK(layout_initialize_flash()&&layout_status().flash_ready);
+    CHECK(!sim_ffat_files.count("/keep.txt"));
     return 0;
 }

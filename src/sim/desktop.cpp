@@ -2,7 +2,6 @@
 #include <SDL.h>
 #include <lvgl.h>
 #include "mock/hardware.hpp"
-#include "mock/SD.h"
 #include "../layout_config.h"
 #include <fstream>
 #include "panel.hpp"
@@ -96,31 +95,14 @@ uint32_t editing_key(SDL_Keycode key){
 int main(int argc,char** argv) {
     bool smoke=false,self_test=false,skip_boot=false,onboarding=false;
     const char* layout_path=nullptr;
-    const char* default_layout_path=nullptr;
     for(int i=1;i<argc;++i){
         if(!std::strcmp(argv[i],"--smoke"))smoke=true;
         else if(!std::strcmp(argv[i],"--self-test"))self_test=true;
         else if(!std::strcmp(argv[i],"--skip-boot"))skip_boot=true;
         else if(!std::strcmp(argv[i],"--onboarding"))onboarding=true;
         else if(!std::strcmp(argv[i],"--layout")&&i+1<argc)layout_path=argv[++i];
-        else if(!std::strcmp(argv[i],"--layout-default")&&i+1<argc)default_layout_path=argv[++i];
         else {std::fprintf(stderr,"Unknown option: %s\n",argv[i]);return 1;}
     }
-    auto import_layout=[](const char* host_path,const char* sd_path){
-        if(!host_path)return true;
-        // Only explicitly supplied host files are imported into the virtual SD.
-        std::ifstream f(host_path,std::ios::binary);
-        if(!f){std::fprintf(stderr,"Cannot open layout: %s\n",host_path);return false;}
-        char bytes[LAYOUT_MAX_BYTES+1];
-        f.read(bytes,sizeof(bytes));
-        if(f.bad()){std::fprintf(stderr,"Cannot read layout: %s\n",host_path);return false;}
-        auto out=SD.open(sd_path,FILE_WRITE);
-        const auto n=size_t(f.gcount());
-        const bool ok=out&&out.write(reinterpret_cast<const uint8_t*>(bytes),n)==n;
-        out.close();return ok;
-    };
-    if(!import_layout(default_layout_path,LAYOUT_DEFAULT_PATH)||
-       !import_layout(layout_path,LAYOUT_PATH))return 1;
     SDL_SetMainReady();
     // Native touch is handled below; disable duplicate synthesized mouse events.
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS,"0");
@@ -145,6 +127,15 @@ int main(int argc,char** argv) {
     preview();
     screen_catalog=lv_screen_active();
     sim::initialize_screens(sim::create_clock());
+    if(layout_path){
+        // Explicit desktop fixture: use the same validated internal-save path.
+        std::ifstream f(layout_path,std::ios::binary);
+        char bytes[LAYOUT_MAX_BYTES+1];
+        if(!f){std::fprintf(stderr,"Cannot open layout: %s\n",layout_path);return 1;}
+        f.read(bytes,sizeof(bytes));
+        const auto result=f.bad()?LayoutResult::InvalidFile:layout_save_text(bytes,size_t(f.gcount()));
+        if(result!=LayoutResult::Ok)std::fprintf(stderr,"Layout: %s\n",layout_result_message(result));
+    }
     create_button_bar(display);
     sim::HardwarePanel panel;
     if(!panel.open(display)){std::fprintf(stderr,"Panel: %s\n",SDL_GetError());return 1;}

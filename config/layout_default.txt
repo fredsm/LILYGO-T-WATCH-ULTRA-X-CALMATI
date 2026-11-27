@@ -1,5 +1,5 @@
-# T-Watch Ultra built-in navigation layout. Copy to /Settings/layout_default.txt on SD.
-# Boot-loaded; copy this file to layout.txt to customize. Swipe directions refer to finger motion.
+# T-Watch Ultra built-in navigation layout; embedded in firmware at build time.
+# Export, edit on SD, then import using Settings > Layout Manager. Swipe directions describe finger motion.
 # Reference inventory only; these lists do not register or enable screens.
 # Includes internal screens reached through their existing menus and workflows.
 available-screens = adsb, alarm, analyze, aprs, arp_mitm, badusb, ble_pair, bluetooth, bt_analyze, calendar, calmati_remote, calmati_result, calmati_targets, camera, car, channels, configuration, deauther, diagnostics, drone, espnow, evil_twin, gatt_explorer, gps, home, lora, lora_analyze, map, meshtastic, meta, mic, mifare, mouse, nfc, nfc_credit, nfc_write, nodes, onboarding, pager, pet, phantom_flood, pin_lock, portscan, printer, quick_controls, rid_spoof, scan, send_message, settings, skimmer, stopwatch, subghz_sentinel, task_manager, tesla_cp, threat_radar, time, timer, tools, tpms, usb_sd, voice, wardriver, waterfall, webpanel, wifi, wifi_radio, wpa3_sae

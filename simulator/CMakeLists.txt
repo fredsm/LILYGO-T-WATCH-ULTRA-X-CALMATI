@@ -6,7 +6,7 @@ add_custom_command(OUTPUT "${CLOCK_INCLUDE}"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/extract_clock.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp" "${CLOCK_INCLUDE}"
     DEPENDS extract_clock.py english_ui.py english_ui.json ../src/main.cpp VERBATIM)
-set(LAYOUT_DEFAULT "${CMAKE_CURRENT_SOURCE_DIR}/../sd/Settings/layout_default.txt")
+set(LAYOUT_DEFAULT "${CMAKE_CURRENT_SOURCE_DIR}/../config/layout_default.txt")
 set(LAYOUT_EMBEDDED "${CMAKE_CURRENT_BINARY_DIR}/layout_default_embedded.h")
 add_custom_command(OUTPUT "${LAYOUT_EMBEDDED}"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/generate_layout_default.py"
@@ -95,7 +95,7 @@ set_tests_properties(ui_navigation_cycle PROPERTIES TIMEOUT 90)
 if(TWATCH_DESKTOP)
     target_link_libraries(twatch_desktop PRIVATE simulator_ui)
     add_test(NAME sdl_all_screens COMMAND twatch_desktop --smoke)
-    add_test(NAME sdl_layout_file COMMAND twatch_desktop --smoke --layout-default "${LAYOUT_DEFAULT}")
+    add_test(NAME sdl_layout_file COMMAND twatch_desktop --smoke --layout "${LAYOUT_DEFAULT}")
     set_tests_properties(sdl_layout_file PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 60)
     set_tests_properties(sdl_all_screens PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 60)
 endif()

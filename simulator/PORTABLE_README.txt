@@ -79,9 +79,9 @@ CPU loads use the core demand sliders, and memory statistics are simulated.
 Optional configurable layout: copy the included layout_default.txt to layout.txt,
 edit layout.txt and launch
   twatch_desktop.exe --layout layout.txt
-The same file can be copied to /Settings/layout.txt on the real watch SD card.
-Only Home shortcuts, Tools order/visibility and Quick Controls order/visibility
-are configurable; the existing screen-local navigation and power/lock remain.
-Use --layout-default layout_default.txt to load a separate SD default in the mock.
-Missing or invalid custom configuration falls back to the SD default, then
-to the embedded layout_default.txt copy.
+The simulator validates and saves this into its independent virtual internal
+flash, retained across simulated deep reboot (session only).
+On the real watch, Settings > Layout Manager can export the current or default
+layout to SD, then import /Settings/layout.txt after it is edited on a PC.
+SD is never used as an active layout source. The internal layout falls back to
+its last valid backup, then to the embedded firmware default.

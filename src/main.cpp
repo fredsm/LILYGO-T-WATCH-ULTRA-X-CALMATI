@@ -1366,7 +1366,9 @@ void setup()
     }
 
     spi_bus_init();
-    instance.begin();
+    // The vendor MSC setup exposes/formats FFat; keep internal layout
+    // private. The SD-only USB reader is initialized separately below.
+    instance.begin(NO_INIT_FATFS);
     instance.powerControl(POWER_NFC, false); // ensure NFC is off on boot
     // GPS switch starts OFF; don't leave the boot-probed UART/rail powered.
     Serial1.end();

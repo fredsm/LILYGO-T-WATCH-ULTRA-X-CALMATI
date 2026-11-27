@@ -43,10 +43,10 @@ void refresh() {
     const auto events=event_stats();
     const auto sd=storage_stats();
     const auto layout_state=layout_status();
-    const char* layout=layout_state.source==LayoutSource::CustomFile?"Custom SD":layout_state.source==LayoutSource::DefaultFile?"Default SD":"Embedded defaults";
+    const char* layout=layout_state.source==LayoutSource::Internal?"Internal flash":layout_state.source==LayoutSource::Backup?"Internal backup":"Embedded defaults";
     lv_label_set_text_fmt(status,"%s%s | Uptime %lu s\nReset: %s\nLayout: %s%s%s",
         d.simulated?"SIMULATED | ":"",!d.ready?"Monitor unavailable":d.paused?"Paused":d.stalled?"STALLED":"Monitoring",
-        (unsigned long)(d.uptime_ms/1000),d.reset_reason,layout,layout_state.invalid_default?" | Invalid default":"",layout_state.invalid_custom?" | Invalid custom":"");
+        (unsigned long)(d.uptime_ms/1000),d.reset_reason,layout,layout_state.flash_ready?"":" | FFat unavailable",layout_state.invalid_internal?" | Invalid internal file":"");
     char a[12],b[12];
     if (d.core0<0) snprintf(a,sizeof(a),"N/A"); else snprintf(a,sizeof(a),"%d%%",d.core0);
     if (d.core1<0) snprintf(b,sizeof(b),"N/A"); else snprintf(b,sizeof(b),"%d%%",d.core1);

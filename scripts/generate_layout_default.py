@@ -11,7 +11,7 @@ def generate(source: Path, destination: Path):
     # Adjacent string literals keep compiler input lines short.
     chunks = ['"' + ''.join(f'\\{byte:03o}' for byte in data[i:i+32]) + '"'
               for i in range(0, len(data), 32)]
-    header = "#pragma once\n// Generated from sd/Settings/layout_default.txt; do not edit.\n"
+    header = "#pragma once\n// Generated from config/layout_default.txt; do not edit.\n"
     header += "static constexpr char layout_embedded_text[] =\n" + "\n".join(chunks) + ";\n"
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists() or destination.read_text() != header:

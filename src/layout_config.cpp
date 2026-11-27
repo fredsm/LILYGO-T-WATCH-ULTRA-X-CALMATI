@@ -129,6 +129,7 @@ const EmbeddedLayout& embedded(){
 }
 }
 bool layout_embedded_valid(){return embedded().valid;}
+const char* layout_embedded_data(size_t& size){size=sizeof(layout_embedded_text)-1;return layout_embedded_text;}
 LayoutConfig layout_defaults(){return embedded().config;}
 bool layout_parse_overlay(char* text,size_t length,const LayoutConfig& base,LayoutConfig& output){
     return parse(text,length,base,output,false);
