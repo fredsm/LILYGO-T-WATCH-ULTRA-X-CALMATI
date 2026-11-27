@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <LV_Helper.h>
+#include "power_manager.h"
 #include <bosch/BoschSensorDataHelper.hpp>
 #include "esp_wifi.h"
 #include <esp_system.h>   // esp_reset_reason() — boot diagnostic
