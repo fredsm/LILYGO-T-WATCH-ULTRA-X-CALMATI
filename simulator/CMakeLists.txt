@@ -69,7 +69,7 @@ endforeach()
 add_library(simulator_ui STATIC ${SCREEN_SOURCES}
     "${CLOCK_INCLUDE}" ../src/sim/startup.cpp "${ENGLISH_ONBOARDING}" ../src/boot_skull_img.cpp ../src/sim/clock.cpp ../src/sim/keyboard.cpp ../src/defcon_img.cpp ../src/matrix_bg.cpp
     "${ENGLISH_TASK_MANAGER}" ../src/tile_icons.cpp ../src/fish_img.cpp ../src/lv_font_montserrat_clock_96.c ../src/calmati_icon.c
-    ../src/sim/screens.cpp ../src/sim/navigation.cpp ../src/quick_controls_screen.cpp ../src/power_manager.cpp ../src/power_lifecycle.cpp ../src/pin_lock_screen.cpp ../src/diagnostics_manager.cpp ../src/diagnostics_screen.cpp ../src/event_manager.cpp ../src/status_cache.cpp ../src/gps_service.cpp ../src/storage_manager.cpp ../src/spi_bus_manager.cpp ../src/i2c_bus_manager.cpp ../src/qspi_display.cpp ../src/radio_manager.cpp ../src/audio_manager.cpp ../src/gps_snapshot.cpp
+    ../src/sim/screens.cpp ../src/sim/navigation.cpp ../src/quick_controls_screen.cpp ../src/power_manager.cpp ../src/power_lifecycle.cpp ../src/layout_config.cpp ../src/layout_runtime.cpp ../src/pin_lock_screen.cpp ../src/diagnostics_manager.cpp ../src/diagnostics_screen.cpp ../src/event_manager.cpp ../src/status_cache.cpp ../src/gps_service.cpp ../src/storage_manager.cpp ../src/spi_bus_manager.cpp ../src/i2c_bus_manager.cpp ../src/qspi_display.cpp ../src/radio_manager.cpp ../src/audio_manager.cpp ../src/gps_snapshot.cpp
     ../src/sim/mock/alarm.cpp ../src/sim/mock/usb_sd.cpp
     ../src/sim/mock/connectivity.cpp ../src/sim/mock/radio_ui.cpp
     ../src/sim/mock/mesh_ui.cpp ../src/sim/mock/network_ui.cpp
@@ -89,6 +89,8 @@ set_tests_properties(ui_navigation_cycle PROPERTIES TIMEOUT 90)
 if(TWATCH_DESKTOP)
     target_link_libraries(twatch_desktop PRIVATE simulator_ui)
     add_test(NAME sdl_all_screens COMMAND twatch_desktop --smoke)
+    add_test(NAME sdl_layout_file COMMAND twatch_desktop --smoke --layout "${CMAKE_CURRENT_SOURCE_DIR}/../sd/Settings/layout.txt")
+    set_tests_properties(sdl_layout_file PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 60)
     set_tests_properties(sdl_all_screens PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 60)
 endif()
 
@@ -194,3 +196,8 @@ add_executable(power_lifecycle_test tests/power_lifecycle_test.cpp ../src/power_
 add_test(NAME peripheral_power_lifecycle COMMAND power_lifecycle_test)
 add_executable(cpu_policy_test tests/cpu_policy_test.cpp)
 add_test(NAME cpu_governor_window_and_stability COMMAND cpu_policy_test)
+
+add_executable(layout_config_test tests/layout_config_test.cpp)
+target_link_libraries(layout_config_test PRIVATE simulator_ui)
+add_test(NAME boot_layout_configuration COMMAND layout_config_test)
+set_tests_properties(boot_layout_configuration PROPERTIES TIMEOUT 30)

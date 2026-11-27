@@ -1,4 +1,6 @@
 #include "tools_screen.h"
+#include "layout_config.h"
+#include <string.h>
 #include "time_screen.h"
 #include "wardriver_screen.h"
 #include "esp32-hal-tinyusb.h"    // usb_persist_restart(RESTART_BOOTLOADER) — tile Download
@@ -1595,6 +1597,24 @@ static void add_time_tile(lv_obj_t* grid){
     lv_obj_move_to_index(time_tile,0);
 }
 
+// Cache existing tile objects by stable config label; moving/hiding preserves
+// every original event handler, icon and service lifecycle.
+static lv_obj_t* layout_tiles[LAYOUT_TOOL_COUNT]={};
+void tools_screen_apply_layout(){
+    if(!s_tools_grid)return;
+    const auto& c=layout_config();
+    for(unsigned i=0;i<c.tool_count;++i){
+        const unsigned id=c.tools[i];
+        auto* tile=layout_tiles[id];
+        if(!tile)continue;
+        if(c.hidden[id])lv_obj_add_flag(tile,LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(tile,LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_to_index(tile,i);
+    }
+    lv_obj_update_layout(s_tools_grid);
+    lv_obj_scroll_to_y(s_tools_grid,0,LV_ANIM_OFF);
+}
+
 void tools_screen_create()
 {
     tools_screen = lv_obj_create(NULL);
@@ -1873,6 +1893,14 @@ void tools_screen_create()
     for (uint32_t i = 0; i < lv_obj_get_child_count(grid); i++)
         tile_icons_passthrough(lv_obj_get_child(grid, i));
 
+    for(unsigned i=0;i<lv_obj_get_child_count(grid);++i){
+        auto* tile=lv_obj_get_child(grid,i);
+        auto* label=lv_obj_get_child(tile,0);
+        if(!label||!lv_obj_check_type(label,&lv_label_class))continue;
+        for(unsigned id=0;id<LAYOUT_TOOL_COUNT;++id)
+            if(!strcmp(lv_label_get_text(label),layout_tool_name(id)))layout_tiles[id]=tile;
+    }
+    tools_screen_apply_layout();
     lv_obj_add_event_cb(tools_screen, on_gesture, LV_EVENT_GESTURE, NULL);
 }
 

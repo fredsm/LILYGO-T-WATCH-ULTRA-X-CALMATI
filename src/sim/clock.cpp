@@ -1,5 +1,6 @@
 #include "clock.hpp"
 #include "navigation.hpp"
+#include "../layout_config.h"
 #include "screens.hpp"
 // Original firmware accesses the colon span's style directly. LVGL 9 keeps
 // that struct definition in this header; the simulator pins the same version.

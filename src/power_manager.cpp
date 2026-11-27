@@ -51,6 +51,9 @@ bool clock_screen_motion_wake_enabled();
 #else
 #include "sim/screens.hpp"
 #include "sim/startup.hpp"
+#include "layout_config.h"
+#include "tools_screen.h"
+#include "quick_controls_screen.h"
 #endif
 
 namespace {
@@ -647,6 +650,7 @@ void sim_wake(uint32_t now) {
     if (cold_boot) {
         diagnostics_reset();
         governor.clear();
+        layout_load();tools_screen_apply_layout();quick_controls_screen_apply_layout();
         load_cpu_preference();
         pin_lock_restore();
         sim::show_home();

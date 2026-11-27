@@ -75,3 +75,10 @@ Upward transitions are immediate; downward transitions wait five seconds.
 System Diagnostics: open Tools > Task Mgr > Diagnostics. F6 hardware panel
 has "Simulate 30s SD stall" to test stall history without blocking the desktop.
 CPU loads use the core demand sliders, and memory statistics are simulated.
+
+Optional configurable layout: edit the included layout.txt and launch
+  twatch_desktop.exe --layout layout.txt
+The same file can be copied to /Settings/layout.txt on the real watch SD card.
+Only Home shortcuts, Tools order/visibility and Quick Controls order/visibility
+are configurable; the existing screen-local navigation and power/lock remain.
+Missing or invalid configuration restores built-in defaults.

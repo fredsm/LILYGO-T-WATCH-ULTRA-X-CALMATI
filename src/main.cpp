@@ -25,6 +25,7 @@
 #include "settings_screen.h"
 #include "screenshot.h"
 #include "tools_screen.h"
+#include "layout_config.h"
 #include "camera_screen.h"
 #include "deauther_screen.h"
 #include "arp_mitm_screen.h"
@@ -724,16 +725,10 @@ static void on_clock_gesture(lv_event_t *e)
 
     lv_indev_t *indev = lv_event_get_indev(e);
     lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-    if (dir == LV_DIR_LEFT)
-        time_screen_show_from_clock();
-    else if (dir == LV_DIR_RIGHT) {
-        meshtastic_mark_read();
-        meshtastic_screen_show();
-    } else if (dir == LV_DIR_BOTTOM) {   // swipe down from clock face
-        quick_controls_screen_show();
-    } else if (dir == LV_DIR_TOP) {      // swipe up from clock face
-        tools_screen_show();
-    }
+    if (dir == LV_DIR_LEFT) layout_open_home(HomeInput::SwipeLeft);
+    else if (dir == LV_DIR_RIGHT) layout_open_home(HomeInput::SwipeRight);
+    else if (dir == LV_DIR_TOP) layout_open_home(HomeInput::SwipeUp);
+    else if (dir == LV_DIR_BOTTOM) layout_open_home(HomeInput::SwipeDown);
 }
 
 // Called by settings screen to switch between digital and analog face
@@ -1415,6 +1410,7 @@ void setup()
     // host until the USB SD screen mounts it.
     storage_init(instance.isCardReady());
     storage_bind_lvgl();
+    layout_load();
     usb_sd_init();
 
     // Load the saved APRS callsign from the SD card (if present).
@@ -1863,7 +1859,7 @@ void setup()
             dim_reset_activity();
             if (clock_vibrate) instance.vibrator();
             if (lv_screen_active() == clock_screen)
-                gps_screen_show();
+                layout_open_home(HomeInput::Power);
             else if (gps_screen_is_active())
                 lora_screen_show();
             else if (lora_screen_is_active())
@@ -2074,7 +2070,7 @@ void loop()
             } else if (nfc_credit_screen_is_active()) {
                 tools_screen_show();
             } else if (lv_screen_active() == clock_screen) {
-                settings_screen_show();
+                layout_open_home(HomeInput::Back);
             } else {
                 clock_screen_show();
             }

@@ -2,6 +2,9 @@
 #include <SDL.h>
 #include <lvgl.h>
 #include "mock/hardware.hpp"
+#include "mock/SD.h"
+#include "../layout_config.h"
+#include <fstream>
 #include "panel.hpp"
 #include "startup.hpp"
 #include "desktop_test.hpp"
@@ -92,12 +95,24 @@ uint32_t editing_key(SDL_Keycode key){
 }
 int main(int argc,char** argv) {
     bool smoke=false,self_test=false,skip_boot=false,onboarding=false;
+    const char* layout_path=nullptr;
     for(int i=1;i<argc;++i){
         if(!std::strcmp(argv[i],"--smoke"))smoke=true;
         else if(!std::strcmp(argv[i],"--self-test"))self_test=true;
         else if(!std::strcmp(argv[i],"--skip-boot"))skip_boot=true;
         else if(!std::strcmp(argv[i],"--onboarding"))onboarding=true;
+        else if(!std::strcmp(argv[i],"--layout")&&i+1<argc)layout_path=argv[++i];
         else {std::fprintf(stderr,"Unknown option: %s\n",argv[i]);return 1;}
+    }
+    if(layout_path){
+        // Read only the explicitly supplied file into the virtual SD.
+        std::ifstream f(layout_path,std::ios::binary);
+        if(!f){std::fprintf(stderr,"Cannot open layout: %s\n",layout_path);return 1;}
+        char bytes[LAYOUT_MAX_BYTES+1];
+        f.read(bytes,sizeof(bytes));
+        auto out=SD.open(LAYOUT_PATH,FILE_WRITE);
+        out.write(reinterpret_cast<const uint8_t*>(bytes),size_t(f.gcount()));
+        out.close();
     }
     SDL_SetMainReady();
     // Native touch is handled below; disable duplicate synthesized mouse events.

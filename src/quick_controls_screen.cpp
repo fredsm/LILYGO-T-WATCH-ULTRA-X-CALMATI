@@ -1,4 +1,5 @@
 #include "quick_controls_screen.h"
+#include "layout_config.h"
 #include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <esp_bt.h>
@@ -22,6 +23,8 @@ namespace {
 lv_obj_t* quick=nullptr;
 lv_obj_t* notice=nullptr;
 lv_obj_t* brightness_value=nullptr;
+lv_obj_t* brightness_tile=nullptr;
+lv_obj_t* action_tiles[LAYOUT_ACTION_COUNT]={};
 void tile_icons_passthrough(lv_obj_t* obj){
     for(unsigned i=0;i<lv_obj_get_child_count(obj);++i){
         auto* child=lv_obj_get_child(obj,i);lv_obj_clear_flag(child,LV_OBJ_FLAG_CLICKABLE);
@@ -77,21 +80,21 @@ void quick_controls_screen_create(){
     for(int i=0;i<5;++i){auto& c=controls[i];c.tile=make_control(i,c.name,c.icon,&c.value);
         lv_obj_add_event_cb(c.tile,toggle,LV_EVENT_CLICKED,&c);
     }
-    auto* brightness=make_control(5,"Brightness",LV_SYMBOL_EYE_OPEN,&brightness_value);
+    auto* brightness=brightness_tile=make_control(5,"Brightness",LV_SYMBOL_EYE_OPEN,&brightness_value);
     lv_obj_add_event_cb(brightness,[](lv_event_t*){
         int value=settings_get_brightness();
         settings_set_brightness(value<DEVICE_MAX_BRIGHTNESS_LEVEL*2/5 ? DEVICE_MAX_BRIGHTNESS_LEVEL*2/3 :
             value<DEVICE_MAX_BRIGHTNESS_LEVEL*4/5 ? DEVICE_MAX_BRIGHTNESS_LEVEL : DEVICE_MAX_BRIGHTNESS_LEVEL/3);
         quick_controls_screen_refresh();
     },LV_EVENT_CLICKED,nullptr);
-    auto* settings=lv_button_create(quick);lv_obj_set_size(settings,160,40);
+    auto* settings=action_tiles[0]=lv_button_create(quick);lv_obj_set_size(settings,160,40);
     lv_obj_set_pos(settings,35,405);lv_obj_set_style_radius(settings,14,0);
     lv_obj_set_style_bg_color(settings,lv_color_hex(0x26394c),0);
     auto* settings_label=lv_label_create(settings);
     lv_label_set_text(settings_label,LV_SYMBOL_SETTINGS "  Settings");lv_obj_center(settings_label);
     tile_icons_passthrough(settings);
     lv_obj_add_event_cb(settings,[](lv_event_t*){settings_screen_show();},LV_EVENT_CLICKED,nullptr);
-    auto* lock=lv_button_create(quick);lv_obj_set_size(lock,160,40);
+    auto* lock=action_tiles[1]=lv_button_create(quick);lv_obj_set_size(lock,160,40);
     lv_obj_set_pos(lock,215,405);lv_obj_set_style_radius(lock,14,0);
     lv_obj_set_style_bg_color(lock,lv_color_hex(0x26394c),0);
     auto* lock_icon=pin_lock_icon_create(lock,lv_color_white(),20);
@@ -106,8 +109,27 @@ void quick_controls_screen_create(){
     lv_obj_add_event_cb(quick,[](lv_event_t* e){auto* input=lv_event_get_indev(e);
         if(input&&lv_indev_get_gesture_dir(input)==LV_DIR_TOP)clock_screen_show();
     },LV_EVENT_GESTURE,nullptr);
+    quick_controls_screen_apply_layout();
     quick_controls_screen_refresh();
     lv_timer_create([](lv_timer_t*){if(quick_controls_screen_is_active())quick_controls_screen_refresh();},250,nullptr);
+}
+void quick_controls_screen_apply_layout(){
+    if(!quick)return;
+    const auto& c=layout_config();
+    lv_obj_t* tiles[LAYOUT_CONTROL_COUNT]={controls[0].tile,controls[1].tile,
+        controls[2].tile,controls[3].tile,controls[4].tile,brightness_tile};
+    for(auto* tile:tiles)lv_obj_add_flag(tile,LV_OBJ_FLAG_HIDDEN);
+    for(unsigned i=0;i<c.control_count;++i){
+        auto* tile=tiles[c.controls[i]];
+        lv_obj_set_pos(tile,35+(i%2)*180,76+(i/2)*110);
+        lv_obj_clear_flag(tile,LV_OBJ_FLAG_HIDDEN);
+    }
+    for(auto* tile:action_tiles)lv_obj_add_flag(tile,LV_OBJ_FLAG_HIDDEN);
+    for(unsigned i=0;i<c.action_count;++i){
+        auto* tile=action_tiles[c.actions[i]];
+        lv_obj_set_pos(tile,35+i*180,405);
+        lv_obj_clear_flag(tile,LV_OBJ_FLAG_HIDDEN);
+    }
 }
 void quick_controls_screen_show(){if(!quick)quick_controls_screen_create();main_loop_request_lvgl_priority(8);quick_controls_screen_refresh();lv_screen_load(quick);}
 bool quick_controls_screen_is_active(){return quick&&lv_screen_active()==quick;}

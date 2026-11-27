@@ -4,3 +4,5 @@
 void tools_screen_create();
 void tools_screen_show();
 bool tools_screen_is_active();
+
+void tools_screen_apply_layout();
