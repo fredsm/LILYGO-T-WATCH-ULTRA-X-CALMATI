@@ -29,6 +29,7 @@
 #include "../diagnostics_screen.h"
 #include "../task_manager.h"
 #include "../status_cache.h"
+#include "../i2c_bus_manager.h"
 #include "../storage_manager.h"
 #include "../mic_rec.h"
 #include <ctime>
