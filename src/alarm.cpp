@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <driver/i2s.h>
+#include "audio_manager.h"
+#include <esp_timer.h>
 
 // Defined in main.cpp — current displayed local time (RTC + UTC offset).
 void clock_screen_get_local_time(struct tm *out);
@@ -44,7 +46,7 @@ static bool     s_configured        = false;
 // a fresh device: vibrate + audio both on, volume full, snooze 5 minutes.
 static bool     s_vibrate           = true;
 static bool     s_audio             = true;
-static uint8_t  s_volume            = 100;
+static std::atomic<uint8_t> s_volume{100};
 static int      s_snooze_minutes    = 5;
 
 static bool     s_ringing           = false;
@@ -216,7 +218,8 @@ static bool s_amp_powered=false; // UI-owned PMU rail
 // playing. 0 = no override → fall back to the user's saved alarm volume.
 // Read on every PCM chunk by chime_write_tone() so a caller can change it
 // mid-loop, same as s_volume.
-static volatile uint8_t s_chime_override_volume = 0;
+static std::atomic<uint8_t> s_chime_override_volume{0};
+static uint32_t s_chime_token=0;
 
 static void chime_write_tone(uint32_t freq_hz, uint32_t duration_ms,
                              int16_t *buf, int buf_samples, float *phase_io)
@@ -245,7 +248,13 @@ static void chime_write_tone(uint32_t freq_hz, uint32_t duration_ms,
                 if (phase >= two_pi) phase -= two_pi;
             }
         }
-        instance.player.write(buf, n * sizeof(int16_t));
+        // Vendor Player::write ignores its timeout argument on IDF 4.x.
+        size_t written=0;
+        const auto start=esp_timer_get_time();
+        auto rc=i2s_write(I2S_NUM_1,buf,n*sizeof(int16_t),&written,pdMS_TO_TICKS(100));
+        bool ok=rc==ESP_OK && written==size_t(n)*sizeof(int16_t);
+        audio_note_io(false,ok,uint32_t(esp_timer_get_time()-start));
+        if(!ok){s_chime_active=false;break;}
         total_samples -= n;
     }
     if (phase_io) *phase_io = phase;
@@ -254,7 +263,9 @@ static void chime_write_tone(uint32_t freq_hz, uint32_t duration_ms,
 static void chime_task(void *)
 {
     vTaskDelay(pdMS_TO_TICKS(20));   // let the amp settle
-    i2s_set_clk(I2S_NUM_1, CHIME_SAMPLE_RATE, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
+    if(s_chime_active && i2s_set_clk(I2S_NUM_1,CHIME_SAMPLE_RATE,I2S_BITS_PER_SAMPLE_16BIT,I2S_CHANNEL_MONO)!=ESP_OK){
+        audio_note_io(false,false,0);s_chime_active=false;
+    }
 
     int16_t chunk[CHIME_CHUNK_SAMPLES];
     float   phase = 0.0f;
@@ -270,6 +281,7 @@ static void chime_task(void *)
         chime_write_tone(0,    900, chunk, CHIME_CHUNK_SAMPLES, &phase);
     }
 
+    audio_release(AudioClient::Chime,s_chime_token);
     s_chime_done.store(true); // UI can now switch off the amp rail
     vTaskDelete(NULL);
 }
@@ -292,15 +304,18 @@ static void start_chime()
 {
     if (!s_chime_done.load()) return;
     if (!i2c_bus_ready(0x34)) return;
+    s_chime_token=audio_acquire(AudioClient::Chime);
+    if(!s_chime_token)return;
     const auto before=i2c_bus_failures();
     instance.powerControl(POWER_SPEAK, true);
     // Even a partial write may have enabled the rail; keep cleanup pending.
     s_amp_powered=true;
-    if(i2c_bus_failures()!=before)return;
+    if(i2c_bus_failures()!=before){audio_release(AudioClient::Chime,s_chime_token);return;}
     s_chime_active=true;
     s_chime_done=false;
     if(xTaskCreatePinnedToCore(chime_task, "alarm_chime", 4096, NULL, 1,
                             nullptr, 0)!=pdPASS){
+        audio_release(AudioClient::Chime,s_chime_token);
         s_chime_active=false;s_chime_done=true;alarm_service_audio();
     }
 }

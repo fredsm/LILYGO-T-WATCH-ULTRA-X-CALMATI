@@ -117,6 +117,9 @@ static void on_toggle(lv_event_t *e)
     // Tear the UART down explicitly so each enable's begin() starts clean.
     if (gps_powered) {
         Serial1.end();
+#ifndef TWATCH_SIMULATOR
+        Serial1.setRxBufferSize(1024);
+#endif
         instance.powerControl(POWER_GPS, true);  // enableBLDO1 + Serial1.begin
     } else {
         gps_service_session(false);
@@ -138,6 +141,9 @@ void gps_screen_power_on()
     if (gps_powered) return;
     gps_powered = true;
     Serial1.end();
+#ifndef TWATCH_SIMULATOR
+    Serial1.setRxBufferSize(1024);
+#endif
     instance.powerControl(POWER_GPS, true);
     gps_service_session(true);
     clock_screen_set_gps_active(true);

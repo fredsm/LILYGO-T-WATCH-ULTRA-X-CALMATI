@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 
-enum class RadioJob : uint8_t { None, Weather, TimeSync, Adsb };
+enum class RadioJob : uint8_t { None, Weather, TimeSync, Adsb, Voice };
 enum class RadioAction : uint8_t { WifiUp, WifiChange, WifiDown, BleUp, BleDown };
 struct RadioStats {
     RadioJob job = RadioJob::None;

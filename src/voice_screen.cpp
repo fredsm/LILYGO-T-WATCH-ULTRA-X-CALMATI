@@ -1,4 +1,6 @@
 #include "voice_screen.h"
+#include "radio_manager.h"
+#include <atomic>
 #include "tools_screen.h"        // tools_screen_show() per il back-gesture
 #include "mic_rec.h"             // registrazione WAV 16k mono su SD
 #include "wifi_creds.h"          // credenziali WiFi (NVS / wifi.txt)
@@ -60,14 +62,18 @@ static VState s_state = V_IDLE;
 
 static uint8_t      *s_wav = nullptr;    // buffer WAV in PSRAM
 static size_t        s_wav_len = 0;
-static volatile bool s_upl_done = false;
+static std::atomic<bool> s_upl_done{true},s_cancel{false};
+static uint32_t s_voice_session=0;
+static char s_upload_path[48];
 static char          s_you_txt[256];
 static char          s_reply_txt[600];
-static TaskHandle_t  s_task = nullptr;
 static uint32_t      s_upl_start = 0;      // per il watchdog dell'upload
 
 static void set_status(const char *s) { if (s_status) lv_label_set_text(s_status, s); }
-static void ensure_wifi();
+static void read_wifi2(char* ssid,size_t sn,char* pass,size_t pn);
+static bool load_wav(const char* path);
+static bool cancelled(){return s_cancel || radio_manager_stats().suspended;}
+static void fail(const char* msg){s_you_txt[0]=0;strlcpy(s_reply_txt,msg,sizeof(s_reply_txt));}
 
 // --- risoluzione indirizzo UDDA (mDNS -> IP fisso) --------------------------
 static void resolve_udda(char *host, size_t n)
@@ -78,40 +84,32 @@ static void resolve_udda(char *host, size_t n)
 }
 
 // --- task di upload (background: l'HTTP dura ~30s, non blocca la UI) --------
-static void upload_task(void *)
+static void run_upload()
 {
-    // WiFi era spento (per il mic): ora e' stato riacceso da ensure_wifi.
-    // Il cold-start del WiFi e' lento -> aspetta fino a ~25s e ritenta la
-    // begin a meta' strada (la prima associazione da radio spenta puo' fallire).
-    for (int i = 0; i < 250 && WiFi.status() != WL_CONNECTED; i++) {
-        if (i == 100) {                 // ~10s: ritenta l'associazione a UDDA
-            WiFi.mode(WIFI_STA);
-            WiFi.begin("UDDA");
-        }
+    if(cancelled()){fail("Upload cancelled");return;}
+    if(!load_wav(s_upload_path)){fail("Audio read error");return;}
+    char ssid[40],pass[68];
+    read_wifi2(ssid,sizeof(ssid),pass,sizeof(pass));
+    if(cancelled()){fail("Upload cancelled");return;}
+    if(!WiFi.mode(WIFI_STA)){fail("WiFi unavailable");return;}
+    if(WiFi.status()!=WL_CONNECTED || !(WiFi.SSID()==String(ssid))){
+        WiFi.disconnect();
+        WiFi.begin(ssid,pass[0]?pass:nullptr);
+    }
+    for(int i=0;i<250 && WiFi.status()!=WL_CONNECTED && !cancelled();++i){
+        if(i==100)WiFi.begin(ssid,pass[0]?pass:nullptr);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    if (WiFi.status() != WL_CONNECTED) {
-        s_you_txt[0] = '\0';
-        snprintf(s_reply_txt, sizeof(s_reply_txt), "UDDA WiFi not connected. Try again.");
-        if (s_wav) { free(s_wav); s_wav = nullptr; }
-        s_upl_done = true; s_task = nullptr;
-        vTaskDelete(nullptr);
-        return;
-    }
+    if(cancelled()){fail("Upload cancelled");return;}
+    if(WiFi.status()!=WL_CONNECTED){fail("UDDA WiFi not connected. Try again.");return;}
     // Associato != pronto: dopo il cold-start il DHCP puo' non aver ancora dato
     // l'IP. Se si fa la POST con localIP == 0.0.0.0 l'HTTP torna -1 e NON mette
     // nulla sul filo (nessun source address). Aspetta un lease valido (~12s).
-    for (int i = 0; i < 120 && WiFi.localIP()[0] == 0; i++) {
+    for (int i = 0; i < 120 && WiFi.localIP()[0] == 0 && !cancelled(); i++) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    if (WiFi.localIP()[0] == 0) {
-        s_you_txt[0] = '\0';
-        snprintf(s_reply_txt, sizeof(s_reply_txt), "UDDA: no IP address (DHCP). Try again.");
-        if (s_wav) { free(s_wav); s_wav = nullptr; }
-        s_upl_done = true; s_task = nullptr;
-        vTaskDelete(nullptr);
-        return;
-    }
+    if(cancelled()){fail("Upload cancelled");return;}
+    if(WiFi.localIP()[0]==0){fail("UDDA: no IP address (DHCP). Try again.");return;}
     // Il power-save del WiFi (modem-sleep, attivo di default) fa cadere i primi
     // pacchetti dopo una riconnessione: il SYN del POST parte ma non viene mai
     // trasmesso e l'HTTP torna -1 dopo il connectTimeout. Va DISATTIVATO.
@@ -126,7 +124,7 @@ static void upload_task(void *)
 
     // Sonda TCP grezza verso il servizio: apre e chiude una connessione a vuoto.
     // Sveglia il link e conferma la raggiungibilita' prima del POST da 180KB.
-    for (int p = 1; p <= 5; p++) {
+    for (int p = 1; p <= 5 && !cancelled(); p++) {
         WiFiClient probe;
         probe.setTimeout(4);
         bool up = probe.connect(host, UDDA_PORT, 4000);
@@ -136,17 +134,18 @@ static void upload_task(void *)
         vTaskDelay(pdMS_TO_TICKS(700));
     }
 
+    if(cancelled()){fail("Upload cancelled");return;}
     char url[96];
     snprintf(url, sizeof(url), "http://%s:%d/api/voice?format=text", host, UDDA_PORT);
     Serial.printf("[VOICE] POST -> %s  (wav %u byte)\n", url, (unsigned)s_wav_len);
     s_you_txt[0] = '\0'; s_reply_txt[0] = '\0';
 
     bool ok = false;
-    for (int attempt = 1; attempt <= 3 && !ok; attempt++) {
+    for (int attempt = 1; attempt <= 3 && !ok && !cancelled(); attempt++) {
         WiFiClient cli;
         HTTPClient http;
         http.setConnectTimeout(8000);
-        http.setTimeout(90000);
+        http.setTimeout(60000); // Arduino HTTPClient timeout is uint16_t
         http.setReuse(false);
         if (!http.begin(cli, url)) {
             Serial.printf("[VOICE] tent.%d http.begin FALLITO\n", attempt);
@@ -177,32 +176,40 @@ static void upload_task(void *)
         http.end();
     }
 
-    if (s_wav) { free(s_wav); s_wav = nullptr; }
-    s_upl_done = true;
-    s_task = nullptr;
+    if(cancelled())fail("Upload cancelled");
+}
+static void upload_task(void*){
+    // Own both connection setup and HTTP, never LVGL. A stop request is
+    // cooperative; no newer upload can overwrite these buffers until done.
+    if(!radio_job_begin(RadioJob::Voice))fail("Radio busy - try again");
+    else{
+        run_upload();
+        radio_job_end(RadioJob::Voice);
+    }
+    free(s_wav);s_wav=nullptr;s_wav_len=0;
+    s_upl_done=true;
     vTaskDelete(nullptr);
 }
 
-// Legge il WAV finalizzato dalla SD in un buffer PSRAM (contesto LVGL = unico
-// a toccare la SD, come da design del firmware).
-static bool load_wav()
-{
+static bool load_wav(const char* path){
     StorageAccess sd_access;
-    if (!sd_access) { return false; }
-    const char *p = mic_rec_last_path();
-    if (!p || !p[0]) return false;
-    File f = SD.open(p, FILE_READ);
-    if (!f) return false;
-    size_t sz = f.size();
-    if (sz < 45 || sz > 2 * 1024 * 1024) { f.close(); return false; }
-    uint8_t *buf = (uint8_t *)heap_caps_malloc(sz, MALLOC_CAP_SPIRAM);
-    if (!buf) buf = (uint8_t *)malloc(sz);
-    if (!buf) { f.close(); return false; }
-    size_t rd = f.read(buf, sz);
+    if(!sd_access || cancelled())return false;
+    File f=SD.open(path,FILE_READ);
+    if(!f)return false;
+    size_t sz=f.size();
+    if(sz<45 || sz>2*1024*1024){f.close();return false;}
+    auto* buf=static_cast<uint8_t*>(heap_caps_malloc(sz,MALLOC_CAP_SPIRAM));
+    if(!buf){f.close();return false;}
+    size_t pos=0;
+    while(pos<sz && !cancelled() && storage_stats().media){
+        size_t count=sz-pos>4096?4096:sz-pos;
+        size_t n=f.read(buf+pos,count);
+        if(n!=count)break;
+        pos+=n;vTaskDelay(1);
+    }
     f.close();
-    if (rd != sz) { free(buf); return false; }
-    s_wav = buf; s_wav_len = sz;
-    return true;
+    if(pos!=sz){free(buf);return false;}
+    s_wav=buf;s_wav_len=sz;return true;
 }
 
 // --- macchina a stati sul task LVGL -----------------------------------------
@@ -214,8 +221,8 @@ static void tick_cb(lv_timer_t *)
         uint32_t el = mic_rec_elapsed_ms();
         char b[40]; snprintf(b, sizeof(b), "Recording... %lus", (unsigned long)(el / 1000));
         set_status(b);
-        if (el >= REC_CAP_MS) {
-            mic_rec_stop();
+        if (el >= REC_CAP_MS || !mic_rec_is_recording() || mic_rec_session()!=s_voice_session) {
+            if(mic_rec_session()==s_voice_session)mic_rec_stop();
             s_state = V_SAVE;
             set_status("Saving...");
             lv_label_set_text(s_btnlbl, "WAIT");
@@ -225,18 +232,16 @@ static void tick_cb(lv_timer_t *)
     case V_SAVE:
         if (!mic_rec_is_recording()) {           // file finalizzato
             kitt_set(0);
-            if (mic_rec_bytes() == 0 || !load_wav()) {
-                set_status(mic_rec_bytes() == 0 ? "No audio" : "Audio read error");
-                lv_label_set_text(s_btnlbl, "SPEAK");
-                s_state = V_IDLE;
-                break;
+            if(mic_rec_session()!=s_voice_session || !mic_rec_saved() ||
+               !mic_rec_copy_path(s_upload_path,sizeof(s_upload_path))){
+                set_status(mic_rec_session()!=s_voice_session?"Recording changed":mic_rec_status_text());
+                lv_label_set_text(s_btnlbl,"SPEAK");s_state=V_IDLE;break;
             }
-            ensure_wifi();               // ora che il mic e' fermo, accendi il WiFi
-            s_upl_done = false;
-            s_upl_start = millis();
-            s_state = V_UPLOAD;
-            set_status("UDDA is thinking... (~30s)");
-            xTaskCreatePinnedToCore(upload_task, "voice_up", 16384, nullptr, 1, &s_task, 0);
+            s_cancel=false;s_upl_done=false;s_upl_start=millis();
+            s_state=V_UPLOAD;set_status("UDDA is thinking... (~30s)");
+            if(xTaskCreatePinnedToCore(upload_task,"voice_up",16384,nullptr,1,nullptr,0)!=pdPASS){
+                fail("Upload task allocation failed");s_upl_done=true;
+            }
         }
         break;
     case V_UPLOAD:
@@ -251,13 +256,9 @@ static void tick_cb(lv_timer_t *)
             set_status("Ready - swipe up to exit");
             lv_label_set_text(s_btnlbl, "AGAIN");
             s_state = V_DONE;
-        } else if (millis() - s_upl_start > 100000) {
-            // watchdog: se dopo 100s non ha risposto, sblocca e fai riprovare
-            lv_label_set_text(s_you, "");
-            lv_label_set_text(s_udda, "Timeout: UDDA did not respond. Same WiFi network?");
-            set_status("Timeout - try again");
-            lv_label_set_text(s_btnlbl, "AGAIN");
-            s_state = V_DONE;
+        } else if (millis()-s_upl_start>100000 && !s_cancel) {
+            s_cancel=true;
+            set_status("Timeout - waiting for cleanup...");
         }
         break;
     default:
@@ -290,47 +291,23 @@ static void read_wifi2(char *ssid, size_t sn, char *pass, size_t pn)
     f.close();
 }
 
-static void ensure_wifi()
-{
-    // La voce vive su UDDA (l'assistente e' li'). Forziamo UDDA anche se il
-    // watch e' su TIM/casa. Al reboot torna alla rete di /wifi.txt (casa).
-    char ssid[40], pass[68];
-    read_wifi2(ssid, sizeof(ssid), pass, sizeof(pass));
-    if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == String(ssid)) {
-        set_status("Connected to UDDA");
-        return;
-    }
-    WiFi.mode(WIFI_STA);
-    WiFi.setSleep(false);              // niente power-save: fa cadere il POST
-    WiFi.disconnect();                 // lascia l'eventuale rete di casa
-    if (pass[0]) WiFi.begin(ssid, pass);
-    else         WiFi.begin(ssid);     // hotspot aperto
-    set_status("Connecting to UDDA...");
-}
-
 static void on_btn(lv_event_t *)
 {
     if (s_state == V_IDLE || s_state == V_DONE) {
-        if (s_task) {                    // upload precedente ancora in corso
-            set_status("Waiting for the previous response...");
-            return;
+        if(!s_upl_done || mic_rec_is_recording()){
+            set_status("Audio busy - try again");return;
         }
-        // Il WiFi ATTIVO disturba il codec audio (mic muto). Quindi lo
-        // SPEGNIAMO del tutto durante la registrazione; lo riaccendo dopo lo
-        // stop, solo per l'upload. Cosi' il mic funziona sempre.
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
         lv_label_set_text(s_you, "");
         lv_label_set_text(s_udda, "");
-        mic_rec_start();
-        if (mic_rec_is_recording()) {
+        if (mic_rec_start_voice()) {
+            s_voice_session=mic_rec_session();
             s_state = V_REC;
             lv_label_set_text(s_btnlbl, "STOP");
         } else {
             set_status(mic_rec_status_text());       // es. "no SD card"
         }
     } else if (s_state == V_REC) {
-        mic_rec_stop();
+        if(mic_rec_session()==s_voice_session)mic_rec_stop();
         s_state = V_SAVE;
         set_status("Saving...");
         lv_label_set_text(s_btnlbl, "WAIT");
@@ -440,7 +417,7 @@ void voice_screen_show()
 {
     if (!s_scr) build();
     // Non azzerare se c'e' un upload in corso (rientro durante l'attesa).
-    if (s_state != V_UPLOAD && s_state != V_SAVE) {
+    if (s_state != V_UPLOAD && s_state != V_SAVE && s_state != V_REC) {
         s_state = V_IDLE;
         lv_label_set_text(s_btnlbl, "SPEAK");
         lv_label_set_text(s_you, "");

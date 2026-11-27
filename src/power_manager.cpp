@@ -33,6 +33,7 @@
 #include "i2c_bus_manager.h"
 #include "qspi_display.h"
 #include "radio_manager.h"
+#include "audio_manager.h"
 #include "adsb.h"
 #include "alarm.h"
 #include "settings_screen.h"
@@ -414,7 +415,9 @@ void lightsleep() {
     // policy is implemented. The vendor routine shuts down several rails.
     if (power_shutting_down()) return;
 #ifndef TWATCH_SIMULATOR
-    if(radio_job_busy())return;
+    if(radio_job_busy() || !audio_idle())return;
+    audio_suspend(true);
+    if(!audio_idle()){audio_suspend(false);return;}
 #endif
     diagnostics_pause();
     gps_service_session(false);
@@ -429,6 +432,7 @@ void lightsleep() {
     storage_suspend();
     if(!storage_idle()){
         storage_resume();
+        audio_suspend(false);
         gps_service_session(gps_screen_is_powered());
         resume_cpu_governor();
         screenunlock();
@@ -442,6 +446,7 @@ void lightsleep() {
         // Do not cut a rail or enter vendor sleep while DMA owns a descriptor.
         panel_transition_pending=true;
         storage_resume();
+        audio_suspend(false);
         gps_service_session(gps_screen_is_powered());
         resume_cpu_governor();
         screenunlock();
@@ -470,6 +475,7 @@ void lightsleep() {
     resume_cpu_governor();
     gps_service_session(gps_screen_is_powered());
     storage_resume();
+    audio_suspend(false);
     diagnostics_resume();
 #endif
 }
@@ -489,9 +495,14 @@ void deepsleep() {
         return;
     }
     radio_manager_suspend(true);
+    audio_suspend(true);
     adsb_stop();
-    if(radio_job_busy()){
-        requested=true; // let the worker release its network resources first
+    wake_word_stop();
+    mic_rec_stop();
+    alarm_stop_chime_loop();
+    alarm_service_audio();
+    if(radio_job_busy() || !audio_idle()){
+        requested=true; // let the workers release radio/I2S/SD resources first
         return;
     }
 #endif
@@ -503,13 +514,6 @@ void deepsleep() {
     // USB hosts should eject first; unsynced host writes cannot be recovered.
     usb_sd_stop();
     wardriver_stop();
-    wake_word_stop();
-    mic_rec_stop();
-    const uint32_t started = millis();
-    while (mic_rec_is_recording() && uint32_t(millis() - started) < 2000) {
-        lv_timer_handler();
-        delay(10);
-    }
     // If the queue was full at stop, retry the final snapshot after accepted
     // jobs finish. Allocation/media failure is not retried indefinitely.
     if(wardriver_storage_pending() && storage_stats().worker && storage_stats().media){
@@ -524,7 +528,6 @@ void deepsleep() {
     storage_release_image_cache();
     storage_suspend();
     while (!storage_idle()) {
-        if(mic_rec_is_recording())lv_timer_handler(); // lets recorder finalize/release its lease
         delay(10);
     }
     WiFi.mode(WIFI_OFF);

@@ -103,6 +103,7 @@ const char* radio_job_name(RadioJob job){
         case RadioJob::Weather:return "Weather";
         case RadioJob::TimeSync:return "Time sync";
         case RadioJob::Adsb:return "Aircraft";
+        case RadioJob::Voice:return "Voice";
         default:return "Idle";
     }
 }

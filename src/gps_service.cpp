@@ -1,4 +1,6 @@
 #include "gps_service.h"
+#include "gps_snapshot.h"
+#include <atomic>
 #include "event_manager.h"
 #ifndef TWATCH_SIMULATOR
 #include <LilyGoLib.h>
@@ -7,7 +9,7 @@
 #include <freertos/semphr.h>
 
 namespace {
-constexpr unsigned chunk_size=128;
+constexpr unsigned chunk_size=256;
 struct Chunk { uint32_t generation; uint16_t len; char data[chunk_size]; };
 struct Fix {
     uint32_t generation=0;
@@ -25,9 +27,17 @@ SemaphoreHandle_t uart_guard=nullptr;
 TaskHandle_t worker=nullptr;
 portMUX_TYPE fix_mux=portMUX_INITIALIZER_UNLOCKED;
 Fix latest;
-uint32_t generation=0, backlog_peak=0;
+uint32_t generation=0;
+std::atomic<uint32_t> backlog_peak{0}, bytes_read{0}, sentences{0}, saturated_reads{0};
 bool enabled=false;
+void snapshot(TinyGPSPlus& parser,uint32_t gen){
+    GpsSnapshot f;
+    f.valid=parser.location.isValid();
+    if(f.valid){auto loc=parser.location;f.lat=loc.lat();f.lon=loc.lng();f.fix_ms=millis()-loc.age();}
+    gps_snapshot_publish(gen,f);
+}
 void publish(TinyGPSPlus& parser,uint32_t gen){
+    snapshot(parser,gen);
     Fix f;
     f.generation=gen;f.location=parser.location;f.date=parser.date;
     f.time=parser.time;f.satellites=parser.satellites;f.altitude=parser.altitude;
@@ -48,11 +58,12 @@ void parser_task(void*){
         if(active){
             chunk.generation=generation;
             int available=Serial1.available();
-            if(available>0 && uint32_t(available)>backlog_peak)backlog_peak=available;
-            while(chunk.len<chunk_size && available-->0){
-                int byte=Serial1.read();if(byte<0)break;
-                chunk.data[chunk.len++]=char(byte);
-            }
+            if(available>0 && uint32_t(available)>backlog_peak.load())backlog_peak=available;
+            if(available>=int(chunk_size))++saturated_reads;
+            // HardwareSerial::read(buffer,n) uses zero timeout in the pinned
+            // Arduino core; read only the available bytes, capped per slice.
+            if(available>0)chunk.len=Serial1.read(reinterpret_cast<uint8_t*>(chunk.data),
+                available>int(chunk_size)?chunk_size:unsigned(available));
         }
         xSemaphoreGive(uart_guard);
         if(!active){
@@ -62,8 +73,9 @@ void parser_task(void*){
         if(current!=chunk.generation){
             parser=TinyGPSPlus();current=chunk.generation;
         }
+        bytes_read+=chunk.len;
         bool complete=false;
-        for(unsigned i=0;i<chunk.len;++i)if(parser.encode(chunk.data[i]))complete=true;
+        for(unsigned i=0;i<chunk.len;++i)if(parser.encode(chunk.data[i])){complete=true;++sentences;}
         if(complete)publish(parser,current);
         // UART 38400 baud: a 10ms interval delivers ~38 bytes. Block
         // between bounded reads so this task does not spin on an empty FIFO.
@@ -88,11 +100,11 @@ void gps_service_session(bool on){
     if(!ui_task_is_owner())return;
     if(uart_guard)xSemaphoreTake(uart_guard,portMAX_DELAY);
     const bool changed=enabled!=on;
-    if(changed){enabled=on;++generation;}
+    if(changed){enabled=on;++generation;gps_snapshot_session(generation,on);}
     if(uart_guard)xSemaphoreGive(uart_guard);
     if(!changed)return;
     UiEvent ignored;event_take(UiEventKind::GPS,ignored);
-    if(on)invalidate();
+    invalidate();
     if(worker)xTaskNotifyGive(worker);
 }
 void gps_service_tick(){
@@ -100,11 +112,14 @@ void gps_service_tick(){
     if(!worker){
         // Allocation failure: keep the prior bounded, single-owner path.
         int available=Serial1.available();
-        if(available>0 && uint32_t(available)>backlog_peak)backlog_peak=available;
-        for(unsigned n=0;n<chunk_size && available-->0;++n){
-            int byte=Serial1.read();if(byte<0)break;
-            instance.gps.encode(char(byte));
-        }
+        if(available>0 && uint32_t(available)>backlog_peak.load())backlog_peak=available;
+        if(available>=int(chunk_size))++saturated_reads;
+        uint8_t buf[chunk_size];
+        size_t n=available>0?Serial1.read(buf,available>int(chunk_size)?chunk_size:unsigned(available)):0;
+        bytes_read+=n;
+        bool complete=false;
+        for(size_t i=0;i<n;++i)if(instance.gps.encode(char(buf[i]))){++sentences;complete=true;}
+        if(complete)snapshot(instance.gps,generation);
     }
     UiEvent e;
     if(event_take(UiEventKind::GPS,e)&&e.generation==generation){
@@ -118,19 +133,15 @@ void gps_service_tick(){
         }
     }
 }
-uint32_t gps_service_backlog(){
-    // Diagnostics must not wait on the UART mutex. The fallback value is
-    // UI-owned; with a worker, report the most recent accessible snapshot.
-    static uint32_t cached=0;
-    if(!worker)return backlog_peak;
-    if(xSemaphoreTake(uart_guard,0)==pdTRUE){
-        cached=backlog_peak;xSemaphoreGive(uart_guard);
-    }
-    return cached;
+uint32_t gps_service_backlog(){return backlog_peak.load();}
+GpsServiceStats gps_service_stats(){
+    GpsServiceStats s;s.bytes=bytes_read;s.sentences=sentences;s.backlog_peak=backlog_peak;
+    s.saturated_reads=saturated_reads;s.worker=worker!=nullptr;return s;
 }
 #else
 void gps_service_init(){}
 void gps_service_session(bool){}
 void gps_service_tick(){}
 uint32_t gps_service_backlog(){return 0;}
+GpsServiceStats gps_service_stats(){return {};}
 #endif

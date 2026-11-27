@@ -7,13 +7,14 @@
 #include "i2c_bus_manager.h"
 #include "qspi_display.h"
 #include "radio_manager.h"
+#include "audio_manager.h"
 #include "task_manager.h"
 #include <lvgl.h>
 #include <stdio.h>
 
 namespace {
 lv_obj_t *screen=nullptr, *status=nullptr, *cpu=nullptr, *ui=nullptr, *memory=nullptr,
-         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr, *qspi=nullptr, *radio=nullptr;
+         *timings=nullptr, *history=nullptr, *spi=nullptr, *i2c=nullptr, *qspi=nullptr, *radio=nullptr, *audio=nullptr, *gps=nullptr;
 lv_timer_t* timer=nullptr;
 lv_obj_t* label(lv_obj_t* parent, const char* text, bool heading=false) {
     auto* obj=lv_label_create(parent);
@@ -92,6 +93,17 @@ void refresh() {
         (unsigned long)r.completed,(unsigned long)r.rejected,(unsigned long)r.lock_timeouts,
         (unsigned long)r.failures,(unsigned long)r.wifi_calls,(unsigned long)r.wifi_max_us,
         (unsigned long)r.ble_calls,(unsigned long)r.ble_max_us);
+    const auto g=gps_service_stats();
+    lv_label_set_text_fmt(gps,"Parser: %s\nBytes: %lu | Sentences: %lu\nBacklog peak: %lu B | Full reads: %lu",
+        g.worker?"Worker":"Fallback / simulated",(unsigned long)g.bytes,(unsigned long)g.sentences,
+        (unsigned long)g.backlog_peak,(unsigned long)g.saturated_reads);
+    const auto au=audio_stats();
+    lv_label_set_text_fmt(audio,"Mic: %s | Speaker: %s%s\nSessions: %lu | Done: %lu | Busy: %lu\nRead/write errors: %lu / %lu\nMax read/write: %lu / %lu us\nBuffer peak: %lu B | Dropped: %lu B\nMax SD write: %lu us",
+        audio_client_name(au.mic),audio_client_name(au.speaker),au.suspended?" (draining)":"",
+        (unsigned long)au.sessions,(unsigned long)au.completed,(unsigned long)au.rejected,
+        (unsigned long)au.read_errors,(unsigned long)au.write_errors,
+        (unsigned long)au.max_read_us,(unsigned long)au.max_write_us,
+        (unsigned long)au.buffer_peak,(unsigned long)au.dropped_bytes,(unsigned long)au.max_sd_us);
     if (!d.ready || !d.memory_sample_ms) lv_label_set_text(memory,"Memory sample pending");
     else lv_label_set_text_fmt(memory,"Internal free: %lu KB\nMinimum free: %lu KB\nLargest block: %lu KB\nFree PSRAM: %lu KB\nUI stack headroom: %lu B\nMemory sample age: %lu s",
         (unsigned long)(d.heap/1024),(unsigned long)(d.min_heap/1024),
@@ -146,6 +158,8 @@ void create() {
     label(body,"SHARED I2C BUS",true);i2c=label(body,"");
     label(body,"DISPLAY QSPI DMA",true);qspi=label(body,"");
     label(body,"RADIO COORDINATION",true);radio=label(body,"");
+    label(body,"GPS SERVICE",true);gps=label(body,"");
+    label(body,"AUDIO SERVICE",true);audio=label(body,"");
     label(body,"MEMORY",true);memory=label(body,"");
     label(body,"SLOWEST OPERATIONS",true);timings=label(body,"");
     label(body,"RECENT UI STALLS",true);history=label(body,"");

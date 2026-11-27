@@ -1,5 +1,6 @@
 #include "adsb.h"
 #include "radio_manager.h"
+#include "gps_snapshot.h"
 #include <atomic>
 #include "wifi_creds.h"
 #include <Arduino.h>
@@ -170,14 +171,16 @@ static void parse_and_store(const char *body, float clat, float clon)
 // never had a lock this session.
 static bool current_center(float *lat, float *lon)
 {
-    if (instance.gps.location.isValid() && instance.gps.location.age() < 60000) {
-        s_clat = (float)instance.gps.location.lat();
-        s_clon = (float)instance.gps.location.lng();
+    const auto fix=gps_snapshot();
+    xSemaphoreTake(s_mtx,portMAX_DELAY);
+    if (fix.fresh(millis(),60000)) {
+        s_clat = (float)fix.lat;
+        s_clon = (float)fix.lon;
         s_have_center = true;
     }
-    if (!s_have_center) return false;
-    *lat = s_clat; *lon = s_clon;
-    return true;
+    bool valid=s_have_center;
+    if(valid){*lat=s_clat;*lon=s_clon;}
+    xSemaphoreGive(s_mtx);return valid;
 }
 
 static bool do_fetch(float clat, float clon)
@@ -327,9 +330,11 @@ uint32_t adsb_seq() { return s_seq; }
 
 bool adsb_center(float *lat, float *lon)
 {
-    if (!s_have_center) return false;
-    *lat = s_clat; *lon = s_clon;
-    return true;
+    if(!s_mtx)return false;
+    xSemaphoreTake(s_mtx,portMAX_DELAY);
+    bool valid=s_have_center;
+    if(valid){*lat=s_clat;*lon=s_clon;}
+    xSemaphoreGive(s_mtx);return valid;
 }
 
 int  adsb_range_nm()   { return RANGES[s_range_idx]; }

@@ -1,93 +1,54 @@
 #include "mic_rec.h"
-#include "usb_sd.h"           // usb_sd_is_running()
+#include "pcm_wav.h"
+#include "audio_manager.h"
+#include "radio_manager.h"
+#include "storage_manager.h"
 #include <Arduino.h>
 #include <LilyGoLib.h>
 #include <SD.h>
-#include "storage_manager.h"
-#include <lvgl.h>
+#include <WiFi.h>
+#include <esp_heap_caps.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <freertos/stream_buffer.h>
+#include <atomic>
 #include <string.h>
 #include <math.h>
 
-// PDM mic is fixed at 16 kHz mono 16-bit (see LilyGoLib initMicrophone()).
-#define MIC_RATE        16000
-#define MIC_BITS        16
-#define MIC_CHANS       1
-#define MIC_BYTES_SEC   (MIC_RATE * (MIC_BITS / 8) * MIC_CHANS)   // 32000 B/s
-
-#define REC_MAX_MS      (10 * 60 * 1000)   // hard cap: 10 min (~19 MB)
-#define SB_SIZE         (64 * 1024)        // ~2 s of slack between reader/writer
-#define MIC_CHUNK       2048               // bytes per mic read (~64 ms)
+#define REC_MAX_MS      (10 * 60 * 1000)
+#define SB_SIZE         (64 * 1024)
+#define MIC_CHUNK       2048
 #define DRAIN_TMP       4096
 
-static StreamBufferHandle_t s_sb   = nullptr;
-static TaskHandle_t   s_task       = nullptr;
-static lv_timer_t    *s_drain      = nullptr;
-static File           s_file;
-static bool           s_storage_lease=false;
+namespace {
+StreamBufferHandle_t s_sb=nullptr;
+StaticStreamBuffer_t s_sb_control;
+uint8_t* s_ring=nullptr;
+std::atomic<bool> s_run{false},s_task_done{true},s_recording{false},s_saved{false};
+std::atomic<uint32_t> s_start_ms{0},s_session{0};
+std::atomic<size_t> s_bytes{0};
+std::atomic<int> s_level{0};
+std::atomic<const char*> s_status{"idle"},s_capture_error{nullptr};
+portMUX_TYPE path_mux=portMUX_INITIALIZER_UNLOCKED;
+char s_path[48]={};
+uint32_t s_audio_token=0;
+bool s_voice=false;
 
-static volatile bool  s_run        = false;   // reader loop should keep going
-static volatile bool  s_task_done  = false;   // reader task has exited
-static volatile bool  s_recording  = false;   // public state (until finalised)
-static uint32_t       s_start_ms   = 0;
-static size_t         s_bytes      = 0;
-static int            s_level      = 0;
-static char           s_path[48]   = {0};
-static const char    *s_status     = "idle";
-
-// ---- WAV header ------------------------------------------------------------
-
-static void put_u32(uint8_t *p, uint32_t v) { p[0]=v; p[1]=v>>8; p[2]=v>>16; p[3]=v>>24; }
-static void put_u16(uint8_t *p, uint16_t v) { p[0]=v; p[1]=v>>8; }
-
-// Build a 44-byte canonical PCM WAV header for `data_len` bytes of audio.
-static void wav_header(uint8_t *h, uint32_t data_len)
-{
-    memcpy(h, "RIFF", 4);
-    put_u32(h + 4, 36 + data_len);
-    memcpy(h + 8, "WAVE", 4);
-    memcpy(h + 12, "fmt ", 4);
-    put_u32(h + 16, 16);                 // PCM fmt chunk size
-    put_u16(h + 20, 1);                  // audioFormat = PCM
-    put_u16(h + 22, MIC_CHANS);
-    put_u32(h + 24, MIC_RATE);
-    put_u32(h + 28, MIC_BYTES_SEC);      // byteRate
-    put_u16(h + 32, MIC_CHANS * (MIC_BITS / 8));  // blockAlign
-    put_u16(h + 34, MIC_BITS);
-    memcpy(h + 36, "data", 4);
-    put_u32(h + 40, data_len);
+void set_path(const char* path){
+    portENTER_CRITICAL(&path_mux);strlcpy(s_path,path,sizeof(s_path));portEXIT_CRITICAL(&path_mux);
 }
-
-// ---- filename --------------------------------------------------------------
-
-// /Recordings/rec_000.wav, incrementing past whatever already exists.
-static void next_path(char *out, size_t sz)
-{
-    if (!SD.exists("/Recordings")) SD.mkdir("/Recordings");
-    for (int i = 0; i < 1000; i++) {
-        snprintf(out, sz, "/Recordings/rec_%03d.wav", i);
-        if (!SD.exists(out)) return;
+// Find a new filename without overwriting an earlier recording.
+bool next_path(char* out,size_t sz){
+    if(!SD.exists("/Recordings") && !SD.mkdir("/Recordings"))return false;
+    for(int i=0;i<1000;++i){
+        snprintf(out,sz,"/Recordings/rec_%03d.wav",i);
+        if(!SD.exists(out))return true;
+        if((i&15)==15)vTaskDelay(1);
+        if(!s_run)return false;
     }
-    snprintf(out, sz, "/Recordings/rec_ovf.wav");   // 1000 files: reuse last
+    return false;
 }
-
-// ---- reader task (core 0) --------------------------------------------------
-
-static void mic_task(void *)
-{
-    uint8_t buf[MIC_CHUNK];
-    while (s_run) {
-        size_t n = instance.mic.readBytes((char *)buf, sizeof(buf));  // blocks
-        if (n && s_sb) xStreamBufferSend(s_sb, buf, n, portMAX_DELAY);
-        if (millis() - s_start_ms >= REC_MAX_MS) s_run = false;       // hard cap
-    }
-    s_task_done = true;
-    s_task = nullptr;
-    vTaskDelete(nullptr);
-}
-
-// ---- drain + level (main/LVGL task) ----------------------------------------
 
 static void update_level(const uint8_t *p, size_t n)
 {
@@ -113,97 +74,153 @@ static void update_level(const uint8_t *p, size_t n)
         if (lvl < 0)   lvl = 0;
         if (lvl > 100) lvl = 100;
     }
-    if (lvl > s_level) s_level = lvl;          // attack: salto immediato su
-    else               s_level -= 6;           // release: decadimento morbido
-    if (s_level < 0) s_level = 0;
+    int prior=s_level.load();
+    s_level=lvl>prior?lvl:(prior>6?prior-6:0);
 }
 
-static void finalize()
-{
-    // Patch the header with the real sizes, then close.
-    if (s_file) {
-        uint8_t h[44];
-        wav_header(h, (uint32_t)s_bytes);
-        s_file.seek(0);
-        s_file.write(h, sizeof(h));
+
+// I2S reader owns only capture and the producer side of the stream buffer.
+void mic_task(void*){
+    alignas(4) uint8_t buf[MIC_CHUNK];
+    unsigned empty=0;
+    while(s_run){
+        size_t n=0;
+        const auto start=esp_timer_get_time();
+        bool ok=instance.mic.read(buf,sizeof(buf),&n,pdMS_TO_TICKS(100));
+        audio_note_io(true,ok && n>0,uint32_t(esp_timer_get_time()-start));
+        n &= ~size_t(1);
+        if(n){
+            empty=0;
+            update_level(buf,n);
+            size_t sent=xStreamBufferSend(s_sb,buf,n,pdMS_TO_TICKS(40));
+            audio_note_buffer(xStreamBufferBytesAvailable(s_sb),n-sent);
+            if(sent!=n){s_capture_error="SD too slow - partial WAV";s_run=false;}
+        }else{
+            if(++empty>=5){s_capture_error="microphone timeout";s_run=false;}
+            else vTaskDelay(pdMS_TO_TICKS(5));
+        }
+        if(uint32_t(millis()-s_start_ms.load())>=REC_MAX_MS)s_run=false;
     }
-    s_file.close();
-    if(s_storage_lease){storage_local_release();s_storage_lease=false;}
-    if (s_sb) { vStreamBufferDelete(s_sb); s_sb = nullptr; }
-    s_recording = false;
-    s_status = s_bytes ? "saved" : "no audio";
-    s_level = 0;
-    if (s_drain) { lv_timer_del(s_drain); s_drain = nullptr; }
+    // Writer may free the buffer only after this release publication.
+    s_task_done=true;
+    vTaskDelete(nullptr);
 }
 
-static void drain_cb(lv_timer_t *)
-{
-    if (!s_sb) return;
-    uint8_t tmp[DRAIN_TMP];
-    for (;;) {
-        size_t n = xStreamBufferReceive(s_sb, tmp, sizeof(tmp), 0);
-        if (n == 0) break;
-        update_level(tmp, n);
-        if (s_file) s_bytes += s_file.write(tmp, n);
+void writer_task(void*){
+    bool radio_owned=false;
+    const char* error=nullptr;
+    char path[48]={};
+    {
+        File file;
+        if(s_voice){
+            radio_owned=radio_job_begin(RadioJob::Voice);
+            if(!radio_owned)error="radio busy";
+            else{
+                WiFi.disconnect(true,false);
+                if(!WiFi.mode(WIFI_OFF))error="WiFi off failed";
+            }
+        }
+        if(!error && s_run && !storage_stats().media)error="SD removed";
+        if(!error && s_run && storage_stats().media){
+            if(!next_path(path,sizeof(path)))error="no recording filename";
+            else{
+                file=SD.open(path,FILE_WRITE);
+                if(!file)error="SD open failed";
+                else{
+                    uint8_t h[44];pcm_wav_header(h,0);
+                    if(file.write(h,sizeof(h))!=sizeof(h))error="SD header failed";
+                    else set_path(path);
+                }
+            }
+        }
+        if(!error && s_run && file){
+            s_ring=static_cast<uint8_t*>(heap_caps_malloc(SB_SIZE+1,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+            if(s_ring)s_sb=xStreamBufferCreateStatic(SB_SIZE+1,1,s_ring,&s_sb_control);
+            if(!s_sb)error="audio buffer allocation failed";
+            else{
+                s_task_done=false;
+                s_start_ms=millis();if(s_run)s_status="recording";
+                if(xTaskCreatePinnedToCore(mic_task,"mic_capture",4096,nullptr,3,nullptr,0)!=pdPASS){
+                    s_task_done=true;error="capture task allocation failed";
+                }
+            }
+        }
+        if(error)s_run=false;
+        // Consumer owns file and all SD operations. Keep draining even after
+        // a write failure so the reader exits before its buffer is freed.
+        if(s_sb){
+            alignas(4) uint8_t tmp[DRAIN_TMP];
+            while(!s_task_done || xStreamBufferBytesAvailable(s_sb)){
+                size_t n=xStreamBufferReceive(s_sb,tmp,sizeof(tmp),pdMS_TO_TICKS(40));
+                if(!storage_stats().media){error="SD removed";s_run=false;}
+                if(n && !error){
+                    const auto start=esp_timer_get_time();
+                    size_t wrote=file.write(tmp,n);
+                    audio_note_sd(uint32_t(esp_timer_get_time()-start));
+                    s_bytes+=wrote & ~size_t(1);
+                    if(wrote!=n){error="SD write failed - partial WAV";s_run=false;}
+                }
+                if(n)vTaskDelay(1);
+            }
+        }
+        if(!error)error=s_capture_error.load();
+        if(file && storage_stats().media){
+            uint8_t h[44];pcm_wav_header(h,uint32_t(s_bytes.load()));
+            if(!file.seek(0) || file.write(h,sizeof(h))!=sizeof(h))error="WAV finalization failed";
+        }
+        file.close();
+    } // File and any other SDK objects destroyed before self-delete.
+    if(s_sb){vStreamBufferDelete(s_sb);s_sb=nullptr;}
+    free(s_ring);s_ring=nullptr;
+    if(radio_owned)radio_job_end(RadioJob::Voice);
+    storage_local_release();
+    s_run=false;s_level=0;
+    s_saved=!error && s_bytes>0;
+    s_status=error?error:s_saved.load()?"saved":"no audio";
+    const auto token=s_audio_token;
+    // No session data is accessed after release; new start may claim it.
+    audio_release(AudioClient::Recorder,token);
+    s_recording=false;
+    vTaskDelete(nullptr);
+}
+
+bool start(bool voice){
+    bool expected=false;
+    if(!s_recording.compare_exchange_strong(expected,true))return false;
+    s_audio_token=audio_acquire(AudioClient::Recorder);
+    if(!s_audio_token){s_status="microphone busy";s_recording=false;return false;}
+    if(!storage_local_acquire()){
+        audio_release(AudioClient::Recorder,s_audio_token);
+        s_status="SD unavailable or busy";s_recording=false;return false;
     }
-    // Finalise once the reader has stopped and the buffer is fully drained.
-    if (!s_run && s_task_done && xStreamBufferBytesAvailable(s_sb) == 0)
-        finalize();
-}
-
-// ---- public API ------------------------------------------------------------
-
-void mic_rec_start()
-{
-    if (s_recording) return;
-
-    if (!instance.isCardReady() || usb_sd_is_running()) {
-        s_status = "no SD card";
-        return;
+    s_voice=voice;s_saved=false;s_capture_error=nullptr;
+    s_start_ms=millis();s_bytes=0;s_level=0;set_path("");
+    ++s_session;s_task_done=true;s_run=true;s_status="starting";
+    if(xTaskCreatePinnedToCore(writer_task,"mic_writer",8192,nullptr,1,nullptr,0)!=pdPASS){
+        s_run=false;storage_local_release();audio_release(AudioClient::Recorder,s_audio_token);
+        s_status="writer task allocation failed";s_recording=false;return false;
     }
-
-    if(!storage_local_acquire()){s_status="SD busy";return;}
-    s_storage_lease=true;
-    next_path(s_path, sizeof(s_path));
-    s_file = SD.open(s_path, FILE_WRITE);      // truncate/create
-    if (!s_file) { storage_local_release();s_storage_lease=false; s_status = "SD open failed"; s_path[0] = '\0'; return; }
-
-    uint8_t h[44];
-    wav_header(h, 0);                          // placeholder; patched on stop
-    s_file.write(h, sizeof(h));
-
-    s_sb = xStreamBufferCreate(SB_SIZE, 1);
-    if (!s_sb) { s_file.close(); storage_local_release();s_storage_lease=false; s_status = "out of memory"; return; }
-
-    s_bytes     = 0;
-    s_level     = 0;
-    s_start_ms  = millis();
-    s_task_done = false;
-    s_run       = true;
-    s_recording = true;
-    s_status    = "recording";
-
-    s_drain = lv_timer_create(drain_cb, 40, nullptr);
-    if(!s_drain){s_run=false;s_task_done=true;finalize();s_status="timer allocation failed";return;}
-    if(xTaskCreatePinnedToCore(mic_task, "micrec", 4096, nullptr, 3, &s_task, 0)!=pdPASS){s_run=false;s_task_done=true;finalize();s_status="task allocation failed";}
+    return true;
+}
 }
 
-void mic_rec_stop()
-{
-    if (!s_recording) return;
-    s_run = false;         // reader exits; drain_cb finalises the file
-    s_status = "saving";
+void mic_rec_start(){start(false);}
+bool mic_rec_start_voice(){return start(true);}
+void mic_rec_stop(){if(s_recording)s_run=false;}
+void mic_rec_toggle(){if(s_recording)mic_rec_stop();else mic_rec_start();}
+bool mic_rec_is_recording(){return s_recording;}
+uint32_t mic_rec_elapsed_ms(){return s_recording?millis()-s_start_ms.load():0;}
+size_t mic_rec_bytes(){return s_bytes;}
+int mic_rec_level(){return s_level;}
+bool mic_rec_saved(){return s_saved;}
+uint32_t mic_rec_session(){return s_session;}
+bool mic_rec_copy_path(char* out,size_t size){
+    if(!out || !size)return false;
+    portENTER_CRITICAL(&path_mux);strlcpy(out,s_path,size);portEXIT_CRITICAL(&path_mux);
+    return out[0]!=0;
 }
-
-void mic_rec_toggle()
-{
-    if (s_recording) mic_rec_stop();
-    else             mic_rec_start();
+const char* mic_rec_last_path(){
+    // Existing UI-only accessor; worker consumers use the copy API.
+    static char path[48];mic_rec_copy_path(path,sizeof(path));return path;
 }
-
-bool     mic_rec_is_recording() { return s_recording; }
-uint32_t mic_rec_elapsed_ms()   { return s_recording ? (millis() - s_start_ms) : 0; }
-size_t   mic_rec_bytes()        { return s_bytes; }
-int      mic_rec_level()        { return s_level; }
-const char *mic_rec_last_path() { return s_path; }
-const char *mic_rec_status_text(){ return s_status; }
+const char* mic_rec_status_text(){return s_recording && !s_run?"saving":s_status.load();}
