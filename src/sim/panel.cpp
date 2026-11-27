@@ -65,7 +65,7 @@ void HardwarePanel::sync(){
     auto check=[](lv_obj_t* obj,bool value){if(value)lv_obj_add_state(obj,LV_STATE_CHECKED);else lv_obj_remove_state(obj,LV_STATE_CHECKED);};
     check(charging,hardware.watch.charging());check(display_on,hardware.watch.display_on());
     check(gps,hardware.gps_fix);check(sd,hardware.sd_ready);
-    lv_label_set_text_fmt(summary,"Battery %d%% | Brightness %d%%\nGPS %s | %d satellites",hardware.watch.battery(),hardware.watch.brightness()*100/255,hardware.gps_fix?"fix":"no fix",hardware.satellites);
+    lv_label_set_text_fmt(summary,"Battery %d%% | Brightness %d%%\nGPS %s | %d satellites\nCPU %lu MHz (simulated)",hardware.watch.battery(),hardware.watch.brightness()*100/255,hardware.gps_fix?"fix":"no fix",hardware.satellites,(unsigned long)getCpuFrequency());
 }
 bool HardwarePanel::event(const SDL_Event& e){
     Uint32 target=0;

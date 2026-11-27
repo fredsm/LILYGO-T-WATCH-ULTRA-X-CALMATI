@@ -3,7 +3,10 @@
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"line %d: %s\n",__LINE__,#x); return 1; } } while(0)
 int main() {
     sim::Watch w;
-    CHECK(w.brightness()==255);
+    CHECK(w.brightness()==255 && w.cpu_frequency()==240);
+    CHECK(w.set_cpu_frequency(80) && w.cpu_frequency()==80);
+    CHECK(!w.set_cpu_frequency(100) && w.cpu_frequency()==80);
+    CHECK(w.set_cpu_frequency(160) && w.cpu_frequency()==160);
     CHECK(w.millis()==0 && w.battery()==100 && !w.charging());
     w.set_rtc(1000);
     CHECK(w.advance(999) && w.rtc_seconds()==1000);

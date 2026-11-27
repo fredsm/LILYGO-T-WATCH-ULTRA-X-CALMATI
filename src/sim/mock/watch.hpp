@@ -24,6 +24,11 @@ public:
     void set_charging(bool value) { charging_=value; }
     int brightness() const { return brightness_; }
     void set_brightness(int value) { brightness_=std::clamp(value,0,255); }
+    uint32_t cpu_frequency() const { return cpu_mhz_; }
+    bool set_cpu_frequency(uint32_t mhz) {
+        if (mhz != 80 && mhz != 160 && mhz != 240) return false;
+        cpu_mhz_ = mhz; return true;
+    }
     bool display_on() const { return display_on_; }
     void set_display_on(bool value) { display_on_=value; }
     void set_haptic_available(bool value) { haptic_available_=value; }
@@ -48,6 +53,7 @@ private:
     uint64_t now_=0,rtc_set_at_=0;
     int64_t rtc_base_=1704067200;
     int battery_=100,brightness_=255;
+    uint32_t cpu_mhz_=240;
     bool charging_=false,display_on_=true,haptic_available_=true;
     bool power_=false,back_=false,motion_=false;
     std::deque<ButtonEvent> buttons_;

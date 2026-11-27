@@ -65,3 +65,7 @@ then release. Only another five-second Power hold wakes it, showing a simulated 
 The hardware panel and F5 cannot wake a powered-off watch.
 ScreenOff Timer in Settings defaults to 60 secs (Off / 60 secs / 3000 secs).
 A short Power press wakes normal screen-off without changing pages.
+
+CPU Frequency: choose 80 / 160 / 240 MHz (default) in Settings. The simulated
+hardware panel shows the current frequency; this does not change the host CPU
+or emulate actual watch timing/current draw. No automatic scaling is enabled.

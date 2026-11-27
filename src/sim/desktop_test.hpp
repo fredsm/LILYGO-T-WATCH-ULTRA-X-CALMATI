@@ -84,6 +84,11 @@ public:
         key(SDLK_ESCAPE,watch_id);check([]{return !text_input_active()&&send_message_screen_is_active();},"Escape cancels editor without quitting");
         key(SDLK_F4,watch_id);check(home,"final return to clock");
         steps.push_back([]{settings_screen_show();});wait();
+        check([]{auto* l=find(lv_screen_active(),&lv_label_class,"CPU Frequency");if(!l)return false;auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);return d&&lv_dropdown_get_selected(d)==2&&getCpuFrequency()==240;},"CPU Frequency default 240 MHz");
+        steps.push_back([this]{auto* l=find(lv_screen_active(),&lv_label_class,"CPU Frequency");if(!l){ok=false;return;}auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);lv_dropdown_set_selected(d,0);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
+        check([this]{return getCpuFrequency()==80&&std::strstr(lv_label_get_text(panel.summary),"CPU 80 MHz (simulated)");},"CPU setting reaches hardware panel");
+        steps.push_back([this]{auto* d=find(lv_obj_get_parent(find(lv_screen_active(),&lv_label_class,"CPU Frequency")),&lv_dropdown_class);lv_dropdown_set_selected(d,2);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
+        check([]{return getCpuFrequency()==240;},"CPU setting restores 240 MHz");
         check([]{auto* l=find(lv_screen_active(),&lv_label_class,"ScreenOff Timer");if(!l)return false;auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);return d&&lv_dropdown_get_selected(d)==1&&power_get_screenoff_timeout()==60000;},"ScreenOff Timer default 60 seconds");
         steps.push_back([this]{auto* l=find(lv_screen_active(),&lv_label_class,"ScreenOff Timer");if(!l){ok=false;return;}auto* d=find(lv_obj_get_parent(l),&lv_dropdown_class);lv_dropdown_set_selected(d,2);lv_obj_send_event(d,LV_EVENT_VALUE_CHANGED,nullptr);});wait();
         check([]{return power_get_screenoff_timeout()==3000000;},"3000 seconds is 50 minutes");

@@ -39,6 +39,8 @@ static lv_obj_t *matrix_switch;
 static lv_obj_t *matrix_val_label;
 static lv_obj_t *dim_dropdown;
 static lv_obj_t *screenoff_dropdown;
+static lv_obj_t *cpu_dropdown;
+static lv_obj_t *cpu_lbl;
 static lv_obj_t *dim_brightness_slider;
 static lv_obj_t *dim_brightness_val_label;
 static int32_t   s_dim_brightness = DEVICE_MAX_BRIGHTNESS_LEVEL / 4;
@@ -81,16 +83,16 @@ static bool g_loading = false;
 // blank space. Toggling back to digital re-applies the base Y.
 #define FACE_HIDDEN_SHIFT  (3 * 48)
 // Manual-time-only content (hint + 5 rollers + SET TIME button) spans
-// y=948..y=1154 in design coords. When the Manual Time switch is off the
+// y=996..y=1202 in design coords. When the Manual Time switch is off the
 // rows below — the screenshot section separator + toggle + hint — close
 // the gap by shifting up this much, leaving a normal row-to-row gap below
-// manual_row (the switch row itself stays visible at y=900).
+// manual_row (the switch row itself stays visible at y=948).
 #define MANUAL_HIDDEN_SHIFT (230)
 // First Y offset that belongs to the manual-time editor (the hint line).
 // register_shiftable entries with base_y >= this also pick up the
 // MANUAL_HIDDEN_SHIFT when the switch is off.
-#define MANUAL_SECTION_TOP  (948)
-#define MAX_SHIFTABLE      32
+#define MANUAL_SECTION_TOP  (996)
+#define MAX_SHIFTABLE      40
 
 struct ShiftableRow { lv_obj_t *obj; int base_x; int base_y; };
 static ShiftableRow s_shiftable[MAX_SHIFTABLE];
@@ -216,6 +218,27 @@ static void on_screenoff_timeout_changed(lv_event_t *)
     if (idx >= 3) idx = 1;
     power_set_screenoff_timeout(SCREENOFF_TIMEOUT_MS[idx], millis());
     settings_save_to_sd();
+}
+
+static const uint32_t CPU_FREQUENCIES[] = {80, 160, 240};
+static void refresh_cpu_selection()
+{
+    const uint32_t mhz = getPreferredCpuFrequency();
+    uint32_t idx = mhz == 80 ? 0 : mhz == 160 ? 1 : 2;
+    lv_dropdown_set_selected(cpu_dropdown, idx);
+    lv_label_set_text(cpu_lbl, "CPU Frequency");
+    lv_obj_set_style_text_color(cpu_lbl, lv_color_hex(0x00aa00), LV_PART_MAIN);
+}
+static void on_cpu_frequency_changed(lv_event_t *)
+{
+    uint32_t idx = lv_dropdown_get_selected(cpu_dropdown);
+    if (idx >= 3 || !setCpuFrequencyPreference(CPU_FREQUENCIES[idx])) {
+        refresh_cpu_selection();
+        lv_label_set_text(cpu_lbl, "CPU change failed");
+        lv_obj_set_style_text_color(cpu_lbl, lv_color_hex(0xff6666), LV_PART_MAIN);
+    } else {
+        refresh_cpu_selection();
+    }
 }
 
 static void on_dim_brightness_changed(lv_event_t *e)
@@ -779,6 +802,40 @@ void settings_screen_create()
     lv_obj_add_event_cb(screenoff_dropdown, on_screenoff_timeout_changed, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_align(screenoff_dropdown, LV_ALIGN_RIGHT_MID, 0, 0);
 
+    // CPU Frequency row: label on left, dropdown on right
+    lv_obj_t *cpu_row = lv_obj_create(settings_screen);
+    lv_obj_set_size(cpu_row, 380, 40);
+    lv_obj_set_style_bg_opa(cpu_row, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(cpu_row, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(cpu_row, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(cpu_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(cpu_row, LV_ALIGN_TOP_MID, 0, 826);
+    register_shiftable(cpu_row, 826);
+
+    cpu_lbl = lv_label_create(cpu_row);
+    lv_obj_set_style_text_color(cpu_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_text_font(cpu_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_label_set_text(cpu_lbl, "CPU Frequency");
+    lv_obj_align(cpu_lbl, LV_ALIGN_LEFT_MID, 0, 0);
+
+    cpu_dropdown = lv_dropdown_create(cpu_row);
+    lv_dropdown_set_options(cpu_dropdown, "80 MHz\n160 MHz\n240 MHz");
+    lv_dropdown_set_selected(cpu_dropdown, 2);
+    lv_obj_set_size(cpu_dropdown, 185, 34);
+    lv_obj_set_style_text_font(cpu_dropdown, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(cpu_dropdown, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(cpu_dropdown, lv_color_make(0x00, 0xFF, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_border_color(cpu_dropdown, lv_color_make(0x00, 0x55, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_border_width(cpu_dropdown, 1, LV_PART_MAIN);
+    // Style the drop-down list
+    lv_obj_t *cpu_list = lv_dropdown_get_list(cpu_dropdown);
+    lv_obj_set_style_bg_color(cpu_list, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(cpu_list, lv_color_make(0x00, 0xFF, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_text_font(cpu_list, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_border_color(cpu_list, lv_color_make(0x00, 0x55, 0x00), LV_PART_MAIN);
+    lv_obj_add_event_cb(cpu_dropdown, on_cpu_frequency_changed, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_align(cpu_dropdown, LV_ALIGN_RIGHT_MID, 0, 0);
+
     // Motion-wake row — sits between the Dimmed slider and the Manual Time
     // section. When on, any wrist movement detected by the BHI260AP resets
     // the dim timer (same effect as a tap or button press).
@@ -788,8 +845,8 @@ void settings_screen_create()
     lv_obj_set_style_border_width(motion_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(motion_row, 0, LV_PART_MAIN);
     lv_obj_clear_flag(motion_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(motion_row, LV_ALIGN_TOP_MID, 0, 826);
-    register_shiftable(motion_row, 826);
+    lv_obj_align(motion_row, LV_ALIGN_TOP_MID, 0, 874);
+    register_shiftable(motion_row, 874);
 
     lv_obj_t *motion_lbl = lv_label_create(motion_row);
     lv_obj_set_style_text_color(motion_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
@@ -824,8 +881,8 @@ void settings_screen_create()
     lv_obj_set_style_bg_opa(sep3, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(sep3, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(sep3, 0, LV_PART_MAIN);
-    lv_obj_align(sep3, LV_ALIGN_TOP_MID, 0, 886);
-    register_shiftable(sep3, 886);
+    lv_obj_align(sep3, LV_ALIGN_TOP_MID, 0, 934);
+    register_shiftable(sep3, 934);
 
     // Manual Time row: label left, state label + override toggle right
     lv_obj_t *manual_row = lv_obj_create(settings_screen);
@@ -834,8 +891,8 @@ void settings_screen_create()
     lv_obj_set_style_border_width(manual_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(manual_row, 0, LV_PART_MAIN);
     lv_obj_clear_flag(manual_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(manual_row, LV_ALIGN_TOP_MID, 0, 900);
-    register_shiftable(manual_row, 900);
+    lv_obj_align(manual_row, LV_ALIGN_TOP_MID, 0, 948);
+    register_shiftable(manual_row, 948);
 
     lv_obj_t *manual_lbl = lv_label_create(manual_row);
     lv_obj_set_style_text_color(manual_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
@@ -862,8 +919,8 @@ void settings_screen_create()
     lv_obj_set_style_text_color(manual_hint, lv_color_make(0x00, 0x77, 0x00), LV_PART_MAIN);
     lv_obj_set_style_text_font(manual_hint, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_label_set_text(manual_hint, "Set the date & time below, then press SET");
-    lv_obj_align(manual_hint, LV_ALIGN_TOP_MID, 0, 948);
-    register_shiftable(manual_hint, 948);
+    lv_obj_align(manual_hint, LV_ALIGN_TOP_MID, 0, 996);
+    register_shiftable(manual_hint, 996);
     register_manual_obj(manual_hint);
 
     // Date / time rollers — Year, Month, Day, Hour, Minute.
@@ -871,15 +928,15 @@ void settings_screen_create()
     char opts[256];
     build_num_opts(opts, sizeof(opts), MANUAL_YEAR_BASE,
                    MANUAL_YEAR_BASE + MANUAL_YEAR_COUNT - 1, 4);
-    year_roller   = make_time_roller("Year",  opts, -148, 972, 84);
+    year_roller   = make_time_roller("Year",  opts, -148, 1020, 84);
     build_num_opts(opts, sizeof(opts), 1, 12, 2);
-    month_roller  = make_time_roller("Month", opts,  -64, 972, 64);
+    month_roller  = make_time_roller("Month", opts,  -64, 1020, 64);
     build_num_opts(opts, sizeof(opts), 1, 31, 2);
-    day_roller    = make_time_roller("Day",   opts,   10, 972, 64);
+    day_roller    = make_time_roller("Day",   opts,   10, 1020, 64);
     build_num_opts(opts, sizeof(opts), 0, 23, 2);
-    hour_roller   = make_time_roller("Hour",  opts,   84, 972, 64);
+    hour_roller   = make_time_roller("Hour",  opts,   84, 1020, 64);
     build_num_opts(opts, sizeof(opts), 0, 59, 2);
-    minute_roller = make_time_roller("Min",   opts,  158, 972, 64);
+    minute_roller = make_time_roller("Min",   opts,  158, 1020, 64);
 
     // SET TIME button
     lv_obj_t *set_btn = lv_obj_create(settings_screen);
@@ -891,8 +948,8 @@ void settings_screen_create()
     lv_obj_set_style_pad_all(set_btn, 0, LV_PART_MAIN);
     lv_obj_clear_flag(set_btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(set_btn, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align(set_btn, LV_ALIGN_TOP_MID, 0, 1102);
-    register_shiftable(set_btn, 1102);
+    lv_obj_align(set_btn, LV_ALIGN_TOP_MID, 0, 1150);
+    register_shiftable(set_btn, 1150);
     register_manual_obj(set_btn);
 
     lv_obj_t *set_lbl = lv_label_create(set_btn);
@@ -917,8 +974,8 @@ void settings_screen_create()
     lv_obj_set_style_bg_opa(sep_ss, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(sep_ss, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(sep_ss, 0, LV_PART_MAIN);
-    lv_obj_align(sep_ss, LV_ALIGN_TOP_MID, 0, 1178);
-    register_shiftable(sep_ss, 1178);
+    lv_obj_align(sep_ss, LV_ALIGN_TOP_MID, 0, 1226);
+    register_shiftable(sep_ss, 1226);
 
     screenshot_row = lv_obj_create(settings_screen);
     lv_obj_set_size(screenshot_row, 380, 40);
@@ -926,8 +983,8 @@ void settings_screen_create()
     lv_obj_set_style_border_width(screenshot_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(screenshot_row, 0, LV_PART_MAIN);
     lv_obj_clear_flag(screenshot_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(screenshot_row, LV_ALIGN_TOP_MID, 0, 1192);
-    register_shiftable(screenshot_row, 1192);
+    lv_obj_align(screenshot_row, LV_ALIGN_TOP_MID, 0, 1240);
+    register_shiftable(screenshot_row, 1240);
 
     lv_obj_t *ss_lbl = lv_label_create(screenshot_row);
     lv_obj_set_style_text_color(ss_lbl, lv_color_make(0x00, 0xAA, 0x00), LV_PART_MAIN);
@@ -958,8 +1015,8 @@ void settings_screen_create()
     lv_label_set_text(screenshot_hint,
         "Hold any point for 3 seconds to save a screenshot to "
         "/Screenshots on the SD card. Requires a mounted SD.");
-    lv_obj_align(screenshot_hint, LV_ALIGN_TOP_MID, 0, 1238);
-    register_shiftable(screenshot_hint, 1238);
+    lv_obj_align(screenshot_hint, LV_ALIGN_TOP_MID, 0, 1286);
+    register_shiftable(screenshot_hint, 1286);
 
     // Reflect the current SD state in the row's interactability + checked
     // state. Boot order matters here — instance.isCardReady() may flip
@@ -978,6 +1035,7 @@ bool settings_screen_is_active()
 void settings_screen_show()
 {
     main_loop_request_lvgl_priority(12);
+    refresh_cpu_selection();
     // Refresh percentage label to match current slider position
     int pct = (int)s_brightness * 100 / (int)DEVICE_MAX_BRIGHTNESS_LEVEL;
     lv_label_set_text_fmt(brightness_val_label, "%d%%", pct);

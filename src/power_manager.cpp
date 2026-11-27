@@ -3,8 +3,10 @@
 #include "pin_lock_screen.h"
 #include <LilyGoLib.h>
 #include <lvgl.h>
+#include <Preferences.h>
 #ifndef TWATCH_SIMULATOR
 #include <esp_sleep.h>
+#include <esp32-hal-cpu.h>
 #include <esp_attr.h>
 #include <esp_idf_version.h>
 #include <esp_timer.h>
@@ -25,6 +27,25 @@
 
 namespace {
 PowerHold hold;
+uint32_t preferred_cpu_mhz = CPU_DEFAULT_MHZ;
+bool cpu_initialized = false;
+bool valid_cpu_frequency(uint32_t mhz) {
+    return mhz == 80 || mhz == 160 || mhz == 240;
+}
+void load_cpu_preference() {
+    uint32_t saved = CPU_DEFAULT_MHZ;
+    Preferences prefs;
+    if (prefs.begin("watchpower", true)) {
+        saved = prefs.getUInt("cpu_mhz", CPU_DEFAULT_MHZ);
+        prefs.end();
+    }
+    preferred_cpu_mhz = valid_cpu_frequency(saved) ? saved : CPU_DEFAULT_MHZ;
+    if (!restoreCpuFrequency()) {
+        preferred_cpu_mhz = CPU_DEFAULT_MHZ;
+        restoreCpuFrequency();
+    }
+    cpu_initialized = true;
+}
 uint32_t last_activity = 0, screenoff_timeout = 60000;
 bool consume_click = false;
 bool locked = false, off = false, asleep = false, requested = false;
@@ -45,6 +66,57 @@ void sync_input() {
 #endif
 }
 }
+bool setCpuFrequency(uint32_t mhz) {
+    if (!valid_cpu_frequency(mhz)) return false;
+#ifdef TWATCH_SIMULATOR
+    return sim::hardware.watch.set_cpu_frequency(mhz);
+#else
+    // The Arduino HAL handles clock configuration and peripheral callbacks.
+    // Read the actual frequency back instead of trusting the request.
+    return setCpuFrequencyMhz(mhz) && getCpuFrequencyMhz() == mhz;
+#endif
+}
+
+uint32_t getCpuFrequency() {
+#ifdef TWATCH_SIMULATOR
+    return sim::hardware.watch.cpu_frequency();
+#else
+    return getCpuFrequencyMhz();
+#endif
+}
+uint32_t getPreferredCpuFrequency() { return preferred_cpu_mhz; }
+
+bool increaseCpuFrequency() {
+    const uint32_t current = getCpuFrequency();
+    return setCpuFrequency(current < 80 ? 80 : current < 160 ? 160 : 240);
+}
+bool decreaseCpuFrequency() {
+    const uint32_t current = getCpuFrequency();
+    return setCpuFrequency(current > 240 ? 240 : current > 160 ? 160 : 80);
+}
+bool restoreCpuFrequency() { return setCpuFrequency(preferred_cpu_mhz); }
+
+bool setCpuFrequencyPreference(uint32_t mhz) {
+    if (!valid_cpu_frequency(mhz)) return false;
+    const uint32_t previous = getCpuFrequency();
+    if (!setCpuFrequency(mhz)) {
+        if (valid_cpu_frequency(previous)) setCpuFrequency(previous);
+        return false;
+    }
+    if (mhz == preferred_cpu_mhz) return true;
+    // CPU policy is device configuration, independent of removable SD storage.
+    Preferences prefs;
+    const bool opened = prefs.begin("watchpower", false);
+    const bool saved = opened && prefs.putUInt("cpu_mhz", mhz) == sizeof(uint32_t);
+    if (opened) prefs.end();
+    if (!saved) {
+        if (valid_cpu_frequency(previous)) setCpuFrequency(previous);
+        return false;
+    }
+    preferred_cpu_mhz = mhz;
+    return true;
+}
+
 void power_note_activity(uint32_t now) { last_activity = now; }
 void power_set_screenoff_timeout(uint32_t ms, uint32_t now) {
     screenoff_timeout = ms;
@@ -109,6 +181,8 @@ void screenon() {
 }
 
 void power_init() {
+    // Resuming light sleep must not overwrite a temporary runtime override.
+    if (!cpu_initialized) load_cpu_preference();
     power_note_activity(millis());
 #ifndef TWATCH_SIMULATOR
     // AXP2101 generates independent falling/press and rising/release IRQs.
@@ -191,6 +265,7 @@ void sim_wake(uint32_t now) {
     power_note_activity(now);
     consume_click = true;
     if (cold_boot) {
+        load_cpu_preference();
         pin_lock_restore();
         sim::show_home();
         sim::start_boot(false);
