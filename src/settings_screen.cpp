@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "settings_screen.h"
 #include "layout_config.h"
 #include "layout_remote.h"
@@ -414,6 +415,7 @@ lv_obj_t* layout_message=nullptr;
 lv_obj_t* layout_init_button=nullptr;
 lv_obj_t* url_editor=nullptr;
 lv_obj_t* url_field=nullptr;
+lv_obj_t* url_keyboard=nullptr;
 lv_obj_t* url_error=nullptr;
 lv_obj_t* url_indicator=nullptr;
 lv_obj_t* layout_buttons[8]{};
@@ -448,6 +450,7 @@ void layout_action_cb(lv_event_t* e){
         lv_label_set_text(url_error,"HTTPS recommended. HTTP is unencrypted.");
         lv_obj_clear_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(url_editor);
+        watch_keyboard_show(url_keyboard,url_field);
         return;
     }
     if(action==LayoutAction::Download||action==LayoutAction::DownloadApply){
@@ -502,10 +505,12 @@ void url_save_cb(lv_event_t*){
     if(!layout_remote_set_url(text)){
         lv_label_set_text(url_error,"Unable to save URL.");return;
     }
+    watch_keyboard_hide(url_keyboard);
     lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
     layout_refresh_status("Source URL saved");
 }
 void url_cancel_cb(lv_event_t*){
+    watch_keyboard_hide(url_keyboard);
     lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
 }
 void create_url_editor(){
@@ -536,10 +541,9 @@ void create_url_editor(){
         auto* label=lv_label_create(btn);lv_label_set_text(label,i?"Cancel":"Save URL");lv_obj_center(label);
         lv_obj_add_event_cb(btn,i?url_cancel_cb:url_save_cb,LV_EVENT_CLICKED,nullptr);
     }
-    auto* kb=lv_keyboard_create(url_editor);lv_obj_set_size(kb,395,245);
-    lv_obj_align(kb,LV_ALIGN_BOTTOM_MID,0,0);lv_keyboard_set_textarea(kb,url_field);
-    lv_obj_add_event_cb(kb,url_save_cb,LV_EVENT_READY,nullptr);
-    lv_obj_add_event_cb(kb,url_cancel_cb,LV_EVENT_CANCEL,nullptr);
+    url_keyboard=watch_keyboard_create(url_editor);
+    lv_obj_add_event_cb(url_keyboard,url_save_cb,LV_EVENT_READY,nullptr);
+    lv_obj_add_event_cb(url_keyboard,url_cancel_cb,LV_EVENT_CANCEL,nullptr);
     lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(settings_screen,[](lv_event_t*){lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);},LV_EVENT_SCREEN_UNLOADED,nullptr);
 }

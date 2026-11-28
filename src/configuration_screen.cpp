@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "configuration_screen.h"
 #include "channels_screen.h"
 #include "meshtastic.h"
@@ -206,8 +207,7 @@ static void load_config_from_sd()
 
 static void show_keyboard(lv_obj_t *ta)
 {
-    lv_keyboard_set_textarea(keyboard, ta);
-    lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_show(keyboard, ta);
     // The keyboard occupies the bottom ~240px; hide the GPS rows underneath
     // so the user isn't presented with half-clipped widgets while typing.
     lv_obj_add_flag(gps_status_row,  LV_OBJ_FLAG_HIDDEN);
@@ -222,7 +222,7 @@ static void show_keyboard(lv_obj_t *ta)
 
 static void hide_keyboard()
 {
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
     lv_obj_clear_flag(gps_status_row,  LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(broadcast_row,   LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(interval_row,    LV_OBJ_FLAG_HIDDEN);
@@ -370,10 +370,7 @@ void configuration_screen_create()
     short_ta = make_field("Short Name", 150, MESH_MAX_SHORT_NAME - 1);
 
     // On-screen keyboard — hidden until a field is focused
-    keyboard = lv_keyboard_create(cfg_screen);
-    lv_obj_set_size(keyboard, 410, 240);
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    keyboard = watch_keyboard_create(cfg_screen);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_READY, NULL);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_CANCEL, NULL);
 

@@ -13,7 +13,10 @@
 #include <esp_http_client.h>
 #include <sdkconfig.h>
 #if CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
-#include <esp_crt_bundle.h>
+// Arduino's WiFiClientSecure ships a different header with this same
+// name. Declare the SDK function using its ESP-IDF ABI to avoid selecting
+// the Arduino wrapper (which requires an externally supplied bundle).
+extern "C" esp_err_t esp_crt_bundle_attach(void* conf);
 #endif
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>

@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "send_message_screen.h"
 #include "meshtastic.h"
 #include "esp_now_link.h"
@@ -458,15 +459,13 @@ static void show_compose()
     lv_obj_align(compose_ta, LV_ALIGN_TOP_MID, 0, 8);    // textarea at the very top
     lv_textarea_set_text(compose_ta, "");
     lv_obj_clear_flag(compose_ta, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(keyboard,   LV_OBJ_FLAG_HIDDEN);
-    lv_keyboard_set_textarea(keyboard, compose_ta);
-    lv_obj_move_foreground(keyboard);
+    watch_keyboard_show(keyboard, compose_ta);
 }
 
 static void hide_compose()
 {
     lv_obj_add_flag(compose_ta, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(keyboard,   LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
     lv_obj_clear_flag(title_label,  LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(list_box,     LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(status_label, LV_OBJ_FLAG_HIDDEN);
@@ -551,12 +550,7 @@ void send_message_screen_create()
     lv_obj_set_style_border_width(compose_ta, 1, LV_PART_MAIN);
     lv_obj_add_flag(compose_ta, LV_OBJ_FLAG_HIDDEN);
 
-    keyboard = lv_keyboard_create(send_screen);
-    lv_obj_set_size(keyboard, 410, 430);          // piu' alta = tasti piu' grandi
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, -4);
-    // Tasti grandi e leggibili sull'AMOLED 2".
-    lv_obj_set_style_text_font(keyboard, &lv_font_montserrat_28, LV_PART_ITEMS);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    keyboard = watch_keyboard_create(send_screen, KeyboardProfile::Compose);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_READY,         NULL);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_CANCEL,        NULL);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_VALUE_CHANGED, NULL);  // Enter=send

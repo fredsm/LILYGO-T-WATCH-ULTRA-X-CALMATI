@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "spi_bus_manager.h"
 #include "nfc_write_screen.h"
 #include <LilyGoLib.h>
@@ -91,15 +92,14 @@ static void on_type_changed(lv_event_t *e)
 
 static void show_keyboard(lv_obj_t *ta)
 {
-    lv_keyboard_set_textarea(keyboard, ta);
     bool phone_value = (ta == value_ta) && (lv_dropdown_get_selected(type_dd) == 2);
     lv_keyboard_set_mode(keyboard, phone_value ? LV_KEYBOARD_MODE_NUMBER : LV_KEYBOARD_MODE_TEXT_LOWER);
-    lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_show(keyboard, ta);
 }
 
 static void hide_keyboard()
 {
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
 }
 
 static void on_ta_event(lv_event_t *e)
@@ -334,10 +334,7 @@ void nfc_write_screen_create()
     lv_obj_align(status_label, LV_ALIGN_BOTTOM_MID, 0, -12);
 
     // On-screen keyboard — hidden until a field is focused
-    keyboard = lv_keyboard_create(wr_screen);
-    lv_obj_set_size(keyboard, 410, 220);
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    keyboard = watch_keyboard_create(wr_screen);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_READY, NULL);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_CANCEL, NULL);
 

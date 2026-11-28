@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "phantom_flood_screen.h"
 #include <LilyGoLib.h>
 #include "ble_scan_manager.h"
@@ -97,9 +98,9 @@ static void on_btn(lv_event_t *)
 static void on_ta_event(lv_event_t *e)
 {
     lv_event_code_t c = lv_event_get_code(e);
-    if (c == LV_EVENT_FOCUSED)   lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (c == LV_EVENT_FOCUSED)   watch_keyboard_show(keyboard, name_ta);
     else if (c == LV_EVENT_DEFOCUSED || c == LV_EVENT_READY) {
-        lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(keyboard);
         sync_name();
     }
 }
@@ -189,9 +190,16 @@ void phantom_flood_screen_create()
     lv_label_set_text(btn_lbl, "START");
     lv_obj_center(btn_lbl);
 
-    keyboard = lv_keyboard_create(s_scr);
-    lv_keyboard_set_textarea(keyboard, name_ta);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    keyboard = watch_keyboard_create(s_scr);
+    lv_obj_add_event_cb(keyboard, [](lv_event_t*){
+        watch_keyboard_hide(keyboard);
+        sync_name();
+    }, LV_EVENT_READY, nullptr);
+    lv_obj_add_event_cb(keyboard, [](lv_event_t*){
+        watch_keyboard_hide(keyboard);
+        sync_name();
+    }, LV_EVENT_CANCEL, nullptr);
+    watch_keyboard_hide(keyboard);
 
     lv_obj_add_event_cb(s_scr, on_gesture, LV_EVENT_GESTURE, NULL);
     lv_timer_create(on_refresh, 60, NULL);
@@ -201,7 +209,7 @@ void phantom_flood_screen_show()
 {
     s_flooding = false; s_sent = 0; s_last_ms = 0;
     set_btn(false);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
     lv_scr_load(s_scr);
     s_pending_stack = true;
 }

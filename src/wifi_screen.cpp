@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "radio_manager.h"
 #include "wifi_screen.h"
 #include "pingsweep.h"
@@ -320,15 +321,14 @@ static void enter_password_mode()
     lv_obj_clear_flag(pw_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(pw_ta,    LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(list_box,   LV_OBJ_FLAG_HIDDEN);
-    lv_keyboard_set_textarea(keyboard, pw_ta);
-    lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_show(keyboard, pw_ta);
 }
 
 static void exit_password_mode()
 {
     lv_obj_add_flag(pw_label,  LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pw_ta,     LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(keyboard,  LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
     lv_obj_clear_flag(list_box, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -610,10 +610,7 @@ void wifi_screen_create()
     lv_obj_set_layout(list_box, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(list_box, LV_FLEX_FLOW_COLUMN);
 
-    keyboard = lv_keyboard_create(wifi_screen);
-    lv_obj_set_size(keyboard, 410, 240);
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    keyboard = watch_keyboard_create(wifi_screen);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_READY,  NULL);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_CANCEL, NULL);
 

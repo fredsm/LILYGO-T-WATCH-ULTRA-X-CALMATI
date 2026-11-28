@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "pager_screen.h"
 #include "pager.h"
 #include "lora_screen.h"
@@ -284,10 +285,9 @@ static void on_rx_freq_ta_event(lv_event_t *e)
         // Tapping the text area implicitly selects Custom...
         lv_dropdown_set_selected(freq_dropdown, FREQ_CUSTOM_IDX);
         lv_keyboard_set_mode(rx_kb, LV_KEYBOARD_MODE_NUMBER);
-        lv_keyboard_set_textarea(rx_kb, rx_freq_ta);
-        lv_obj_clear_flag(rx_kb, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_show(rx_kb, rx_freq_ta);
     } else if (code == LV_EVENT_DEFOCUSED) {
-        lv_obj_add_flag(rx_kb, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(rx_kb);
         // Apply the typed frequency immediately if RX is already running
         if (pager_is_running() &&
             (int)lv_dropdown_get_selected(freq_dropdown) == FREQ_CUSTOM_IDX) {
@@ -303,7 +303,7 @@ static void on_rx_kb_event(lv_event_t *e)
     if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
         lv_obj_t *ta = lv_keyboard_get_textarea(rx_kb);
         if (ta) lv_obj_clear_state(ta, LV_STATE_FOCUSED);
-        lv_obj_add_flag(rx_kb, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(rx_kb);
     }
 }
 
@@ -368,7 +368,7 @@ static void tx_modal_show()
 static void tx_modal_hide()
 {
     lv_obj_add_flag(tx_modal, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(tx_keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(tx_keyboard);
 }
 
 static void on_tx_ta_event(lv_event_t *e)
@@ -384,10 +384,9 @@ static void on_tx_ta_event(lv_event_t *e)
         lv_keyboard_set_mode(tx_keyboard,
             numeric ? LV_KEYBOARD_MODE_NUMBER
                     : LV_KEYBOARD_MODE_TEXT_LOWER);
-        lv_keyboard_set_textarea(tx_keyboard, ta);
-        lv_obj_clear_flag(tx_keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_show(tx_keyboard, ta);
     } else if (code == LV_EVENT_DEFOCUSED) {
-        lv_obj_add_flag(tx_keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(tx_keyboard);
     }
 }
 
@@ -414,7 +413,7 @@ static void on_tx_kb_event(lv_event_t *e)
     if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
         lv_obj_t *ta = lv_keyboard_get_textarea(tx_keyboard);
         if (ta) lv_obj_clear_state(ta, LV_STATE_FOCUSED);
-        lv_obj_add_flag(tx_keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(tx_keyboard);
     }
 }
 
@@ -677,11 +676,10 @@ void pager_screen_create()
     lv_obj_set_flex_flow(msg_list, LV_FLEX_FLOW_COLUMN);
 
     // On-screen keyboard for the custom RX frequency field.
-    rx_kb = lv_keyboard_create(pager_screen);
-    lv_obj_set_size(rx_kb, lv_pct(100), 200);
-    lv_obj_align(rx_kb, LV_ALIGN_BOTTOM_MID, 0, 0);
+    rx_kb = watch_keyboard_create(pager_screen, KeyboardProfile::Compact);
+
     lv_obj_add_event_cb(rx_kb, on_rx_kb_event, LV_EVENT_ALL, NULL);
-    lv_obj_add_flag(rx_kb, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(rx_kb);
 
     lv_obj_add_event_cb(pager_screen, on_gesture, LV_EVENT_GESTURE, NULL);
 
@@ -872,11 +870,10 @@ void pager_screen_create()
 
     // Shared on-screen keyboard for both text areas. Lives on the modal so
     // it sits above the panel; the textarea's focus events show/hide it.
-    tx_keyboard = lv_keyboard_create(tx_modal);
-    lv_obj_set_size(tx_keyboard, lv_pct(100), 180);
-    lv_obj_align(tx_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    tx_keyboard = watch_keyboard_create(tx_modal, KeyboardProfile::Compact);
+
     lv_obj_add_event_cb(tx_keyboard, on_tx_kb_event, LV_EVENT_ALL, NULL);
-    lv_obj_add_flag(tx_keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(tx_keyboard);
 
     update_mode_buttons();
     update_status();

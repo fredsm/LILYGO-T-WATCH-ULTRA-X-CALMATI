@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "portscan_screen.h"
 #include "portscan.h"
 #include <LilyGoLib.h>
@@ -277,10 +278,9 @@ static void on_ta_event(lv_event_t *e)
     lv_obj_t *ta = (lv_obj_t *)lv_event_get_target(e);
     if (code == LV_EVENT_FOCUSED) {
         lv_keyboard_set_mode(keyboard, LV_KEYBOARD_MODE_NUMBER);
-        lv_keyboard_set_textarea(keyboard, ta);
-        lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_show(keyboard, ta);
     } else if (code == LV_EVENT_DEFOCUSED) {
-        lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(keyboard);
     }
 }
 
@@ -290,7 +290,7 @@ static void on_kb_event(lv_event_t *e)
     if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
         lv_obj_t *ta = lv_keyboard_get_textarea(keyboard);
         if (ta) lv_obj_clear_state(ta, LV_STATE_FOCUSED);
-        lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(keyboard);
     }
 }
 
@@ -467,11 +467,10 @@ void portscan_screen_create()
 
     // Shared on-screen keyboard for the lo/hi fields; hidden until either
     // text-area gets focus.
-    keyboard = lv_keyboard_create(portscan_screen);
-    lv_obj_set_size(keyboard, lv_pct(100), 180);
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    keyboard = watch_keyboard_create(portscan_screen, KeyboardProfile::Compact);
+
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_ALL, NULL);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
 
     paint_tech_btns();
     paint_preset_btns((int)s_preset);

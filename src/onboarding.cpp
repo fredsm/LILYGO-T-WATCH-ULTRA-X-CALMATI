@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "onboarding.h"
 #include <LilyGoLib.h>
 #include <WiFi.h>
@@ -129,10 +130,9 @@ static void on_email_focus(lv_event_t *e)
 {
     lv_event_code_t c = lv_event_get_code(e);
     if (c == LV_EVENT_FOCUSED) {
-        lv_keyboard_set_textarea(keyboard, email_ta);
-        lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_show(keyboard, email_ta);
     } else if (c == LV_EVENT_DEFOCUSED || c == LV_EVENT_READY || c == LV_EVENT_CANCEL) {
-        lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+        watch_keyboard_hide(keyboard);
     }
 }
 
@@ -236,10 +236,11 @@ void onboarding_screen_create()
     lv_label_set_text(bl, "ACCEPT");
     lv_obj_center(bl);
 
-    keyboard = lv_keyboard_create(screen);
-    lv_obj_set_size(keyboard, 410, 200);
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    keyboard = watch_keyboard_create(screen);
+    lv_obj_add_event_cb(keyboard, [](lv_event_t*){watch_keyboard_hide(keyboard);}, LV_EVENT_READY, nullptr);
+    lv_obj_add_event_cb(keyboard, [](lv_event_t*){watch_keyboard_hide(keyboard);}, LV_EVENT_CANCEL, nullptr);
+
+    watch_keyboard_hide(keyboard);
 }
 
 void onboarding_screen_show()

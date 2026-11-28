@@ -3,6 +3,7 @@
 #include <lvgl.h>
 #include "mock/hardware.hpp"
 #include "../layout_config.h"
+#include "../watch_display_geometry.h"
 #include <fstream>
 #include "panel.hpp"
 #include "startup.hpp"
@@ -21,7 +22,7 @@
 #include <cstdio>
 #include <cstring>
 namespace {
-constexpr int W=410,H=502;
+constexpr int W=WATCH_DISPLAY_WIDTH,H=WATCH_DISPLAY_HEIGHT;
 constexpr int BAR=60;
 std::array<uint16_t,W*(H+BAR)> pixels{};
 std::array<uint16_t,W*32> buffer{};
@@ -40,7 +41,8 @@ void flush(lv_display_t* d,const lv_area_t* a,uint8_t* data) {
     for(int y=a->y1;y<=a->y2;++y)
         for(int x=a->x1;x<=a->x2;++x)
             if(x>=0 && x<W && y>=0 && y<H)
-                pixels[(y+(d==controls_display?H:0))*W+x]=src[(y-a->y1)*width+x-a->x1];
+                pixels[(y+(d==controls_display?H:0))*W+x]=
+                    d==controls_display||watch_display_contains(x,y)?src[(y-a->y1)*width+x-a->x1]:0;
     lv_display_flush_ready(d);
 }
 void read_pointer(lv_indev_t*,lv_indev_data_t* d) {
@@ -170,8 +172,8 @@ int main(int argc,char** argv) {
     };
     auto route_pointer=[&](int x,int y,bool down){
         int hit=(y>=H+8 && y<H+52 && x>=10 && x<400)?(x<195?0:(x>=215?1:-1)):-1;
-        if(down && !contact){contact=true;captured_button=y>=H?(hit>=0?hit:-2):-1;if(captured_button==0)power_down();}
-        // A tap in the control-bar margin must not reach the watch underneath.
+        if(down && !contact){contact=true;captured_button=y>=H?(hit>=0?hit:-2):(watch_display_contains(x,y)?-1:-2);if(captured_button==0)power_down();}
+        // Taps in the control-bar margin or masked display corners are ignored.
         if(captured_button==-2){if(!down){contact=false;captured_button=-1;}return;}
         if(captured_button>=0){
             auto* button=watch_buttons[captured_button];

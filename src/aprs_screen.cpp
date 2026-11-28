@@ -1,3 +1,4 @@
+#include "keyboard_manager.h"
 #include "aprs_screen.h"
 #include "aprs.h"
 #include "lora_screen.h"
@@ -152,15 +153,14 @@ static void on_refresh(lv_timer_t *)
 
 static void show_keyboard()
 {
-    lv_keyboard_set_textarea(keyboard, call_ta);
-    lv_obj_clear_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_show(keyboard, call_ta);
     lv_obj_add_flag(btn_row,  LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pkt_list, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void hide_keyboard()
 {
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
     lv_obj_clear_flag(btn_row,  LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(pkt_list, LV_OBJ_FLAG_HIDDEN);
 }
@@ -331,11 +331,10 @@ void aprs_screen_create()
     lv_obj_set_flex_flow(pkt_list, LV_FLEX_FLOW_COLUMN);
 
     // On-screen keyboard — hidden until the callsign field is focused
-    keyboard = lv_keyboard_create(aprs_screen);
-    lv_obj_set_size(keyboard, 410, 240);
-    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    keyboard = watch_keyboard_create(aprs_screen);
+
     lv_keyboard_set_mode(keyboard, LV_KEYBOARD_MODE_TEXT_UPPER);
-    lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
+    watch_keyboard_hide(keyboard);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_READY,  NULL);
     lv_obj_add_event_cb(keyboard, on_kb_event, LV_EVENT_CANCEL, NULL);
 

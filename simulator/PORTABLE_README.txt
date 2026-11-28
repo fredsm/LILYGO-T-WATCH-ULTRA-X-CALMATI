@@ -89,3 +89,7 @@ its last valid backup, then to the embedded firmware default.
 Layout Manager also supports a saved Layout Source URL and Download / Download
 & Apply actions. Connect the simulated Wi-Fi first. Remote responses are
 synthetic (default: home.power=timer), not real network requests.
+
+The simulated display now masks rounded corners and rejects new taps there. All
+text and numeric keyboards use the shared 350-pixel safe-width layout; the
+physical corner radius is approximate and should be checked on the watch.
