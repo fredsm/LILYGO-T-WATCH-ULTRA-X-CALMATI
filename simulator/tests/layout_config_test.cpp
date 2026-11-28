@@ -1,4 +1,7 @@
 #include "../../src/layout_config.h"
+#include "../../src/layout_remote.h"
+#include "../../src/radio_manager.h"
+#include "../../src/sim/mock/WiFi.h"
 #include "../../src/sim/screens.hpp"
 #include "../../src/sim/clock.hpp"
 #include "../../src/sim/pointer.hpp"
@@ -33,6 +36,11 @@ lv_obj_t* label(lv_obj_t* root,const char* value){
     if(lv_obj_check_type(root,&lv_label_class)&&!strcmp(lv_label_get_text(root),value))return root;
     for(unsigned i=0;i<lv_obj_get_child_count(root);++i)
         if(auto* o=label(lv_obj_get_child(root,i),value))return o;
+    return nullptr;
+}
+lv_obj_t* textarea(lv_obj_t* root){
+    if(lv_obj_check_type(root,&lv_textarea_class))return root;
+    for(unsigned i=0;i<lv_obj_get_child_count(root);++i)if(auto* o=textarea(lv_obj_get_child(root,i)))return o;
     return nullptr;
 }
 void save(const char* text,const char* path=LAYOUT_PATH){auto f=SD.open(path,FILE_WRITE);f.print(text);f.close();}
@@ -151,6 +159,98 @@ int main(){
     CHECK(storage_try_usb_claim());
     CHECK(layout_import_sd()==LayoutResult::NoSd&&layout_export_sd(true)==LayoutResult::NoSd);
     storage_usb_release();
+    storage_media_inserted(); // USB ejected and local FAT remounted
+    // Remote source is held in NVS, never the SD boot source.
+    CHECK(!layout_remote_valid_url("ftp://host/layout.txt"));
+    CHECK(!layout_remote_valid_url("https://user:pass@host/layout.txt"));
+    CHECK(!layout_remote_valid_url("https://"));
+    CHECK(!layout_remote_valid_url("https://host/layout.txt#fragment"));
+    CHECK(!layout_remote_valid_url("https://host/layout file.txt"));
+    CHECK(layout_remote_valid_url("http://192.168.1.10/layout.txt"));
+    settings_screen_show();pump();
+    auto* url_button=label(lv_screen_active(),"Layout Source URL");CHECK(url_button);
+    lv_obj_send_event(lv_obj_get_parent(url_button),LV_EVENT_CLICKED,nullptr);
+    auto* url_input=textarea(lv_screen_active());CHECK(url_input);
+    auto* save_url=label(lv_screen_active(),"Save URL");CHECK(save_url);
+    lv_textarea_set_text(url_input,"ftp://host/layout.txt");
+    lv_obj_send_event(lv_obj_get_parent(save_url),LV_EVENT_CLICKED,nullptr);
+    CHECK(!*layout_remote_url());
+    lv_textarea_set_text(url_input,"https://example.com/layout.txt");
+    lv_obj_send_event(lv_obj_get_parent(save_url),LV_EVENT_CLICKED,nullptr);
+    CHECK(!strcmp(layout_remote_url(),"https://example.com/layout.txt"));
+    layout_remote_load();
+    CHECK(!strcmp(layout_remote_url(),"https://example.com/layout.txt"));
+    WiFi.disconnect();
+    CHECK(!layout_remote_start(true)&&layout_remote_result()==LayoutRemoteResult::NoWifi);
+    WiFi.begin("SIM");
+    CHECK(radio_job_begin(RadioJob::Weather));
+    CHECK(!layout_remote_start(true)&&layout_remote_result()==LayoutRemoteResult::RadioBusy);
+    radio_job_end(RadioJob::Weather);
+    // The actual Settings actions start a deferred worker. Only the UI poll
+    // publishes the newly persisted layout.
+    settings_screen_show();pump();
+    auto* remote=label(lv_screen_active(),"Download layout to SD");CHECK(remote);
+    auto* apply=label(lv_screen_active(),"Download & Apply Layout");CHECK(apply);
+    layout_remote_sim_response("home.power=alarm");
+    lv_obj_send_event(lv_obj_get_parent(remote),LV_EVENT_CLICKED,nullptr);
+    CHECK(layout_remote_busy()&&layout_remote_result()==LayoutRemoteResult::Pending);
+    CHECK(!layout_remote_start(true)&&!layout_remote_set_url("http://other/layout.txt"));
+    CHECK(lv_obj_has_state(lv_obj_get_parent(apply),LV_STATE_DISABLED));
+    pump();
+    CHECK(layout_remote_result()==LayoutRemoteResult::Downloaded);
+    CHECK(*sim_sd_files[LAYOUT_PATH]=="home.power=alarm");
+    CHECK(layout_config().home[5]==HomeTarget::Timer);
+    layout_remote_sim_response("home.power=stopwatch");
+    lv_obj_send_event(lv_obj_get_parent(apply),LV_EVENT_CLICKED,nullptr);
+    layout_remote_sim_pump();
+    CHECK(layout_config().home[5]==HomeTarget::Timer);
+    pump();
+    CHECK(layout_remote_result()==LayoutRemoteResult::Applied);
+    CHECK(layout_config().home[5]==HomeTarget::Stopwatch);
+    layout_load();CHECK(layout_config().home[5]==HomeTarget::Stopwatch);
+    // Failure paths: neither an invalid HTTP response nor an oversized,
+    // truncated or invalid file may replace the SD editing copy or FFat.
+    auto remote_fail=[&](const char* body,int response,bool complete,LayoutRemoteResult expect){
+        layout_remote_sim_response(body,response,complete);
+        if(!layout_remote_start(true))return false;
+        pump();
+        return layout_remote_result()==expect &&
+            layout_config().home[5]==HomeTarget::Stopwatch &&
+            *sim_sd_files[LAYOUT_PATH]=="home.power=stopwatch";
+    };
+    CHECK(remote_fail("home.power=alarm",302,true,LayoutRemoteResult::HttpError));
+    CHECK(remote_fail("home.power=alarm",200,false,LayoutRemoteResult::Incomplete));
+    CHECK(remote_fail("home.power=bad",200,true,LayoutRemoteResult::InvalidLayout));
+    CHECK(remote_fail("",200,true,LayoutRemoteResult::Incomplete));
+    CHECK(remote_fail(huge.c_str(),200,true,LayoutRemoteResult::TooLarge));
+    layout_remote_sim_error(LayoutRemoteResult::Timeout);
+    CHECK(layout_remote_start(true));pump();
+    CHECK(layout_remote_result()==LayoutRemoteResult::Timeout);
+    layout_remote_sim_response("home.power=alarm");
+    sim::hardware.sd_ready=false;storage_media_removed();
+    CHECK(!layout_remote_start(true)&&layout_remote_result()==LayoutRemoteResult::NoSd);
+    sim::hardware.sd_ready=true;storage_media_inserted();
+    CHECK(layout_remote_start(true));
+    radio_manager_suspend(true);pump();radio_manager_suspend(false);
+    CHECK(layout_remote_result()==LayoutRemoteResult::RadioBusy);
+    CHECK(layout_remote_start(true));
+    CHECK(storage_try_usb_claim());pump();
+    CHECK(layout_remote_result()==LayoutRemoteResult::NoSd);
+    storage_usb_release();storage_media_inserted();
+    CHECK(layout_config().home[5]==HomeTarget::Stopwatch);
+    sim_ffat_fail_write=true;
+    CHECK(layout_remote_start(true));pump();
+    CHECK(layout_remote_result()==LayoutRemoteResult::FlashWriteFailed);
+    CHECK(layout_config().home[5]==HomeTarget::Stopwatch);
+    CHECK(*sim_sd_files[LAYOUT_PATH]=="home.power=alarm");
+    // A failed internal write leaves the validated download on SD for retry.
+    CHECK(layout_import_sd()==LayoutResult::Ok&&layout_config().home[5]==HomeTarget::Alarm);
+    deepsleep();CHECK(power_is_asleep());power_button_down(20000);
+    power_tick(25000);power_button_up(25100);
+    CHECK(!strcmp(layout_remote_url(),"https://example.com/layout.txt"));
+    CHECK(layout_config().home[5]==HomeTarget::Alarm);
+    CHECK(layout_remote_set_url(""));
+    layout_remote_load();CHECK(!*layout_remote_url());
     // Simulate interrupted publication/corrupted internal primary; fallback to backup.
     auto recovered=FFat.open("/Settings/layout.bak",FILE_WRITE);
     recovered.print("home.power=calendar");recovered.close();

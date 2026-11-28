@@ -51,9 +51,42 @@ partitions are not formatted by this action. The legacy vendor MSC startup is
 disabled because it can auto-format and expose FFat; the firmware's existing
 SD-only USB reader remains enabled.
 
-Only small, bounded files are read/written; import/export/initialization are
-explicit synchronous UI actions rather than background polling. Native storage
-latency (especially formatting) is not bounded by the byte limit.
+Manual import/export/initialization are explicit synchronous UI actions rather
+than background polling. Native storage latency (especially formatting) is not
+bounded by the byte limit. Remote downloads and their SD/FFat transactions run
+in a background worker; only the UI owner applies the resulting layout.
+
+### Remote configuration
+
+1. Host a plain-text layout file at a direct URL (for GitHub, use the **Raw**
+   file URL, not the HTML repository view).
+2. Connect the watch to Wi-Fi, insert the SD card, and eject/stop USB SD mode.
+3. Open Settings > Layout Manager > **Layout Source URL**, enter the URL
+   (up to 512 characters), and tap Save URL. It is stored in internal NVS,
+   independent of the SD card or the FFat partition. Save an empty field to
+   clear the URL. Avoid putting credentials or access tokens in URLs.
+4. **Download layout to SD** validates and replaces SD `/Settings/layout.txt`
+   without touching the active layout. Use Import layout from SD when ready.
+5. **Download & Apply Layout** performs the same verified SD transfer, then
+   saves the validated bytes to internal FFat and applies the layout immediately.
+   If the internal write fails, the downloaded SD copy remains available for
+   retry with Import layout from SD; the previous active layout is retained.
+
+HTTPS verifies the server certificate and hostname with the SDK's trusted CA
+bundle (requires an accurate clock); HTTP is supported for trusted local
+servers but is unencrypted. Redirects are rejected: use the final direct URL.
+Only HTTP 200 and complete, nonempty bodies up to 4096 bytes are accepted
+(content length or chunked framing required). The worker uses a five-second
+socket timeout and checks a 20-second deadline between network operations.
+No network request occurs on boot, and there are no scheduled downloads.
+Other layout actions are disabled during a transfer. The existing radio
+manager serializes downloads with other managed network services; a busy
+radio or unavailable SD results in a visible retry message.
+
+The desktop simulator exercises the same URL storage, validation, transfer and
+application code with a synthetic HTTP response (`home.power=timer` by default).
+It does not make real web requests. Regression tests inject invalid, oversized,
+incomplete and failed responses.
 
 ```ini
 home.swipe_left = time

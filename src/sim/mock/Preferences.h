@@ -11,6 +11,8 @@ class Preferences {
 public:
     bool begin(const char* name,bool ro=false){ns=name;readonly=ro;return true;}
     void end(){ns.clear();readonly=true;}
+    String getString(const char* key,const char* fallback="")const{auto it=values.find(ns+"/"+key);return it==values.end()?String(fallback):String(it->second);}
+    bool remove(const char* key){return !readonly&&values.erase(ns+"/"+key)>0;}
     bool getBool(const char* key,bool fallback=false)const{
         auto it=values.find(ns+"/"+key);return it==values.end()?fallback:it->second=="1";
     }

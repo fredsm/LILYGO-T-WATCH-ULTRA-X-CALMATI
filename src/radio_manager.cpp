@@ -104,6 +104,7 @@ const char* radio_job_name(RadioJob job){
         case RadioJob::TimeSync:return "Time sync";
         case RadioJob::Adsb:return "Aircraft";
         case RadioJob::Voice:return "Voice";
+        case RadioJob::Layout:return "Layout download";
         default:return "Idle";
     }
 }

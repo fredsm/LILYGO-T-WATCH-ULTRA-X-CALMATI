@@ -25,3 +25,6 @@ void settings_screen_apply_sd_state();
 
 int settings_get_brightness();
 void settings_set_brightness(int level);
+
+// UI-owned completion service, called even when Settings is not active.
+void settings_layout_remote_tick();

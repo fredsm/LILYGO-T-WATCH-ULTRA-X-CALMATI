@@ -79,19 +79,19 @@ template<class FS> bool stage(FS& fs,const char* path,const char* data,size_t le
     return read_text(fs,path,verify)==ReadResult::Loaded&&verify.size==len&&
         memcmp(verify.data,data,len)==0;
 }
-bool mount_flash(bool initialize=false){
+bool mount_flash(LayoutStatus& state,bool initialize=false){
     // No automatic format. Only the explicit Settings confirmation may request it.
-    status.flash_ready=FFat.begin(initialize,"/fs");
-    return status.flash_ready;
+    state.flash_ready=FFat.begin(initialize,"/fs");
+    return state.flash_ready;
 }
 bool settings_dir(){
     return FFat.exists("/Settings")||FFat.mkdir("/Settings");
 }
-bool persist(const char* text,size_t size){
+bool persist(const char* text,size_t size,LayoutStatus& state){
     if(!settings_dir()||!stage(FFat,temp_path,text,size))return false;
     LayoutConfig previous;Text old;
     const bool primary_valid=read_valid(FFat,LAYOUT_PATH,old,previous)==ReadResult::Loaded;
-    if(status.source==LayoutSource::Internal&&!primary_valid)return false;
+    if(state.source==LayoutSource::Internal&&!primary_valid)return false;
     if(primary_valid){
         // Preserve the last known good file across a failed rename or power loss.
         if(!remove_if_present(FFat,backup_path)||!FFat.rename(LAYOUT_PATH,backup_path))return false;
@@ -100,7 +100,7 @@ bool persist(const char* text,size_t size){
     }
     if(!FFat.rename(temp_path,LAYOUT_PATH)){
         if(primary_valid&&!FFat.exists(LAYOUT_PATH)&&!FFat.rename(backup_path,LAYOUT_PATH))
-            status.source=LayoutSource::Backup;
+            state.source=LayoutSource::Backup;
         return false;
     }
     return true;
@@ -130,7 +130,7 @@ const LayoutConfig& layout_config(){return current;}
 LayoutStatus layout_status(){return status;}
 void layout_load(){
     current=layout_defaults();status={LayoutSource::Embedded,false,false};
-    if(!mount_flash())return;
+    if(!mount_flash(status))return;
     Text primary;
     const auto result=read_valid(FFat,LAYOUT_PATH,primary,current);
     if(result==ReadResult::Loaded){status.source=LayoutSource::Internal;return;}
@@ -148,10 +148,36 @@ LayoutResult layout_save_text(const char* text,size_t length){
     const bool valid=layout_parse(copy,length,parsed);
     free(copy);
     if(!valid)return LayoutResult::InvalidFile;
-    if(!mount_flash())return LayoutResult::FlashUnavailable;
-    if(!persist(text,length))return LayoutResult::WriteFailed;
+    if(!mount_flash(status))return LayoutResult::FlashUnavailable;
+    if(!persist(text,length,status))return LayoutResult::WriteFailed;
     current=parsed;status={LayoutSource::Internal,true,false};apply();
     return LayoutResult::Ok;
+}
+// Worker-only transaction. The caller reserves the layout manager until the
+// result is consumed by the UI. Never touches current or LVGL from this task.
+LayoutResult layout_store_download(const char* text,size_t length,bool activate,
+                                   LayoutStatus& state,LayoutConfig& parsed){
+    if(!text||!length||length>LAYOUT_MAX_BYTES||memchr(text,0,length))return LayoutResult::InvalidFile;
+    auto* copy=static_cast<char*>(storage_allocate(length+1));
+    if(!copy)return LayoutResult::WriteFailed;
+    memcpy(copy,text,length);copy[length]=0;
+    const bool valid=layout_parse(copy,length,parsed);
+    free(copy);
+    if(!valid)return LayoutResult::InvalidFile;
+    StorageAccess access;
+    if(!access)return LayoutResult::NoSd;
+    if(!export_file(LAYOUT_PATH,"/Settings/layout_export.tmp","/Settings/layout_export.bak",text,length))
+        return LayoutResult::WriteFailed;
+    if(!activate)return LayoutResult::Ok;
+    if(!mount_flash(state))return LayoutResult::FlashUnavailable;
+    if(!persist(text,length,state))return LayoutResult::FlashWriteFailed;
+    state={LayoutSource::Internal,true,false};
+    return LayoutResult::Ok;
+}
+void layout_finish_download(LayoutResult result,bool activate,const LayoutStatus& state,const LayoutConfig& parsed){
+    if(!activate)return;
+    status=state;
+    if(result==LayoutResult::Ok){current=parsed;apply();}
 }
 LayoutResult layout_import_sd(){
     StorageAccess access;
@@ -168,7 +194,7 @@ LayoutResult layout_export_sd(bool defaults){
     size_t len=0;const char* data=layout_embedded_data(len);
     Text active;
     if(!defaults&&status.source!=LayoutSource::Embedded){
-        if(!mount_flash())return LayoutResult::FlashUnavailable;
+        if(!mount_flash(status))return LayoutResult::FlashUnavailable;
         LayoutConfig parsed;
         const char* path=status.source==LayoutSource::Backup?backup_path:LAYOUT_PATH;
         if(read_valid(FFat,path,active,parsed)!=ReadResult::Loaded)return LayoutResult::InvalidFile;
@@ -180,7 +206,7 @@ LayoutResult layout_export_sd(bool defaults){
     return ok?LayoutResult::Ok:LayoutResult::WriteFailed;
 }
 LayoutResult layout_restore_defaults(){
-    if(!mount_flash())return LayoutResult::FlashUnavailable;
+    if(!mount_flash(status))return LayoutResult::FlashUnavailable;
     // Remove only files owned by the layout manager, never the filesystem.
     if(!remove_if_present(FFat,temp_path)||!remove_if_present(FFat,backup_path)||
        !remove_if_present(FFat,LAYOUT_PATH))return LayoutResult::WriteFailed;
@@ -188,7 +214,7 @@ LayoutResult layout_restore_defaults(){
     return LayoutResult::Ok;
 }
 bool layout_initialize_flash(){
-    if(!mount_flash()&&!mount_flash(true))return false;
+    if(!mount_flash(status)&&!mount_flash(status,true))return false;
     layout_load();apply();return status.flash_ready;
 }
 const char* layout_result_message(LayoutResult result){
@@ -199,6 +225,7 @@ const char* layout_result_message(LayoutResult result){
         case LayoutResult::InvalidFile:return "Invalid layout; unchanged";
         case LayoutResult::FlashUnavailable:return "Internal storage unavailable";
         case LayoutResult::WriteFailed:return "Write failed; check storage";
+        case LayoutResult::FlashWriteFailed:return "Internal write failed";
     }
     return "Unknown error";
 }

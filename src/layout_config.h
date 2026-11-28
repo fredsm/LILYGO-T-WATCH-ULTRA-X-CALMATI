@@ -9,7 +9,7 @@ constexpr size_t LAYOUT_MAX_BYTES=4096;
 enum class HomeInput:uint8_t { SwipeLeft, SwipeRight, SwipeUp, SwipeDown, Back, Power, Count };
 enum class LayoutSource:uint8_t { Embedded, Internal, Backup };
 struct LayoutStatus { LayoutSource source; bool flash_ready, invalid_internal; };
-enum class LayoutResult:uint8_t { Ok, NoSd, MissingFile, InvalidFile, FlashUnavailable, WriteFailed };
+enum class LayoutResult:uint8_t { Ok, NoSd, MissingFile, InvalidFile, FlashUnavailable, WriteFailed, FlashWriteFailed };
 
 enum class HomeTarget:uint8_t {
     None, Time, Meshtastic, Tools, QuickControls, Settings, Gps, LoRa,
@@ -43,4 +43,8 @@ LayoutResult layout_restore_defaults();
 bool layout_initialize_flash(); // explicit destructive confirmation required by UI
 const char* layout_result_message(LayoutResult result);
 
+// Remote worker stages SD and optionally persists FFat using a private state
+// snapshot; only the UI owner publishes the resulting config.
+LayoutResult layout_store_download(const char*,size_t,bool,LayoutStatus&,LayoutConfig&);
+void layout_finish_download(LayoutResult,bool,const LayoutStatus&,const LayoutConfig&);
 void layout_open_home(HomeInput input);

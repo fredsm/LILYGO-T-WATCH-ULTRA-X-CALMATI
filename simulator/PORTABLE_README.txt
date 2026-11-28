@@ -85,3 +85,7 @@ On the real watch, Settings > Layout Manager can export the current or default
 layout to SD, then import /Settings/layout.txt after it is edited on a PC.
 SD is never used as an active layout source. The internal layout falls back to
 its last valid backup, then to the embedded firmware default.
+
+Layout Manager also supports a saved Layout Source URL and Download / Download
+& Apply actions. Connect the simulated Wi-Fi first. Remote responses are
+synthetic (default: home.power=timer), not real network requests.

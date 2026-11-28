@@ -26,6 +26,7 @@
 #include "screenshot.h"
 #include "tools_screen.h"
 #include "layout_config.h"
+#include "layout_remote.h"
 #include "camera_screen.h"
 #include "deauther_screen.h"
 #include "arp_mitm_screen.h"
@@ -1413,6 +1414,7 @@ void setup()
     storage_init(instance.isCardReady());
     storage_bind_lvgl();
     layout_load();
+    layout_remote_load();
     usb_sd_init();
 
     // Load the saved APRS callsign from the SD card (if present).
@@ -1945,6 +1947,7 @@ void loop()
     DIAG_RUN(HardwareEvents, instance.loop()); // required for power button and PMU event dispatch
     DIAG_RUN(Power, power_tick(millis(), false)); // process the hold first, inactivity after touch/Back
     if (power_shutting_down()) { delay(5); return; }
+    settings_layout_remote_tick();
     DIAG_RUN(Alarm, alarm_service_audio()); // PMU rail cleanup on UI, not I2S worker
     diagnostics_ui_handler(); // UI heartbeat before legacy background calls
     if (!pin_lock_active()) stealth_poll();   // 4 s long-press disarms the duress disguise

@@ -1,5 +1,6 @@
 #include "settings_screen.h"
 #include "layout_config.h"
+#include "layout_remote.h"
 #include "usb_sd.h"
 #include "power_manager.h"
 #include <LilyGoLib.h>
@@ -411,7 +412,13 @@ namespace {
 lv_obj_t* layout_section=nullptr;
 lv_obj_t* layout_message=nullptr;
 lv_obj_t* layout_init_button=nullptr;
-enum class LayoutAction { Import, Export, ExportDefault, Restore, Initialize };
+lv_obj_t* url_editor=nullptr;
+lv_obj_t* url_field=nullptr;
+lv_obj_t* url_error=nullptr;
+lv_obj_t* url_indicator=nullptr;
+lv_obj_t* layout_buttons[8]{};
+unsigned layout_button_count=0;
+enum class LayoutAction { Import, Export, ExportDefault, Restore, Initialize, EditUrl, Download, DownloadApply };
 LayoutAction confirm_action=LayoutAction::Import;
 bool confirm_pending=false;
 uint32_t confirm_at=0;
@@ -424,10 +431,31 @@ void layout_refresh_status(const char* detail=nullptr){
         detail?"\n":"",detail?detail:"");
     if(state.flash_ready)lv_obj_add_flag(layout_init_button,LV_OBJ_FLAG_HIDDEN);
     else lv_obj_clear_flag(layout_init_button,LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_height(layout_section,state.flash_ready?322:374);
+    lv_obj_set_height(layout_section,state.flash_ready?510:562);
+    for(unsigned i=0;i<layout_button_count;i++){
+        if(layout_remote_busy())lv_obj_add_state(layout_buttons[i],LV_STATE_DISABLED);
+        else lv_obj_clear_state(layout_buttons[i],LV_STATE_DISABLED);
+    }
+    lv_label_set_text(url_indicator,*layout_remote_url()?
+        (strncmp(layout_remote_url(),"https://",8)==0?"HTTPS source saved":"HTTP source saved (unencrypted)"):"No source URL saved");
 }
 void layout_action_cb(lv_event_t* e){
     const auto action=static_cast<LayoutAction>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(e)));
+    if(layout_remote_busy())return;
+    if(action==LayoutAction::EditUrl){
+        confirm_pending=false;
+        lv_textarea_set_text(url_field,layout_remote_url());
+        lv_label_set_text(url_error,"HTTPS recommended. HTTP is unencrypted.");
+        lv_obj_clear_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(url_editor);
+        return;
+    }
+    if(action==LayoutAction::Download||action==LayoutAction::DownloadApply){
+        confirm_pending=false;
+        layout_remote_start(action==LayoutAction::DownloadApply);
+        layout_refresh_status(layout_remote_message());
+        return;
+    }
     if(action==LayoutAction::Restore||action==LayoutAction::Initialize){
         const uint32_t now=lv_tick_get();
         if(!confirm_pending||confirm_action!=action||uint32_t(now-confirm_at)>15000){
@@ -448,6 +476,7 @@ void layout_action_cb(lv_event_t* e){
         case LayoutAction::Initialize:
             result=layout_initialize_flash()?LayoutResult::Ok:LayoutResult::FlashUnavailable;
             success="Internal storage ready";break;
+        default:return;
     }
     layout_refresh_status(result==LayoutResult::Ok?success:layout_result_message(result));
 }
@@ -462,11 +491,61 @@ lv_obj_t* layout_button(const char* name,int y,LayoutAction action){
     lv_obj_center(label);
     lv_obj_add_event_cb(button,layout_action_cb,LV_EVENT_CLICKED,
         reinterpret_cast<void*>(static_cast<uintptr_t>(action)));
+    layout_buttons[layout_button_count++]=button;
     return button;
+}
+void url_save_cb(lv_event_t*){
+    const char* text=lv_textarea_get_text(url_field);
+    if(*text&&!layout_remote_valid_url(text)){
+        lv_label_set_text(url_error,"Enter a valid HTTP or HTTPS URL.");return;
+    }
+    if(!layout_remote_set_url(text)){
+        lv_label_set_text(url_error,"Unable to save URL.");return;
+    }
+    lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
+    layout_refresh_status("Source URL saved");
+}
+void url_cancel_cb(lv_event_t*){
+    lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
+}
+void create_url_editor(){
+    // On-screen modal belongs to Settings, never the global top layer.
+    url_editor=lv_obj_create(settings_screen);
+    lv_obj_set_size(url_editor,410,502);
+    lv_obj_add_flag(url_editor,LV_OBJ_FLAG_FLOATING);
+    lv_obj_clear_flag(url_editor,LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(url_editor,LV_ALIGN_TOP_MID,0,0);
+    lv_obj_set_style_bg_color(url_editor,lv_color_hex(0x101a18),0);
+    lv_obj_set_style_pad_all(url_editor,6,0);
+    auto* title=lv_label_create(url_editor);lv_label_set_text(title,"Layout Source URL");
+    lv_obj_set_style_text_font(title,&lv_font_montserrat_20,0);
+    lv_obj_align(title,LV_ALIGN_TOP_MID,0,8);
+    url_field=lv_textarea_create(url_editor);
+    lv_obj_set_size(url_field,380,80);
+    lv_obj_align(url_field,LV_ALIGN_TOP_MID,0,42);
+    lv_textarea_set_max_length(url_field,LAYOUT_URL_MAX);
+    lv_textarea_set_placeholder_text(url_field,"https://server/layout.txt");
+    url_error=lv_label_create(url_editor);
+    lv_obj_set_width(url_error,380);
+    lv_label_set_long_mode(url_error,LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(url_error,&lv_font_montserrat_14,0);
+    lv_obj_align(url_error,LV_ALIGN_TOP_MID,0,130);
+    for(int i=0;i<2;i++){
+        auto* btn=lv_button_create(url_editor);lv_obj_set_size(btn,170,40);
+        lv_obj_align(btn,LV_ALIGN_TOP_MID,i?95:-95,175);
+        auto* label=lv_label_create(btn);lv_label_set_text(label,i?"Cancel":"Save URL");lv_obj_center(label);
+        lv_obj_add_event_cb(btn,i?url_cancel_cb:url_save_cb,LV_EVENT_CLICKED,nullptr);
+    }
+    auto* kb=lv_keyboard_create(url_editor);lv_obj_set_size(kb,395,245);
+    lv_obj_align(kb,LV_ALIGN_BOTTOM_MID,0,0);lv_keyboard_set_textarea(kb,url_field);
+    lv_obj_add_event_cb(kb,url_save_cb,LV_EVENT_READY,nullptr);
+    lv_obj_add_event_cb(kb,url_cancel_cb,LV_EVENT_CANCEL,nullptr);
+    lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(settings_screen,[](lv_event_t*){lv_obj_add_flag(url_editor,LV_OBJ_FLAG_HIDDEN);},LV_EVENT_SCREEN_UNLOADED,nullptr);
 }
 void create_layout_manager(){
     layout_section=lv_obj_create(settings_screen);
-    lv_obj_set_size(layout_section,380,374);
+    lv_obj_set_size(layout_section,380,562);
     lv_obj_set_style_bg_color(layout_section,lv_color_hex(0x101a18),0);
     lv_obj_set_style_border_color(layout_section,lv_color_hex(0x225548),0);
     lv_obj_set_style_pad_all(layout_section,6,0);
@@ -488,8 +567,15 @@ void create_layout_manager(){
     layout_button("Export current layout to SD",154,LayoutAction::Export);
     layout_button("Export default layout to SD",206,LayoutAction::ExportDefault);
     layout_button("Restore default layout",258,LayoutAction::Restore);
-    layout_init_button=layout_button("Initialize internal storage",310,LayoutAction::Initialize);
+    layout_button("Layout Source URL",310,LayoutAction::EditUrl);
+    url_indicator=lv_label_create(layout_section);
+    lv_obj_set_style_text_font(url_indicator,&lv_font_montserrat_14,0);
+    lv_obj_align(url_indicator,LV_ALIGN_TOP_MID,0,354);
+    layout_button("Download layout to SD",378,LayoutAction::Download);
+    layout_button("Download & Apply Layout",430,LayoutAction::DownloadApply);
+    layout_init_button=layout_button("Initialize internal storage",482,LayoutAction::Initialize);
     layout_refresh_status();
+    create_url_editor();
 }
 }
 void settings_screen_create()
@@ -1125,7 +1211,7 @@ void settings_screen_show()
     main_loop_request_lvgl_priority(12);
     refresh_cpu_selection();
     confirm_pending=false;
-    layout_refresh_status();
+    layout_refresh_status(layout_remote_result()==LayoutRemoteResult::Idle?nullptr:layout_remote_message());
     // Refresh percentage label to match current slider position
     int pct = (int)s_brightness * 100 / (int)DEVICE_MAX_BRIGHTNESS_LEVEL;
     lv_label_set_text_fmt(brightness_val_label, "%d%%", pct);
@@ -1341,4 +1427,11 @@ void settings_set_brightness(int level){
     lv_slider_set_value(brightness_slider, level, LV_ANIM_OFF);
     on_brightness_changed(nullptr);
     settings_save_to_sd();
+}
+
+void settings_layout_remote_tick(){
+#ifdef TWATCH_SIMULATOR
+    layout_remote_sim_pump();
+#endif
+    if(layout_remote_poll()&&layout_section)layout_refresh_status(layout_remote_message());
 }
